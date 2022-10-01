@@ -22,21 +22,20 @@
 
 #include <gtest/gtest.h>
 
-#include "libmscore/masterscore.h"
 #include "libmscore/engravingitem.h"
 #include "libmscore/factory.h"
+#include "libmscore/masterscore.h"
 
 #include "utils/scorerw.h"
 #include "engraving/compat/scoreaccess.h"
 
 using namespace mu::engraving;
-using namespace Ms;
 
-class ElementTests : public ::testing::Test
+class Engraving_ElementTests : public ::testing::Test
 {
 };
 
-TEST_F(ElementTests, DISABLED_testIds)
+TEST_F(Engraving_ElementTests, DISABLED_testIds)
 {
     ElementType ids[] = {
         ElementType::VOLTA,
@@ -60,6 +59,7 @@ TEST_F(ElementTests, DISABLED_testIds)
         ElementType::TEXT,
         ElementType::INSTRUMENT_NAME,
         ElementType::STAFF_TEXT,
+        ElementType::PLAYTECH_ANNOTATION,
         ElementType::REHEARSAL_MARK,
         ElementType::INSTRUMENT_CHANGE,
         ElementType::NOTEHEAD,

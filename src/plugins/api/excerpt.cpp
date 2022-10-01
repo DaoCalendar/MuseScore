@@ -24,7 +24,7 @@
 #include "score.h"
 #include "libmscore/masterscore.h"
 
-namespace Ms {
+namespace mu::engraving {
 namespace PluginAPI {
 //---------------------------------------------------------
 //   Excerpt::partScore
@@ -32,7 +32,7 @@ namespace PluginAPI {
 
 Score* Excerpt::partScore()
 {
-    return wrap<Score>(e->partScore(), Ownership::SCORE);
+    return wrap<Score>(e->excerptScore(), Ownership::SCORE);
 }
 
 //---------------------------------------------------------
@@ -40,7 +40,7 @@ Score* Excerpt::partScore()
 ///   \cond PLUGIN_API \private \endcond
 //---------------------------------------------------------
 
-Excerpt* excerptWrap(Ms::Excerpt* e)
+Excerpt* excerptWrap(mu::engraving::Excerpt* e)
 {
     return excerptWrap<Excerpt>(e);
 }

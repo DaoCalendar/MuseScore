@@ -22,9 +22,10 @@
 
 #include "transposedialog.h"
 
-#include "framework/global/widgetstatestore.h"
+#include "ui/view/widgetstatestore.h"
 
 using namespace mu::notation;
+using namespace mu::ui;
 
 //---------------------------------------------------------
 //   TransposeDialog
@@ -57,6 +58,9 @@ TransposeDialog::TransposeDialog(QWidget* parent)
     connect(this, &TransposeDialog::accepted, this, &TransposeDialog::apply);
 
     WidgetStateStore::restoreGeometry(this);
+
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 TransposeDialog::TransposeDialog(const TransposeDialog& dialog)
@@ -188,8 +192,8 @@ void TransposeDialog::apply()
 
 Key TransposeDialog::firstPitchedStaffKey() const
 {
-    int startStaffIdx = 0;
-    int endStaffIdx   = 0;
+    mu::engraving::staff_idx_t startStaffIdx = 0;
+    mu::engraving::staff_idx_t endStaffIdx   = 0;
     Fraction startTick = Fraction(0, 1);
     INotationSelectionRangePtr range = selection()->range();
 
@@ -202,7 +206,7 @@ Key TransposeDialog::firstPitchedStaffKey() const
     Key key = Key::C;
 
     for (const Part* part : notation()->parts()->partList()) {
-        for (const Staff* staff : *part->staves()) {
+        for (const Staff* staff : part->staves()) {
             if (staff->idx() < startStaffIdx || staff->idx() > endStaffIdx) {
                 continue;
             }
@@ -215,7 +219,7 @@ Key TransposeDialog::firstPitchedStaffKey() const
                     int diff = staff->part()->instrument(startTick)->transpose().chromatic;
 
                     if (diff) {
-                        key = Ms::transposeKey(key, diff, staff->part()->preferSharpFlat());
+                        key = mu::engraving::transposeKey(key, diff, staff->part()->preferSharpFlat());
                     }
                 }
 

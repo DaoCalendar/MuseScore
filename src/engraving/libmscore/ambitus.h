@@ -24,23 +24,26 @@
 #define __AMBITUS_H__
 
 #include "engravingitem.h"
-#include "note.h"
-#include "accidental.h"
+
+#include "pitchspelling.h"
+
+#include "types/types.h"
 
 namespace mu::engraving {
+class Accidental;
 class Factory;
-}
 
-namespace Ms {
 //---------------------------------------------------------
 //   @@ Ambitus
 //---------------------------------------------------------
 
 class Ambitus final : public EngravingItem
 {
-    NoteHead::Group _noteHeadGroup;
-    NoteHead::Type _noteHeadType;
-    MScore::DirectionH _dir;
+    OBJECT_ALLOCATOR(engraving, Ambitus)
+
+    NoteHeadGroup _noteHeadGroup;
+    NoteHeadType _noteHeadType;
+    DirectionH _dir;
     bool _hasLine;
     Spatium _lineWidth;
     Accidental* _topAccid = nullptr;
@@ -53,8 +56,9 @@ class Ambitus final : public EngravingItem
     mu::PointF _bottomPos;    // position of bottom note symbol
     mu::LineF _line;          // the drawn line
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
     Ambitus(Segment* parent);
+    Ambitus(const Ambitus& a);
 
     void normalize();
 
@@ -65,17 +69,16 @@ public:
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
 
-    qreal mag() const override;
+    double mag() const override;
 
     void initFrom(Ambitus* a);
 
     // getters and setters
-    NoteHead::Group noteHeadGroup() const { return _noteHeadGroup; }
-    NoteHead::Type noteHeadType() const { return _noteHeadType; }
-    MScore::DirectionH direction() const { return _dir; }
+    NoteHeadGroup noteHeadGroup() const { return _noteHeadGroup; }
+    NoteHeadType noteHeadType() const { return _noteHeadType; }
+    DirectionH direction() const { return _dir; }
     bool hasLine() const { return _hasLine; }
     Spatium lineWidth() const { return _lineWidth; }
     int topOctave() const { return (_topPitch / 12) - 1; }
@@ -85,9 +88,9 @@ public:
     int topTpc() const { return _topTpc; }
     int bottomTpc() const { return _bottomTpc; }
 
-    void setNoteHeadGroup(NoteHead::Group val) { _noteHeadGroup = val; }
-    void setNoteHeadType(NoteHead::Type val) { _noteHeadType  = val; }
-    void setDirection(MScore::DirectionH val) { _dir = val; }
+    void setNoteHeadGroup(NoteHeadGroup val) { _noteHeadGroup = val; }
+    void setNoteHeadType(NoteHeadType val) { _noteHeadType  = val; }
+    void setDirection(DirectionH val) { _dir = val; }
     void setHasLine(bool val) { _hasLine = val; }
     void setLineWidth(Spatium val) { _lineWidth = val; }
     void setTopPitch(int val);
@@ -96,9 +99,9 @@ public:
     void setBottomTpc(int val);
 
     // some utility functions
-    Segment* segment() const { return (Segment*)parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
     SymId noteHead() const;
-    qreal headWidth() const;
+    double headWidth() const;
 
     // re-implemented virtual functions
     void      draw(mu::draw::Painter* painter) const override;
@@ -106,15 +109,17 @@ public:
     mu::PointF pagePos() const override;        ///< position in page coordinates
     void      read(XmlReader&) override;
     void      scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
-    void      setTrack(int val) override;
+    void      setTrack(track_idx_t val) override;
     void      write(XmlWriter&) const override;
     bool      readProperties(XmlReader&) override;
-    QString   accessibleInfo() const override;
+    String    accessibleInfo() const override;
+
+    void remove(EngravingItem*) override;
 
     // properties
-    QVariant getProperty(Pid) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
     EngravingItem* nextSegmentElement() override;
     EngravingItem* prevSegmentElement() override;
@@ -130,5 +135,6 @@ private:
 
     Ranges estimateRanges() const;                // scan staff up to next section break and update range pitches
 };
-}     // namespace Ms
+} // namespace mu::engraving
+
 #endif

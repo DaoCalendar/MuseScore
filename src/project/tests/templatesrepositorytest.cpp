@@ -26,7 +26,10 @@
 
 #include "notation/tests/mocks/msczreadermock.h"
 #include "mocks/projectconfigurationmock.h"
-#include "system/tests/mocks/filesystemmock.h"
+#include "global/tests/mocks/filesystemmock.h"
+
+#include <QJsonDocument>
+#include <QJsonArray>
 
 using ::testing::_;
 using ::testing::Return;
@@ -34,9 +37,9 @@ using ::testing::Return;
 using namespace mu;
 using namespace mu::project;
 using namespace mu::notation;
-using namespace mu::system;
+using namespace mu::io;
 
-class TemplatesRepositoryTest : public ::testing::Test
+class Project_TemplatesRepositoryTest : public ::testing::Test
 {
 protected:
     void SetUp() override
@@ -51,15 +54,32 @@ protected:
         m_repository->setfileSystem(m_fileSystem);
     }
 
-    ProjectMeta createMeta(const io::path& path) const
+    QVariantMap buildCategory(const QString& title, const QStringList& files) const
     {
-        ProjectMeta meta;
+        QVariantMap obj;
+        obj["title"] = title;
+        obj["files"] = files;
 
-        meta.title = path.toQString();
-        meta.filePath = path;
-        meta.creationDate = QDate::currentDate();
+        return obj;
+    }
 
-        return meta;
+    Template buildTemplate(const QString& categoryTitle, const io::path_t& path) const
+    {
+        Template templ;
+        templ.categoryTitle = categoryTitle;
+        templ.meta.title = path.toQString();
+        templ.meta.filePath = path;
+        templ.meta.creationDate = QDate::currentDate();
+
+        return templ;
+    }
+
+    QByteArray categoriesToJson(const QVariantList& categories) const
+    {
+        QJsonDocument document;
+        document.setArray(QJsonArray::fromVariantList(categories));
+
+        return document.toJson();
     }
 
     std::shared_ptr<TemplatesRepository> m_repository;
@@ -69,58 +89,94 @@ protected:
 };
 
 namespace mu::project {
-bool operator==(const Template& templ1, const Template& templ2)
+inline bool operator==(const Template& templ1, const Template& templ2)
 {
     bool equals = true;
 
-    equals &= (templ1.title == templ2.title);
+    equals &= (templ1.meta.title == templ1.meta.title);
     equals &= (templ1.categoryTitle == templ2.categoryTitle);
-    equals &= (templ1.creationDate == templ2.creationDate);
+    equals &= (templ1.meta.creationDate == templ2.meta.creationDate);
 
     return equals;
 }
 }
 
-TEST_F(TemplatesRepositoryTest, Templates)
+TEST_F(Project_TemplatesRepositoryTest, Templates)
 {
-    // [GIVEN] All paths to templates dirs
-    io::paths templatesDirPaths {
-        "/path/to/templates",
-        "/path/to/user/templates"
-        "/extensions/templates"
+    // [GIVEN] All template dirs
+    io::paths_t templateDirs {
+        "/path/to/standard/templates",
+        "/path/to/user/templates",
+        "/path/to/user/templates/without/categories_json"
     };
 
-    EXPECT_CALL(*m_configuration, availableTemplatesPaths())
-    .WillOnce(Return(templatesDirPaths));
+    io::path_t otherUserTemplatesDir = templateDirs[2];
 
-    // [GIVEN] All paths to mscz files
-    io::paths allPathsToMsczFiles;
+    ON_CALL(*m_configuration, availableTemplateDirs())
+    .WillByDefault(Return(templateDirs));
 
-    for (size_t i = 0; i < templatesDirPaths.size(); ++i) {
-        io::path dirPath = templatesDirPaths[i];
-        io::path filePath = dirPath + QString("/file%1.mscz").arg(i);
-        allPathsToMsczFiles.push_back(filePath);
+    // [GIVEN] All files with categories
+    io::paths_t categoriesJsonPaths {
+        "/path/to/standard/templates/categories.json",
+        "/path/to/user/templates/categories.json"
+    };
 
-        QStringList filters = { "*.mscz", "*.mscx" };
+    for (size_t i = 0; i < templateDirs.size(); ++i) {
+        if (i < categoriesJsonPaths.size()) {
+            ON_CALL(*m_configuration, templateCategoriesJsonPath(templateDirs[i]))
+            .WillByDefault(Return(categoriesJsonPaths[i]));
 
-        RetVal<io::paths> result = RetVal<io::paths>::make_ok(io::paths { filePath });
-        ON_CALL(*m_fileSystem, scanFiles(dirPath, filters, IFileSystem::ScanMode::IncludeSubdirs))
-        .WillByDefault(Return(result));
+            ON_CALL(*m_fileSystem, exists(categoriesJsonPaths[i]))
+            .WillByDefault(Return(Ret(true)));
+        }
     }
 
-    // [GIVEN] Templates meta
-    Templates expectedTemplates;
+    // [GIVEN] One dir has no categories.json file
+    ON_CALL(*m_fileSystem, exists(otherUserTemplatesDir))
+    .WillByDefault(Return(Ret(false)));
 
-    for (const io::path& path: allPathsToMsczFiles) {
-        RetVal<ProjectMeta> meta(make_ret(Ret::Code::Ok));
-        meta.val = createMeta(path.toQString());
+    io::paths_t otherUserTemplates {
+        "/path/to/user/templates/without/categories_json/AAA.mscz",
+        "/path/to/user/templates/without/categories_json/BBB.mscx"
+    };
 
-        ON_CALL(*m_msczReader, readMeta(path))
-        .WillByDefault(Return(meta));
+    std::vector<std::string> filters = { "*.mscz", "*.mscx" };
+    ON_CALL(*m_fileSystem, scanFiles(otherUserTemplatesDir, filters, ScanMode::FilesInCurrentDirAndSubdirs))
+    .WillByDefault(Return(RetVal<io::paths_t>::make_ok(otherUserTemplates)));
 
-        Template templ(meta.val);
-        templ.categoryTitle = io::dirname(path).toQString();
-        expectedTemplates << templ;
+    // [GIVEN] All templates
+    QVariantList standardTemplates {
+        buildCategory("Jazz", { "Big_Band.mscx", "Jazz_Combo.mscz" }),
+        buildCategory("Solo", { "Guitar.mscx" })
+    };
+
+    ByteArray standardTemplatesJson = ByteArray::fromQByteArray(categoriesToJson(standardTemplates));
+    ON_CALL(*m_fileSystem, readFile(categoriesJsonPaths[0]))
+    .WillByDefault(Return(RetVal<ByteArray>::make_ok(standardTemplatesJson)));
+
+    QVariantList userTemplates {
+        buildCategory("Popular", { "Rock_Band.mscz" })
+    };
+
+    ByteArray userTemplatesJson = ByteArray::fromQByteArray(categoriesToJson(userTemplates));
+    ON_CALL(*m_fileSystem, readFile(categoriesJsonPaths[1]))
+    .WillByDefault(Return(RetVal<ByteArray>::make_ok(userTemplatesJson)));
+
+    // [GIVEN] Expected templates after reading
+    Templates expectedTemplates {
+        buildTemplate("Jazz", "/path/to/standard/templates/Big_Band.mscx"),
+        buildTemplate("Jazz", "/path/to/standard/templates/Jazz_Combo.mscz"),
+        buildTemplate("Solo", "/path/to/standard/templates/Guitar.mscx"),
+        buildTemplate("Popular", "/path/to/user/templates/Rock_Band.mscz")
+    };
+
+    for (const io::path_t& otherTemplatePath : otherUserTemplates) {
+        expectedTemplates << buildTemplate("My templates", otherTemplatePath);
+    }
+
+    for (const Template& templ : expectedTemplates) {
+        ON_CALL(*m_msczReader, readMeta(templ.meta.filePath))
+        .WillByDefault(Return(RetVal<ProjectMeta>::make_ok(templ.meta)));
     }
 
     // [WHEN] Get templates meta

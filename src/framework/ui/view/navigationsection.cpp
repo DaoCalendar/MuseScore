@@ -21,7 +21,8 @@
  */
 #include "navigationsection.h"
 
-#include <algorithm>
+#include <QQuickWindow>
+#include <QApplication>
 
 #include "log.h"
 
@@ -72,6 +73,13 @@ bool NavigationSection::enabled() const
         return false;
     }
 
+    QWindow* sectionWindow = window();
+    QWindow* topWindow = application()->focusWindow();
+
+    if (sectionWindow && (topWindow != sectionWindow)) {
+        return type() == INavigationSection::Type::Exclusive;
+    }
+
     bool enbl = false;
     for (INavigationPanel* p : m_panels) {
         if (p->enabled()) {
@@ -107,6 +115,11 @@ void NavigationSection::onEvent(EventPtr e)
     AbstractNavigation::onEvent(e);
 }
 
+QWindow* NavigationSection::window() const
+{
+    return AbstractNavigation::window();
+}
+
 void NavigationSection::addPanel(NavigationPanel* panel)
 {
     TRACEFUNC;
@@ -116,18 +129,9 @@ void NavigationSection::addPanel(NavigationPanel* panel)
 
     m_panels.insert(panel);
 
-    panel->activeRequested().onReceive(this, [this](INavigationPanel* panel, INavigationControl* control) {
-        m_forceActiveRequested.send(this, panel, control);
-    });
-
     if (m_panelsListChanged.isConnected()) {
         m_panelsListChanged.notify();
     }
-}
-
-SectionPanelControlChannel NavigationSection::activeRequested() const
-{
-    return m_forceActiveRequested;
 }
 
 void NavigationSection::removePanel(NavigationPanel* panel)
@@ -138,10 +142,22 @@ void NavigationSection::removePanel(NavigationPanel* panel)
     }
 
     m_panels.erase(panel);
-    panel->activeRequested().resetOnReceive(this);
 
     if (m_panelsListChanged.isConnected()) {
         m_panelsListChanged.notify();
+    }
+}
+
+void NavigationSection::setOnActiveRequested(const OnActiveRequested& func)
+{
+    m_onActiveRequested = func;
+}
+
+void NavigationSection::requestActive(INavigationPanel* panel, INavigationControl* control, bool enableHighlight,
+                                      INavigation::ActivationType activationType)
+{
+    if (m_onActiveRequested) {
+        m_onActiveRequested(this, panel, control, enableHighlight, activationType);
     }
 }
 

@@ -22,11 +22,12 @@
 
 #include "inspectorpopupcontroller.h"
 
+#include <QApplication>
+#include <QWindow>
+
 #include "uicomponents/view/popupview.h"
 
 #include "log.h"
-
-#include <QApplication>
 
 using namespace mu::inspector;
 using namespace mu::uicomponents;
@@ -43,26 +44,8 @@ InspectorPopupController::~InspectorPopupController()
 
 void InspectorPopupController::load()
 {
-    IF_ASSERT_FAILED(m_popup && m_visualControl) {
-        return;
-    }
-
-    connect(m_popup, &PopupView::isOpenedChanged, this, [this]() {
-        if (m_popup->isOpened()) {
-            qApp->installEventFilter(this);
-        } else {
-            qApp->removeEventFilter(this);
-        }
-    });
-
-    connect(m_visualControl, &QQuickItem::visibleChanged, this, [this]() {
-        if (!m_visualControl->isVisible()) {
-            closePopup();
-        }
-    });
-
-    connect(m_visualControl, &QQuickItem::enabledChanged, this, [this]() {
-        if (!m_visualControl->isEnabled()) {
+    connect(qApp, &QApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state != Qt::ApplicationActive) {
             closePopup();
         }
     });
@@ -78,13 +61,41 @@ PopupView* InspectorPopupController::popup() const
     return m_popup;
 }
 
+QQuickItem* InspectorPopupController::notationView() const
+{
+    return m_notationView;
+}
+
 void InspectorPopupController::setVisualControl(QQuickItem* control)
 {
     if (m_visualControl == control) {
         return;
     }
 
+    if (m_visualControl) {
+        m_visualControl->disconnect(this);
+    }
+
     m_visualControl = control;
+
+    if (m_visualControl) {
+        connect(m_visualControl, &QQuickItem::visibleChanged, this, [this]() {
+            if (!m_visualControl->isVisible()) {
+                closePopup();
+            }
+        });
+
+        connect(m_visualControl, &QQuickItem::enabledChanged, this, [this]() {
+            if (!m_visualControl->isEnabled()) {
+                closePopup();
+            }
+        });
+
+        connect(m_visualControl, &QQuickItem::destroyed, this, [this]() {
+            setVisualControl(nullptr);
+        });
+    }
+
     emit visualControlChanged();
 }
 
@@ -94,14 +105,50 @@ void InspectorPopupController::setPopup(PopupView* popup)
         return;
     }
 
+    if (m_popup) {
+        m_popup->disconnect(this);
+    }
+
     m_popup = popup;
+
+    if (m_popup) {
+        qApp->installEventFilter(this);
+
+        connect(m_popup, &PopupView::isOpenedChanged, this, [this]() {
+            if (m_popup && !m_popup->isOpened()) {
+                setPopup(nullptr);
+            }
+        });
+
+        connect(m_popup, &PopupView::destroyed, this, [this]() {
+            setPopup(nullptr);
+        });
+    } else {
+        qApp->removeEventFilter(this);
+    }
+
     emit popupChanged();
+}
+
+void InspectorPopupController::setNotationView(QQuickItem* notationView)
+{
+    if (m_notationView == notationView) {
+        return;
+    }
+
+    m_notationView = notationView;
+    emit notationViewChanged(m_notationView);
 }
 
 bool InspectorPopupController::eventFilter(QObject* watched, QEvent* event)
 {
-    if (event->type() == QEvent::MouseButtonPress) {
-        closePopupIfNeed(static_cast<QMouseEvent*>(event)->globalPos());
+    if ((event->type() == QEvent::FocusOut || event->type() == QEvent::MouseButtonPress)
+        && watched == popup()->window()) {
+        closePopupIfNeed(QCursor::pos());
+    } else if (event->type() == QEvent::Move && watched == mainWindow()->qWindow()) {
+        if (m_popup->isOpened()) {
+            closePopup();
+        }
     }
 
     return QObject::eventFilter(watched, event);
@@ -124,17 +171,19 @@ void InspectorPopupController::closePopupIfNeed(const QPoint& mouseGlobalPos)
         return QRect(globalPos.x(), globalPos.y(), item->width(), item->height());
     };
 
-    QRect globalAnchorItemRect = globalRect(anchorItem);
-    if (!globalAnchorItemRect.contains(mouseGlobalPos)) {
-        return;
-    }
-
     QRect globalVisualControlRect = globalRect(m_visualControl);
     QRect globalPopupContentRect = globalRect(popupContent);
 
-    if (!globalVisualControlRect.contains(mouseGlobalPos) && !globalPopupContentRect.contains(mouseGlobalPos)) {
-        closePopup();
+    if (globalVisualControlRect.contains(mouseGlobalPos) || globalPopupContentRect.contains(mouseGlobalPos)) {
+        return;
     }
+
+    QRectF globalNotationViewRect = globalRect(m_notationView);
+    if (globalNotationViewRect.contains(mouseGlobalPos)) {
+        return;
+    }
+
+    closePopup();
 }
 
 void InspectorPopupController::closePopup()

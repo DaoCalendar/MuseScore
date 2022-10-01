@@ -21,15 +21,16 @@
  */
 #include "writescorehook.h"
 
-#include "io/xml.h"
+#include "rw/xml.h"
 #include "libmscore/masterscore.h"
 #include "libmscore/excerpt.h"
 
 #include "config.h"
 
+using namespace mu::engraving;
 using namespace mu::engraving::compat;
 
-void WriteScoreHook::onWriteStyle302(Ms::Score* score, Ms::XmlWriter& xml)
+void WriteScoreHook::onWriteStyle302(Score* score, XmlWriter& xml)
 {
     bool isWriteStyle = false;
     //! NOTE Write the style to the score file if the compatibility define is set
@@ -43,16 +44,16 @@ void WriteScoreHook::onWriteStyle302(Ms::Score* score, Ms::XmlWriter& xml)
     }
 
     //! NOTE If the test mode, because the tests have not yet been adapted to the new format
-    if (Ms::MScore::testMode) {
+    if (MScore::testMode && MScore::testWriteStyleToScore) {
         isWriteStyle = true;
     }
 
     if (isWriteStyle) {
-        score->style().save(xml, true);     // save only differences to buildin style (logic from 3.)
+        score->style().save(xml, true);     // save only differences to builtin style (logic from 3.)
     }
 }
 
-void WriteScoreHook::onWriteExcerpts302(Ms::Score* score, Ms::XmlWriter& xml, bool selectionOnly)
+void WriteScoreHook::onWriteExcerpts302(Score* score, XmlWriter& xml, bool selectionOnly)
 {
     bool isWriteExcerpts = false;
     //! NOTE Write the Excerpts to the score file if the compatibility define is set
@@ -63,15 +64,15 @@ void WriteScoreHook::onWriteExcerpts302(Ms::Score* score, Ms::XmlWriter& xml, bo
     if (isWriteExcerpts) {
         if (score->isMaster()) {
             if (!selectionOnly) {
-                Ms::MasterScore* mScore = static_cast<Ms::MasterScore*>(score);
-                for (const Ms::Excerpt* excerpt : mScore->excerpts()) {
-                    if (excerpt->partScore() != score) {
-                        excerpt->partScore()->write(xml, selectionOnly, *this); // recursion write
+                MasterScore* mScore = static_cast<MasterScore*>(score);
+                for (const Excerpt* excerpt : mScore->excerpts()) {
+                    if (excerpt->excerptScore() != score) {
+                        excerpt->excerptScore()->write(xml, selectionOnly, *this); // recursion write
                     }
                 }
             }
         } else {
-            xml.tag("name", score->excerpt()->title());
+            xml.tag("name", score->excerpt()->name());
         }
     }
 }

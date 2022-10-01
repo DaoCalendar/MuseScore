@@ -34,7 +34,6 @@
 #include "libmscore/measure.h"
 #include "libmscore/segment.h"
 #include "libmscore/system.h"
-#include "libmscore/scorefont.h"
 #include "libmscore/page.h"
 #include "libmscore/staff.h"
 #include "libmscore/chordrest.h"
@@ -49,6 +48,7 @@ using namespace mu;
 using namespace mu::notation;
 using namespace mu::midi;
 using namespace mu::async;
+using namespace mu::engraving;
 
 NotationPlayback::NotationPlayback(IGetScore* getScore,
                                    async::Notification notationChanged)
@@ -59,19 +59,45 @@ NotationPlayback::NotationPlayback(IGetScore* getScore,
     });
 }
 
-Ms::Score* NotationPlayback::score() const
+mu::engraving::Score* NotationPlayback::score() const
 {
     return m_getScore->score();
 }
 
-void NotationPlayback::init()
+void NotationPlayback::init(INotationUndoStackPtr undoStack)
 {
-    IF_ASSERT_FAILED(score()) {
+    IF_ASSERT_FAILED(score() && undoStack) {
         return;
     }
 
-    QObject::connect(score(), &Ms::Score::posChanged, [this](Ms::POS pos, int tick) {
-        if (Ms::POS::CURRENT == pos) {
+    m_playbackModel.setPlayRepeats(configuration()->isPlayRepeatsEnabled());
+    m_playbackModel.setPlayChordSymbols(configuration()->isPlayChordSymbolsEnabled());
+
+    m_playbackModel.load(score());
+
+    updateTotalPlayTime();
+    m_playbackModel.dataChanged().onNotify(this, [this]() {
+        updateTotalPlayTime();
+    });
+
+    configuration()->isPlayRepeatsChanged().onNotify(this, [this]() {
+        bool expandRepeats = configuration()->isPlayRepeatsEnabled();
+        if (expandRepeats != m_playbackModel.isPlayRepeatsEnabled()) {
+            m_playbackModel.setPlayRepeats(expandRepeats);
+            m_playbackModel.reload();
+        }
+    });
+
+    configuration()->isPlayChordSymbolsChanged().onNotify(this, [this]() {
+        bool playChordSymbols = configuration()->isPlayChordSymbolsEnabled();
+        if (playChordSymbols != m_playbackModel.isPlayChordSymbolsEnabled()) {
+            m_playbackModel.setPlayChordSymbols(playChordSymbols);
+            m_playbackModel.reload();
+        }
+    });
+
+    score()->posChanged().onReceive(this, [this](mu::engraving::POS pos, int tick) {
+        if (mu::engraving::POS::CURRENT == pos) {
             m_playPositionTickChanged.send(tick);
         } else {
             updateLoopBoundaries();
@@ -79,157 +105,141 @@ void NotationPlayback::init()
     });
 }
 
+const engraving::InstrumentTrackId& NotationPlayback::metronomeTrackId() const
+{
+    return m_playbackModel.metronomeTrackId();
+}
+
+engraving::InstrumentTrackId NotationPlayback::chordSymbolsTrackId(const ID& partId) const
+{
+    return m_playbackModel.chordSymbolsTrackId(partId);
+}
+
+bool NotationPlayback::isChordSymbolsTrack(const engraving::InstrumentTrackId& trackId) const
+{
+    return m_playbackModel.isChordSymbolsTrack(trackId);
+}
+
+const mpe::PlaybackData& NotationPlayback::trackPlaybackData(const engraving::InstrumentTrackId& trackId) const
+{
+    return m_playbackModel.resolveTrackPlaybackData(trackId);
+}
+
+void NotationPlayback::triggerEventsForItems(const std::vector<const EngravingItem*>& items)
+{
+    m_playbackModel.triggerEventsForItems(items);
+}
+
+void NotationPlayback::triggerMetronome(int tick)
+{
+    m_playbackModel.triggerMetronome(tick);
+}
+
+InstrumentTrackIdSet NotationPlayback::existingTrackIdSet() const
+{
+    return m_playbackModel.existingTrackIdSet();
+}
+
+async::Channel<InstrumentTrackId> NotationPlayback::trackAdded() const
+{
+    return m_playbackModel.trackAdded();
+}
+
+async::Channel<InstrumentTrackId> NotationPlayback::trackRemoved() const
+{
+    return m_playbackModel.trackRemoved();
+}
+
 void NotationPlayback::updateLoopBoundaries()
 {
-    LoopBoundaries boundaries;
-    boundaries.loopInTick = score()->loopInTick().ticks();
-    boundaries.loopOutTick = score()->loopOutTick().ticks();
+    LoopBoundaries newBoundaries;
+    newBoundaries.loopInTick = score()->loopInTick().ticks();
+    newBoundaries.loopOutTick = score()->loopOutTick().ticks();
+    newBoundaries.visible = m_loopBoundaries.visible;
 
-    if (boundaries.isNull()) {
-        return;
-    }
-
-    boundaries.loopInRect = loopBoundaryRectByTick(LoopBoundaryType::LoopIn, boundaries.loopInTick);
-    boundaries.loopOutRect = loopBoundaryRectByTick(LoopBoundaryType::LoopOut, boundaries.loopOutTick);
-    boundaries.visible = m_loopBoundaries.val.visible;
-
-    if (m_loopBoundaries.val != boundaries) {
-        m_loopBoundaries.set(boundaries);
+    if (m_loopBoundaries != newBoundaries) {
+        m_loopBoundaries = newBoundaries;
+        m_loopBoundariesChanged.notify();
     }
 }
 
-audio::msecs_t NotationPlayback::totalPlayTime() const
+void NotationPlayback::updateTotalPlayTime()
 {
-    Ms::Score* score = m_getScore->score();
+    const mu::engraving::Score* score = m_getScore->score();
     if (!score) {
-        return 0;
+        return;
     }
 
     int lastTick = score->repeatList().ticks();
     qreal secs = score->utick2utime(lastTick);
 
-    return secs * 1000.f;
+    audio::msecs_t newPlayTime = secs * 1000.f;
+
+    if (m_totalPlayTime == newPlayTime) {
+        return;
+    }
+
+    m_totalPlayTime = newPlayTime;
+    m_totalPlayTimeChanged.send(m_totalPlayTime);
 }
 
-float NotationPlayback::tickToSec(tick_t tick) const
+audio::msecs_t NotationPlayback::totalPlayTime() const
+{
+    return m_totalPlayTime;
+}
+
+async::Channel<audio::msecs_t> NotationPlayback::totalPlayTimeChanged() const
+{
+    return m_totalPlayTimeChanged;
+}
+
+float NotationPlayback::playedTickToSec(tick_t tick) const
 {
     return score() ? score()->utick2utime(tick) : 0.0;
 }
 
-tick_t NotationPlayback::secToTick(float sec) const
-{
-    return score() ? score()->utime2utick(sec) : 0;
-}
-
-//! NOTE Copied from ScoreView::moveCursor(const Fraction& tick)
-QRect NotationPlayback::playbackCursorRectByTick(tick_t _tick) const
+tick_t NotationPlayback::secToPlayedTick(float sec) const
 {
     if (!score()) {
-        return QRect();
+        return 0;
     }
 
-    Fraction tick = Fraction::fromTicks(_tick);
+    return score()->utime2utick(sec);
+}
 
-    Measure* measure = score()->tick2measureMM(tick);
-    if (!measure) {
-        return QRect();
+tick_t NotationPlayback::secToTick(float sec) const
+{
+    if (!score()) {
+        return 0;
     }
 
-    Ms::System* system = measure->system();
-    if (!system) {
-        return QRect();
+    tick_t utick = secToPlayedTick(sec);
+
+    return score()->repeatList().utick2tick(utick);
+}
+
+RetVal<midi::tick_t> NotationPlayback::playPositionTickByRawTick(midi::tick_t tick) const
+{
+    if (!score()) {
+        return make_ret(Err::Undefined);
     }
 
-    qreal x = 0.0;
-    Ms::Segment* s = nullptr;
-    for (s = measure->first(Ms::SegmentType::ChordRest); s;) {
-        Fraction t1 = s->tick();
-        int x1 = s->canvasPos().x();
-        qreal x2;
-        Fraction t2;
-        Ms::Segment* ns = s->next(Ms::SegmentType::ChordRest);
-        while (ns && !ns->visible()) {
-            ns = ns->next(Ms::SegmentType::ChordRest);
-        }
-        if (ns) {
-            t2 = ns->tick();
-            x2 = ns->canvasPos().x();
-        } else {
-            t2 = measure->endTick();
-            // measure->width is not good enough because of courtesy keysig, timesig
-            Ms::Segment* seg = measure->findSegment(Ms::SegmentType::EndBarLine, measure->tick() + measure->ticks());
-            if (seg) {
-                x2 = seg->canvasPos().x();
-            } else {
-                x2 = measure->canvasPos().x() + measure->width();             //safety, should not happen
-            }
-        }
-        if (tick >= t1 && tick < t2) {
-            Fraction dt = t2 - t1;
-            qreal dx = x2 - x1;
-            x = x1 + dx * (tick - t1).ticks() / dt.ticks();
-            break;
-        }
-        s = ns;
-    }
+    midi::tick_t playbackTick = score()->repeatList().tick2utick(tick);
 
-    if (!s) {
-        return QRect();
-    }
-
-    double y = system->staffYpage(0) + system->page()->pos().y();
-    double _spatium = score()->spatium();
-
-    qreal mag = _spatium / Ms::SPATIUM20;
-    double w  = _spatium * 2.0 + score()->scoreFont()->width(Ms::SymId::noteheadBlack, mag);
-    double h  = 6 * _spatium;
-    //
-    // set cursor height for whole system
-    //
-    double y2 = 0.0;
-
-    for (int i = 0; i < score()->nstaves(); ++i) {
-        Ms::SysStaff* ss = system->staff(i);
-        if (!ss->show() || !score()->staff(i)->show()) {
-            continue;
-        }
-        y2 = ss->bbox().bottom();
-    }
-    h += y2;
-    x -= _spatium;
-    y -= 3 * _spatium;
-
-    return QRect(x, y, w, h);
+    return RetVal<midi::tick_t>::make_ok(std::move(playbackTick));
 }
 
 RetVal<midi::tick_t> NotationPlayback::playPositionTickByElement(const EngravingItem* element) const
 {
-    RetVal<tick_t> result;
-    result.ret = make_ret(Err::Undefined);
-    result.val = 0;
-
     IF_ASSERT_FAILED(element) {
-        return result;
+        return make_ret(Err::Undefined);
     }
 
     if (!score()) {
-        return result;
+        return make_ret(Err::Undefined);
     }
 
-    //! NOTE Copied from void ScoreView::mousePressEvent(QMouseEvent* ev)  case ViewState::PLAY: {
-    if (!(element->isNote() || element->isRest())) {
-        return result;
-    }
-
-    if (element->isNote()) {
-        element = element->parentItem();
-    }
-
-    const Ms::ChordRest* cr = Ms::toChordRest(element);
-
-    int ticks = score()->repeatList().tick2utick(cr->tick().ticks());
-
-    return result.make_ok(std::move(ticks));
+    return playPositionTickByRawTick(element->tick().ticks());
 }
 
 void NotationPlayback::addLoopBoundary(LoopBoundaryType boundaryType, tick_t tick)
@@ -288,133 +298,46 @@ void NotationPlayback::addLoopOut(int _tick)
 
 void NotationPlayback::setLoopBoundariesVisible(bool visible)
 {
-    if (m_loopBoundaries.val.visible == visible) {
+    if (m_loopBoundaries.visible == visible) {
         return;
     }
 
-    m_loopBoundaries.val.visible = visible;
-    m_loopBoundaries.set(m_loopBoundaries.val);
+    m_loopBoundaries.visible = visible;
+    m_loopBoundariesChanged.notify();
 }
 
-QRect NotationPlayback::loopBoundaryRectByTick(LoopBoundaryType boundaryType, int _tick) const
-{
-    Fraction tick = Fraction::fromTicks(_tick);
-
-    // set mark height for whole system
-    if (boundaryType == LoopBoundaryType::LoopOut && tick > Fraction(0, 1)) {
-        tick -= Fraction::fromTicks(1);
-    }
-
-    Measure* measure = score()->tick2measureMM(tick);
-    if (measure == nullptr) {
-        return QRect();
-    }
-
-    qreal x = 0.0;
-    const Fraction offset = { 0, 1 };
-
-    Ms::Segment* s = nullptr;
-    for (s = measure->first(Ms::SegmentType::ChordRest); s;) {
-        Fraction t1 = s->tick();
-        int x1 = s->canvasPos().x();
-        qreal x2 = 0;
-        Fraction t2;
-        Ms::Segment* ns = s->next(Ms::SegmentType::ChordRest);
-        if (ns) {
-            t2 = ns->tick();
-            x2 = ns->canvasPos().x();
-        } else {
-            t2 = measure->endTick();
-            x2 = measure->canvasPos().x() + measure->width();
-        }
-        t1 += offset;
-        t2 += offset;
-        if (tick >= t1 && tick < t2) {
-            Fraction dt = t2 - t1;
-            qreal dx = x2 - x1;
-            x = x1 + dx * (tick - t1).ticks() / dt.ticks();
-            break;
-        }
-        s = ns;
-    }
-
-    if (s == nullptr) {
-        return QRect();
-    }
-
-    Ms::System* system = measure->system();
-    if (system == nullptr || system->page() == nullptr || system->staves()->empty()) {
-        return QRect();
-    }
-
-    double y = system->staffYpage(0) + system->page()->pos().y();
-    double _spatium = score()->spatium();
-
-    qreal mag = _spatium / Ms::SPATIUM20;
-    double width = (_spatium * 2.0 + score()->scoreFont()->width(Ms::SymId::noteheadBlack, mag)) / 3;
-    double height = 6 * _spatium;
-
-    // set cursor height for whole system
-    double y2 = 0.0;
-
-    for (int i = 0; i < score()->nstaves(); ++i) {
-        Ms::SysStaff* ss = system->staff(i);
-        if (!ss->show() || !score()->staff(i)->show()) {
-            continue;
-        }
-        y2 = ss->y() + ss->bbox().height();
-    }
-    height += y2;
-    y -= 3 * _spatium;
-
-    if (boundaryType == LoopBoundaryType::LoopIn) {
-        x = x - _spatium + width / 1.5;
-    } else {
-        x = x - _spatium * .5;
-    }
-
-    return QRect(x, y, width, height);
-}
-
-mu::ValCh<LoopBoundaries> NotationPlayback::loopBoundaries() const
+const LoopBoundaries& NotationPlayback::loopBoundaries() const
 {
     return m_loopBoundaries;
 }
 
-Tempo NotationPlayback::tempo(tick_t tick) const
+Notification NotationPlayback::loopBoundariesChanged() const
 {
-    Tempo tempo;
-
-    if (!score()) {
-        return tempo;
-    }
-
-    const Ms::TempoText* tempoText = this->tempoText(tick);
-    Ms::TDuration duration = tempoText ? tempoText->duration() : Ms::TDuration();
-
-    if (!tempoText || !duration.isValid()) {
-        tempo.duration = DurationType::V_QUARTER;
-        tempo.valueBpm = std::round(score()->tempo(Fraction::fromTicks(tick)) * 60.);
-        return tempo;
-    }
-
-    tempo.valueBpm = tempoText->tempoBpm();
-    tempo.duration = duration.type();
-    tempo.withDot = duration.dots() > 0;
-
-    return tempo;
+    return m_loopBoundariesChanged;
 }
 
-const Ms::TempoText* NotationPlayback::tempoText(int _tick) const
+const Tempo& NotationPlayback::tempo(tick_t tick) const
+{
+    if (!score()) {
+        static Tempo empty;
+        return empty;
+    }
+
+    m_currentTempo.valueBpm = static_cast<int>(std::round(score()->tempomap()->tempo(tick).toBPM().val));
+
+    return m_currentTempo;
+}
+
+const mu::engraving::TempoText* NotationPlayback::tempoText(int _tick) const
 {
     Fraction tick = Fraction::fromTicks(_tick);
-    Ms::TempoText* result = nullptr;
+    mu::engraving::TempoText* result = nullptr;
 
-    Ms::SegmentType segmentType = Ms::SegmentType::All;
-    for (const Ms::Segment* segment = score()->firstSegment(segmentType); segment; segment = segment->next1(segmentType)) {
-        for (Ms::EngravingItem* element: segment->annotations()) {
+    mu::engraving::SegmentType segmentType = mu::engraving::SegmentType::All;
+    for (const mu::engraving::Segment* segment = score()->firstSegment(segmentType); segment; segment = segment->next1(segmentType)) {
+        for (mu::engraving::EngravingItem* element: segment->annotations()) {
             if (element && element->isTempoText() && element->tick() <= tick) {
-                result = Ms::toTempoText(element);
+                result = mu::engraving::toTempoText(element);
             }
         }
     }
@@ -440,4 +363,16 @@ MeasureBeat NotationPlayback::beat(tick_t tick) const
 tick_t NotationPlayback::beatToTick(int measureIndex, int beatIndex) const
 {
     return score() ? score()->sigmap()->bar2tick(measureIndex, beatIndex) : 0;
+}
+
+double NotationPlayback::tempoMultiplier() const
+{
+    return score() ? score()->tempomap()->tempoMultiplier().val : 1.0;
+}
+
+void NotationPlayback::setTempoMultiplier(double multiplier)
+{
+    if (score()) {
+        score()->tempomap()->setTempoMultiplier(multiplier);
+    }
 }

@@ -40,6 +40,10 @@ AppearancePreferencesModel::AppearancePreferencesModel(QObject* parent)
 
 void AppearancePreferencesModel::init()
 {
+    uiConfiguration()->isFollowSystemTheme().notification.onNotify(this, [this]() {
+        emit isFollowSystemThemeChanged();
+    });
+
     uiConfiguration()->currentThemeChanged().onNotify(this, [this]() {
         emit themesChanged();
         emit foregroundColorChanged();
@@ -68,6 +72,25 @@ void AppearancePreferencesModel::init()
     });
 }
 
+bool AppearancePreferencesModel::isFollowSystemThemeAvailable() const
+{
+    return uiConfiguration()->isFollowSystemThemeAvailable();
+}
+
+bool AppearancePreferencesModel::isFollowSystemTheme() const
+{
+    return uiConfiguration()->isFollowSystemTheme().val;
+}
+
+void AppearancePreferencesModel::setFollowSystemTheme(bool enabled)
+{
+    if (enabled == isFollowSystemTheme()) {
+        return;
+    }
+
+    uiConfiguration()->setFollowSystemTheme(enabled);
+}
+
 bool AppearancePreferencesModel::highContrastEnabled() const
 {
     return uiConfiguration()->isHighContrast();
@@ -91,7 +114,7 @@ QVariantList AppearancePreferencesModel::highContrastThemes() const
     QVariantList result;
 
     for (const ThemeInfo& theme : allThemes()) {
-        if (theme.codeKey == HIGH_CONTRAST_BLACK_THEME_CODE || theme.codeKey == HIGH_CONTRAST_WHITE_THEME_CODE) {
+        if (theme.codeKey == HIGH_CONTRAST_WHITE_THEME_CODE || theme.codeKey == HIGH_CONTRAST_BLACK_THEME_CODE) {
             result << ThemeConverter::toMap(theme);
         }
     }
@@ -138,8 +161,8 @@ QStringList AppearancePreferencesModel::allFonts() const
 
 QString AppearancePreferencesModel::wallpaperPathFilter() const
 {
-    return qtrc("appshell", "Images") + " (*.jpg *.jpeg *.png);;"
-           + qtrc("appshell", "All") + " (*)";
+    return qtrc("appshell/preferences", "Images") + " (*.jpg *.jpeg *.png);;"
+           + qtrc("appshell/preferences", "All") + " (*)";
 }
 
 QString AppearancePreferencesModel::wallpapersDir() const
@@ -234,17 +257,11 @@ bool AppearancePreferencesModel::scoreInversionEnabled() const
 
 void AppearancePreferencesModel::setCurrentThemeCode(const QString& themeCode)
 {
-    if (themeCode == currentThemeCode()) {
+    if (themeCode == currentThemeCode() && !isFollowSystemTheme()) {
         return;
     }
 
-    for (const ThemeInfo& theme : allThemes()) {
-        if (themeCode == QString::fromStdString(theme.codeKey)) {
-            uiConfiguration()->setCurrentTheme(theme.codeKey);
-            break;
-        }
-    }
-    emit themesChanged();
+    uiConfiguration()->setCurrentTheme(themeCodeFromString(themeCode));
 }
 
 void AppearancePreferencesModel::setCurrentAccentColorIndex(int index)
@@ -259,7 +276,6 @@ void AppearancePreferencesModel::setCurrentAccentColorIndex(int index)
 
     QColor color = accentColors()[index];
     uiConfiguration()->setCurrentThemeStyleValue(ThemeStyleKey::ACCENT_COLOR, Val(color));
-    emit themesChanged();
 }
 
 void AppearancePreferencesModel::setCurrentFontIndex(int index)

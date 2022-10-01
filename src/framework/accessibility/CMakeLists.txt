@@ -26,15 +26,27 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/iaccessible.h
     ${CMAKE_CURRENT_LIST_DIR}/iaccessibilitycontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/iaccessibilityconfiguration.h
+    ${CMAKE_CURRENT_LIST_DIR}/iqaccessibleinterfaceregister.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibilitycontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibilitycontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibleobject.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibleobject.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/accessiblestub.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/accessiblestub.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibleiteminterface.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibleiteminterface.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibilityconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/accessibilityconfiguration.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/qaccessibleinterfaceregister.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/qaccessibleinterfaceregister.h
     )
+
+if (OS_IS_LIN)
+# it needed to send a spontaneous event by activating navigation
+set(MODULE_INCLUDE
+    ${Qt5Core_PRIVATE_INCLUDE_DIRS}
+    )
+endif()
 
 include(${PROJECT_SOURCE_DIR}/build/module.cmake)

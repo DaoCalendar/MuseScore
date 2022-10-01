@@ -26,6 +26,7 @@
 #include "translation.h"
 
 using namespace mu::inspector;
+using namespace mu::engraving;
 
 SpacerSettingsModel::SpacerSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
@@ -38,24 +39,29 @@ SpacerSettingsModel::SpacerSettingsModel(QObject* parent, IElementRepositoryServ
 
 void SpacerSettingsModel::createProperties()
 {
-    m_spacerHeight = buildPropertyItem(Ms::Pid::SPACE);
+    m_spacerHeight = buildPropertyItem(Pid::SPACE);
 }
 
 void SpacerSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::SPACER);
+    m_elementList = m_repository->findElementsByType(ElementType::SPACER);
 }
 
 void SpacerSettingsModel::loadProperties()
 {
-    loadPropertyItem(m_spacerHeight, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
-    });
+    loadPropertyItem(m_spacerHeight, formatDoubleFunc);
 }
 
 void SpacerSettingsModel::resetProperties()
 {
     m_spacerHeight->resetToDefault();
+}
+
+void SpacerSettingsModel::onNotationChanged(const PropertyIdSet& changedPropertyIdSet, const StyleIdSet&)
+{
+    if (mu::contains(changedPropertyIdSet, Pid::SPACE)) {
+        loadPropertyItem(m_spacerHeight, formatDoubleFunc);
+    }
 }
 
 PropertyItem* SpacerSettingsModel::spacerHeight() const

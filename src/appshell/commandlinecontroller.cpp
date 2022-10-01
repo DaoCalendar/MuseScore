@@ -76,6 +76,23 @@ void CommandLineController::parse(const QStringList& args)
 
     m_parser.addOption(QCommandLineOption({ "S", "style" }, "Load style file", "style"));
 
+    // Video export
+    m_parser.addOption(QCommandLineOption("score-video", "Generate video for the given score and export it to file"));
+// not implemented
+//    m_parser.addOption(QCommandLineOption("view-mode",
+//                                          "View mode [paged-float, paged-original, paged-float-height, pano, auto]. Auto (default) will choose the best mode according to number of instruments etc... Will show piano for piano score only",
+//                                          "auto"));
+// not implemented
+//    m_parser.addOption(QCommandLineOption("piano", "Show Piano, works only if one part and not auto or float modes"));
+//    m_parser.addOption(QCommandLineOption("piano-position", "Show Piano top or bottom. Default bottom", "bottom"));
+    m_parser.addOption(QCommandLineOption("resolution", "Resolution [2160p, 1440p, 1080p, 720p, 480p, 360p]", "1080p"));
+    m_parser.addOption(QCommandLineOption("fps", "Frame per second [60, 30, 24]", "24"));
+
+    m_parser.addOption(QCommandLineOption("gp-linked", "create tabulature linked staves for guitar pro"));
+
+    //! NOTE Currently only implemented `full` mode
+    m_parser.addOption(QCommandLineOption("migration", "Whether to do migration with given mode, `full` - full migration", "mode"));
+
     m_parser.process(args);
 }
 
@@ -150,12 +167,12 @@ void CommandLineController::apply()
         }
     }
 
-    notationConfiguration()->setTemplateModeEnalbed(m_parser.isSet("template-mode"));
+    notationConfiguration()->setTemplateModeEnabled(m_parser.isSet("template-mode"));
     notationConfiguration()->setTestModeEnabled(m_parser.isSet("t"));
 
-    QString sessionType;
+    QString modeType;
     if (m_parser.isSet("session-type")) {
-        sessionType = m_parser.value("session-type");
+        modeType = m_parser.value("session-type");
     }
 
     // Converter mode
@@ -244,6 +261,63 @@ void CommandLineController::apply()
         }
     }
 
+    // Video
+#ifdef BUILD_VIDEOEXPORT_MODULE
+    if (m_parser.isSet("score-video")) {
+        application()->setRunMode(IApplication::RunMode::Converter);
+        m_converterTask.type = ConvertType::ExportScoreVideo;
+        m_converterTask.inputFile = scorefiles[0];
+        m_converterTask.outputFile = m_parser.value("o");
+
+        using namespace mu::iex::videoexport;
+// not implemented
+//        if (m_parser.isSet("view-mode")) {
+//            auto toViewMode = [](const QString& str) {
+//                if ("auto" == str) {
+//                    return ViewMode::Auto;
+//                }
+//                if ("paged-float" == str) {
+//                    return ViewMode::PagedFloat;
+//                }
+//                if ("paged-original" == str) {
+//                    return ViewMode::PagedOriginal;
+//                }
+//                if ("paged-float-height" == str) {
+//                    return ViewMode::PagedFloatHeight;
+//                }
+//                if ("pano" == str) {
+//                    return ViewMode::Pano;
+//                }
+//                return ViewMode::Auto;
+//            };
+//            videoExportConfiguration()->setViewMode(toViewMode(m_parser.value("view-mode")));
+//        }
+
+// not implemented
+//        if (m_parser.isSet("piano")) {
+//            videoExportConfiguration()->setShowPiano(true);
+//        }
+
+//        if (m_parser.isSet("piano-position")) {
+//            auto toPianoPosition= [](const QString& str) {
+//                if ("top" == str) {
+//                    return PianoPosition::Top;
+//                }
+//                return PianoPosition::Bottom;
+//            };
+//            videoExportConfiguration()->setPianoPosition(toPianoPosition(m_parser.value("piano-position")));
+//        }
+
+        if (m_parser.isSet("resolution")) {
+            videoExportConfiguration()->setResolution(m_parser.value("resolution").toStdString());
+        }
+
+        if (m_parser.isSet("fps")) {
+            videoExportConfiguration()->setFps(intValue("fps"));
+        }
+    }
+#endif
+
     if (m_parser.isSet("F") || m_parser.isSet("R")) {
         configuration()->revertToFactorySettings(m_parser.isSet("R"));
     }
@@ -256,12 +330,37 @@ void CommandLineController::apply()
         m_converterTask.params[CommandLineController::ParamKey::StylePath] = m_parser.value("S");
     }
 
+    if (application()->runMode() == IApplication::RunMode::Converter) {
+        project::MigrationOptions migration;
+        migration.appVersion = mu::engraving::MSCVERSION;
+
+        //! NOTE Don't ask about migration in convert mode
+        migration.isAskAgain = false;
+
+        if (m_parser.isSet("migration")) {
+            QString val = m_parser.value("migration");
+            bool isMigration = (val == "full") ? true : false;
+            migration.isApplyMigration = isMigration;
+            migration.isApplyEdwin = isMigration;
+            migration.isApplyLeland = isMigration;
+        }
+
+        //! NOTE Don't write to settings, just on current session
+        for (project::MigrationType type : project::allMigrationTypes()) {
+            projectConfiguration()->setMigrationOptions(type, migration, false);
+        }
+    }
+
     if (application()->runMode() == IApplication::RunMode::Editor) {
-        startupScenario()->setSessionType(sessionType);
+        startupScenario()->setModeType(modeType);
 
         if (!scorefiles.isEmpty()) {
             startupScenario()->setStartupScorePath(scorefiles[0]);
         }
+    }
+
+    if (m_parser.isSet("gp-linked")) {
+        guitarProConfiguration()->setLinkedTabStaffCreated(true);
     }
 }
 

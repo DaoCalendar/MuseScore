@@ -28,7 +28,7 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Note input")
+    title: qsTrc("appshell/preferences", "Note input")
 
     property alias advanceToNextNote: advanceToNextNoteBox.checked
     property alias colorNotes: colorNotesBox.checked
@@ -40,48 +40,49 @@ BaseSection {
 
     CheckBox {
         id: advanceToNextNoteBox
+        width: parent.width
 
-        text: qsTrc("appshell", "Advance to next note on key release (MIDI)")
+        text: qsTrc("appshell/preferences", "Advance to next note on key release (MIDI)")
 
         navigation.name: "AdvanceToNextNoteBox"
         navigation.panel: root.navigation
         navigation.row: 0
 
         onClicked: {
-            root.advanceToNextNoteOnKeyReleaseChangeRequested(!checked)
+            root.advanceToNextNoteChangeRequested(!checked)
         }
     }
 
     CheckBox {
         id: colorNotesBox
+        width: parent.width
 
-        width: 170
-        text: qsTrc("appshell", "Colour notes outside of usable pitch range")
+        text: qsTrc("appshell/preferences", "Color notes outside of usable pitch range")
 
         navigation.name: "ColorNotesBox"
         navigation.panel: root.navigation
         navigation.row: 1
 
         onClicked: {
-            root.colorNotesOusideOfUsablePitchRangeChangeRequested(!checked)
+            root.colorNotesChangeRequested(!checked)
         }
     }
 
     IncrementalPropertyControlWithTitle {
         id: delayBetweenNotesControl
 
-        title: qsTrc("appshell", "Delay between notes in automatic real time mode:")
+        title: qsTrc("appshell/preferences", "Delay between notes in automatic real time mode:")
 
-        titleWidth: 173
-        spacing: 46
+        columnWidth: root.columnWidth
+        spacing: root.columnSpacing
 
-        measureUnitsSymbol: qsTrc("appshell", "ms")
+        measureUnitsSymbol: qsTrc("global", "ms")
 
         navigation.name: "DelayBetweenNotesControl"
         navigation.panel: root.navigation
         navigation.row: 2
 
-        onValueEdited: {
+        onValueEdited: function(newValue) {
             root.delayBetweenNotesChangeRequested(newValue)
         }
     }

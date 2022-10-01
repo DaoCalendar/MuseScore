@@ -31,7 +31,7 @@ import "../../../common"
 InspectorPropertyView {
     id: root
 
-    titleText: qsTrc("inspector", "Notehead group")
+    titleText: qsTrc("inspector", "Notehead type")
 
     navigationRowEnd: navigationRowStart + gridView.count + 1 /*menu button*/
 
@@ -46,12 +46,14 @@ InspectorPropertyView {
             radius: 3
         }
 
-        GridView {
+        StyledGridView {
             id: gridView
             anchors.fill: parent
             anchors.margins: 8
 
             implicitHeight: Math.min(contentHeight, 3 * cellHeight)
+
+            readonly property int cellRadius: 2
 
             cellHeight: 40
             cellWidth: 40
@@ -60,24 +62,18 @@ InspectorPropertyView {
                 id: noteheadGroupsModel
             }
 
-            interactive: true
-            boundsBehavior: Flickable.StopAtBounds
-            clip: true
-
-            ScrollBar.vertical: StyledScrollBar {}
-
             delegate: ListItemBlank {
                 id: delegateItem
                 implicitHeight: gridView.cellHeight
                 implicitWidth: gridView.cellWidth
 
                 hint: model.headHint
+                background.radius: gridView.cellRadius
 
                 navigation.name: hint
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 1 + index
                 navigation.accessible.name: hint
-                navigation.enabled: root.enabled
                 navigation.onActiveChanged: {
                     if (navigation.active) {
                         gridView.positionViewAtIndex(index, ListView.Contain)
@@ -104,12 +100,16 @@ InspectorPropertyView {
             highlight: Rectangle {
                 color: ui.theme.accentColor
                 opacity: ui.theme.accentOpacityNormal
-                radius: 2
+                radius: gridView.cellRadius
             }
 
             currentIndex: root.propertyItem && !root.propertyItem.isUndefined
                           ? root.propertyItem.value
                           : -1
+
+            ScrollBar.vertical: StyledScrollBar {
+                policy: ScrollBar.AlwaysOn
+            }
         }
     }
 }

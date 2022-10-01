@@ -44,42 +44,38 @@ InspectorPropertyView {
             radius: 3
         }
 
-        GridView {
+        StyledGridView {
             id: gridView
             anchors.fill: parent
             anchors.margins: 8
 
             implicitHeight: Math.min(contentHeight, 3 * cellHeight)
 
+            readonly property int cellRadius: 2
+
             cellHeight: 40
             cellWidth: 40
 
             model: [
                 { value: Beam.MODE_AUTO, iconCode: IconCode.AUTO_TEXT, hint: qsTrc("inspector", "Auto") },
-                { value: Beam.MODE_BEGIN, iconCode: IconCode.BEAM_START, hint: qsTrc("inspector", "Begin") },
-                { value: Beam.MODE_MID, iconCode: IconCode.BEAM_MIDDLE, hint: qsTrc("inspector", "Middle") },
-                { value: Beam.MODE_NONE, iconCode: IconCode.NOTE_HEAD_EIGHTH, hint: qsTrc("inspector", "None") },
-                { value: Beam.MODE_BEGIN32, iconCode: IconCode.BEAM_32, hint: qsTrc("inspector", "Begin 32") },
-                { value: Beam.MODE_BEGIN64, iconCode: IconCode.BEAM_64, hint: qsTrc("inspector", "Begin 64") }
+                { value: Beam.MODE_NONE, iconCode: IconCode.NOTE_HEAD_EIGHTH, hint: qsTrc("inspector", "No beam") },
+                { value: Beam.MODE_BEGIN, iconCode: IconCode.BEAM_BREAK_LEFT, hint: qsTrc("inspector", "Break beam left") },
+                { value: Beam.MODE_BEGIN32, iconCode: IconCode.BEAM_BREAK_INNER_8TH, hint: qsTrc("inspector", "Break inner beams (8th)") },
+                { value: Beam.MODE_BEGIN64, iconCode: IconCode.BEAM_BREAK_INNER_16TH, hint: qsTrc("inspector", "Break inner beams (16th)") },
+                { value: Beam.MODE_MID, iconCode: IconCode.BEAM_JOIN, hint: qsTrc("inspector", "Join beams") },
             ]
-
-            interactive: true
-            boundsBehavior: Flickable.StopAtBounds
-            clip: true
-
-            ScrollBar.vertical: StyledScrollBar {}
 
             delegate: ListItemBlank {
                 implicitHeight: gridView.cellHeight
                 implicitWidth: gridView.cellWidth
 
                 hint: modelData["hint"] ?? ""
+                background.radius: gridView.cellRadius
 
-                navigation.name: hint
+                navigation.name: "BeamType" + hint
                 navigation.panel: root.navigationPanel
                 navigation.row: root.navigationRowStart + 1 + index
                 navigation.accessible.name: hint
-                navigation.enabled: root.enabled
                 navigation.onActiveChanged: {
                     if (navigation.active) {
                         gridView.positionViewAtIndex(index, ListView.Contain)
@@ -89,15 +85,12 @@ InspectorPropertyView {
                 StyledIconLabel {
                     anchors.centerIn: parent
                     iconCode: modelData["iconCode"] ?? IconCode.NONE
-                    font.pixelSize: 30
+                    font.pixelSize: 32
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        if (root.propertyItem) {
-                            root.propertyItem.value = modelData["value"]
-                        }
+                onClicked: {
+                    if (root.propertyItem) {
+                        root.propertyItem.value = modelData["value"]
                     }
                 }
             }
@@ -105,7 +98,7 @@ InspectorPropertyView {
             highlight: Rectangle {
                 color: ui.theme.accentColor
                 opacity: ui.theme.accentOpacityNormal
-                radius: 2
+                radius: gridView.cellRadius
             }
 
             currentIndex: root.propertyItem && !root.propertyItem.isUndefined

@@ -22,21 +22,22 @@
 
 #include "fingering.h"
 
-#include "io/xml.h"
+#include "translation.h"
 
-#include "score.h"
-#include "staff.h"
-#include "undo.h"
+#include "rw/xml.h"
+
 #include "chord.h"
-#include "part.h"
 #include "measure.h"
-#include "stem.h"
+#include "note.h"
+#include "part.h"
 #include "skyline.h"
+#include "staff.h"
+#include "stem.h"
 #include "system.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   fingeringStyle
 //---------------------------------------------------------
@@ -51,15 +52,15 @@ static const ElementStyle fingeringStyle {
 //      EngravingItem(Score* = 0, ElementFlags = ElementFlag::NOTHING);
 //---------------------------------------------------------
 
-Fingering::Fingering(Note* parent, Tid tid, ElementFlags ef)
+Fingering::Fingering(Note* parent, TextStyleType tid, ElementFlags ef)
     : TextBase(ElementType::FINGERING, parent, tid, ef)
 {
-    setPlacement(Placement::ABOVE);
+    setPlacement(PlacementV::ABOVE);
     initElementStyle(&fingeringStyle);
 }
 
 Fingering::Fingering(Note* parent, ElementFlags ef)
-    : Fingering(parent, Tid::FINGERING, ef)
+    : Fingering(parent, TextStyleType::FINGERING, ef)
 {
 }
 
@@ -69,10 +70,10 @@ Fingering::Fingering(Note* parent, ElementFlags ef)
 
 ElementType Fingering::layoutType()
 {
-    switch (tid()) {
-    case Tid::FINGERING:
-    case Tid::RH_GUITAR_FINGERING:
-    case Tid::STRING_NUMBER:
+    switch (textStyleType()) {
+    case TextStyleType::FINGERING:
+    case TextStyleType::RH_GUITAR_FINGERING:
+    case TextStyleType::STRING_NUMBER:
         return ElementType::CHORD;
     default:
         return ElementType::NOTE;
@@ -83,19 +84,19 @@ ElementType Fingering::layoutType()
 //   calculatePlacement
 //---------------------------------------------------------
 
-Placement Fingering::calculatePlacement() const
+PlacementV Fingering::calculatePlacement() const
 {
     Note* n = note();
     if (!n) {
-        return Placement::ABOVE;
+        return PlacementV::ABOVE;
     }
     Chord* chord = n->chord();
     Staff* staff = chord->staff();
     Part* part   = staff->part();
-    int nstaves  = part->nstaves();
+    size_t nstaves  = part->nstaves();
     bool voices  = chord->measure()->hasVoices(staff->idx(), chord->tick(), chord->actualTicks());
     bool below   = voices ? !chord->up() : (nstaves > 1) && (staff->rstaff() == nstaves - 1);
-    return below ? Placement::BELOW : Placement::ABOVE;
+    return below ? PlacementV::BELOW : PlacementV::ABOVE;
 }
 
 //---------------------------------------------------------
@@ -104,28 +105,29 @@ Placement Fingering::calculatePlacement() const
 
 void Fingering::layout()
 {
-    if (parent()) {
+    if (explicitParent()) {
         Fraction tick = parentItem()->tick();
         const Staff* st = staff();
+        _skipDraw = false;
         if (st && st->isTabStaff(tick) && !st->staffType(tick)->showTabFingering()) {
-            setbbox(RectF());
+            _skipDraw = true;
             return;
         }
     }
 
     TextBase::layout();
-    rypos() = 0.0;      // handle placement below
+    setPosY(0.0);      // handle placement below
 
     if (autoplace() && note()) {
         Note* n      = note();
         Chord* chord = n->chord();
         bool voices  = chord->measure()->hasVoices(chord->staffIdx(), chord->tick(), chord->actualTicks());
-        bool tight   = voices && chord->notes().size() == 1 && !chord->beam() && tid() != Tid::STRING_NUMBER;
+        bool tight   = voices && chord->notes().size() == 1 && !chord->beam() && textStyleType() != TextStyleType::STRING_NUMBER;
 
-        qreal headWidth = n->bboxRightPos();
+        double headWidth = n->bboxRightPos();
 
         // update offset after drag
-        qreal rebase = 0.0;
+        double rebase = 0.0;
         if (offsetChanged() != OffsetChange::NONE && !tight) {
             rebase = rebaseOffset();
         }
@@ -138,40 +140,40 @@ void Fingering::layout()
             Stem* stem = chord->stem();
             Segment* s = chord->segment();
             Measure* m = s->measure();
-            qreal sp = spatium();
-            qreal md = minDistance().val() * sp;
+            double sp = spatium();
+            double md = minDistance().val() * sp;
             SysStaff* ss = m->system()->staff(chord->vStaffIdx());
             Staff* vStaff = chord->staff();           // TODO: use current height at tick
 
             if (n->mirror()) {
-                rxpos() -= n->ipos().x();
+                movePosX(-n->ipos().x());
             }
-            rxpos() += headWidth * .5;
+            movePosX(headWidth * .5);
             if (above) {
                 if (tight) {
                     if (chord->stem()) {
-                        rxpos() -= 0.8 * sp;
+                        movePosX(-0.8 * sp);
                     }
-                    rypos() -= 1.5 * sp;
+                    movePosY(-1.5 * sp);
                 } else {
                     RectF r = bbox().translated(m->pos() + s->pos() + chord->pos() + n->pos() + pos());
                     SkylineLine sk(false);
                     sk.add(r.x(), r.bottom(), r.width());
-                    qreal d = sk.minDistance(ss->skyline().north());
-                    qreal yd = 0.0;
+                    double d = sk.minDistance(ss->skyline().north());
+                    double yd = 0.0;
                     if (d > 0.0 && isStyled(Pid::MIN_DISTANCE)) {
                         yd -= d + height() * .25;
                     }
                     // force extra space above staff & chord (but not other fingerings)
-                    qreal top;
+                    double top;
                     if (chord->up() && chord->beam() && stem) {
                         top = stem->y() + stem->bbox().top();
                     } else {
                         Note* un = chord->upNote();
-                        top = qMin(0.0, un->y() + un->bbox().top());
+                        top = std::min(0.0, un->y() + un->bbox().top());
                     }
                     top -= md;
-                    qreal diff = (bbox().bottom() + ipos().y() + yd + n->y()) - top;
+                    double diff = (bbox().bottom() + ipos().y() + yd + n->y()) - top;
                     if (diff > 0.0) {
                         yd -= diff;
                     }
@@ -181,33 +183,33 @@ void Fingering::layout()
                         bool inStaff = above ? r.bottom() + rebase > 0.0 : r.top() + rebase < staff()->height();
                         rebaseMinDistance(md, yd, sp, rebase, above, inStaff);
                     }
-                    rypos() += yd;
+                    movePosY(yd);
                 }
             } else {
                 if (tight) {
                     if (chord->stem()) {
-                        rxpos() += 0.8 * sp;
+                        movePosX(0.8 * sp);
                     }
-                    rypos() += 1.5 * sp;
+                    movePosY(1.5 * sp);
                 } else {
                     RectF r = bbox().translated(m->pos() + s->pos() + chord->pos() + n->pos() + pos());
                     SkylineLine sk(true);
                     sk.add(r.x(), r.top(), r.width());
-                    qreal d = ss->skyline().south().minDistance(sk);
-                    qreal yd = 0.0;
+                    double d = ss->skyline().south().minDistance(sk);
+                    double yd = 0.0;
                     if (d > 0.0 && isStyled(Pid::MIN_DISTANCE)) {
                         yd += d + height() * .25;
                     }
                     // force extra space below staff & chord (but not other fingerings)
-                    qreal bottom;
+                    double bottom;
                     if (!chord->up() && chord->beam() && stem) {
                         bottom = stem->y() + stem->bbox().bottom();
                     } else {
                         Note* dn = chord->downNote();
-                        bottom = qMax(vStaff->height(), dn->y() + dn->bbox().bottom());
+                        bottom = std::max(vStaff->height(), dn->y() + dn->bbox().bottom());
                     }
                     bottom += md;
-                    qreal diff = bottom - (bbox().top() + ipos().y() + yd + n->y());
+                    double diff = bottom - (bbox().top() + ipos().y() + yd + n->y());
                     if (diff > 0.0) {
                         yd += diff;
                     }
@@ -217,16 +219,16 @@ void Fingering::layout()
                         bool inStaff = above ? r.bottom() + rebase > 0.0 : r.top() + rebase < staff()->height();
                         rebaseMinDistance(md, yd, sp, rebase, above, inStaff);
                     }
-                    rypos() += yd;
+                    movePosY(yd);
                 }
             }
-        } else if (tid() == Tid::LH_GUITAR_FINGERING) {
+        } else if (textStyleType() == TextStyleType::LH_GUITAR_FINGERING) {
             // place to left of note
-            qreal left = n->shape().left();
+            double left = n->shape().left();
             if (left - n->x() > 0.0) {
-                rxpos() -= left;
+                movePosX(-left);
             } else {
-                rxpos() -= n->x();
+                movePosX(-n->x());
             }
         }
         // for other fingering styles, do not autoplace
@@ -250,30 +252,48 @@ void Fingering::draw(mu::draw::Painter* painter) const
     TextBase::draw(painter);
 }
 
+bool Fingering::isEditAllowed(EditData& ed) const
+{
+    if (isTextNavigationKey(ed.key, ed.modifiers)) {
+        return false;
+    }
+
+    return TextBase::isEditAllowed(ed);
+}
+
+bool Fingering::edit(EditData& ed)
+{
+    if (!isEditAllowed(ed)) {
+        return false;
+    }
+
+    return TextBase::edit(ed);
+}
+
 //---------------------------------------------------------
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Fingering::accessibleInfo() const
+String Fingering::accessibleInfo() const
 {
-    QString rez = EngravingItem::accessibleInfo();
-    if (tid() == Tid::STRING_NUMBER) {
-        rez += " " + QObject::tr("String number");
+    String rez = EngravingItem::accessibleInfo();
+    if (textStyleType() == TextStyleType::STRING_NUMBER) {
+        rez += u' ' + mtrc("engraving", "String number");
     }
-    return QString("%1: %2").arg(rez, plainText());
+    return String(u"%1: %2").arg(rez, plainText());
 }
 
 //---------------------------------------------------------
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Fingering::propertyDefault(Pid id) const
+engraving::PropertyValue Fingering::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::PLACEMENT:
-        return int(calculatePlacement());
-    case Pid::SUB_STYLE:
-        return int(Tid::FINGERING);
+        return calculatePlacement();
+    case Pid::TEXT_STYLE:
+        return TextStyleType::FINGERING;
     default:
         return TextBase::propertyDefault(id);
     }

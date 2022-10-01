@@ -23,13 +23,16 @@
 #ifndef __TABLATURE_H__
 #define __TABLATURE_H__
 
-namespace Ms {
+#include <cstddef>
+#include <vector>
+#include <map>
+
+namespace mu::engraving {
 class Chord;
 class Note;
 class XmlReader;
 class XmlWriter;
 class Staff;
-class Fraction;
 
 //---------------------------------------------------------
 //   StringData
@@ -48,9 +51,9 @@ struct instrString {
 
 class StringData
 {
-//      QList<int>  stringTable { 40, 45, 50, 55, 59, 64 };   // guitar is default
+//      std::vector<int>  stringTable { 40, 45, 50, 55, 59, 64 };   // guitar is default
 //      int         _frets = 19;
-    QList<instrString> stringTable {  };                      // no strings by default
+    std::vector<instrString> stringTable {  };                      // no strings by default
     int _frets = 0;
 
     static bool bFretting;
@@ -58,22 +61,22 @@ class StringData
     bool        convertPitch(int pitch, int pitchOffset, int* string, int* fret) const;
     int         fret(int pitch, int string, int pitchOffset) const;
     int         getPitch(int string, int fret, int pitchOffset) const;
-    void        sortChordNotes(QMap<int, Note*>& sortedNotes, const Chord* chord, int pitchOffset, int* count) const;
+    void        sortChordNotes(std::map<int, Note*>& sortedNotes, const Chord* chord, int pitchOffset, int* count) const;
 
 public:
     StringData() {}
     StringData(int numFrets, int numStrings, int strings[]);
-    StringData(int numFrets, QList<instrString>& strings);
+    StringData(int numFrets, std::vector<instrString>& strings);
     void        set(const StringData& src);
     bool        convertPitch(int pitch, Staff* staff, int* string, int* fret) const;
     int         fret(int pitch, int string, Staff* staff) const;
     void        fretChords(Chord* chord) const;
     int         getPitch(int string, int fret, Staff* staff) const;
     static int  pitchOffsetAt(Staff* staff);
-    int         strings() const { return stringTable.size(); }
+    size_t      strings() const { return stringTable.size(); }
     int         frettedStrings() const;
-    const QList<instrString>& stringList() const { return stringTable; }
-    QList<instrString>& stringList() { return stringTable; }
+    const std::vector<instrString>& stringList() const { return stringTable; }
+    std::vector<instrString>& stringList() { return stringTable; }
     int         frets() const { return _frets; }
     void        setFrets(int val) { _frets = val; }
     void        read(XmlReader&);
@@ -83,5 +86,5 @@ public:
     int         adjustBanjo5thFret(int fret) const;
     bool        isFiveStringBanjo() const;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

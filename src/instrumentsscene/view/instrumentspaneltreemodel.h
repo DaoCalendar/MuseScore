@@ -32,6 +32,7 @@
 #include "async/asyncable.h"
 #include "actions/iactionsdispatcher.h"
 #include "actions/actionable.h"
+#include "shortcuts/ishortcutsregister.h"
 
 namespace mu::uicomponents {
 class ItemMultiSelectionModel;
@@ -47,13 +48,14 @@ class InstrumentsPanelTreeModel : public QAbstractItemModel, public async::Async
     INJECT(instruments, context::IGlobalContext, context)
     INJECT(instruments, notation::ISelectInstrumentsScenario, selectInstrumentsScenario)
     INJECT(instruments, actions::IActionsDispatcher, dispatcher)
+    INJECT(instruments, shortcuts::IShortcutsRegister, shortcutsRegister)
 
-    Q_PROPERTY(QItemSelectionModel * selectionModel READ selectionModel NOTIFY selectionChanged)
     Q_PROPERTY(bool isMovingUpAvailable READ isMovingUpAvailable NOTIFY isMovingUpAvailableChanged)
     Q_PROPERTY(bool isMovingDownAvailable READ isMovingDownAvailable NOTIFY isMovingDownAvailableChanged)
     Q_PROPERTY(bool isRemovingAvailable READ isRemovingAvailable NOTIFY isRemovingAvailableChanged)
     Q_PROPERTY(bool isAddingAvailable READ isAddingAvailable NOTIFY isAddingAvailableChanged)
     Q_PROPERTY(bool isEmpty READ isEmpty NOTIFY isEmptyChanged)
+    Q_PROPERTY(QString addInstrumentsKeyboardShortcut READ addInstrumentsKeyboardShortcut NOTIFY addInstrumentsKeyboardShortcutChanged)
 
 public:
     explicit InstrumentsPanelTreeModel(QObject* parent = nullptr);
@@ -66,31 +68,34 @@ public:
     QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    QItemSelectionModel* selectionModel() const;
     bool isMovingUpAvailable() const;
     bool isMovingDownAvailable() const;
     bool isRemovingAvailable() const;
     bool isAddingAvailable() const;
     bool isEmpty() const;
+    QString addInstrumentsKeyboardShortcut() const;
 
     Q_INVOKABLE void load();
     Q_INVOKABLE void selectRow(const QModelIndex& rowIndex);
-    Q_INVOKABLE bool isSelected(const QModelIndex& rowIndex) const;
+    Q_INVOKABLE void clearSelection();
     Q_INVOKABLE void addInstruments();
     Q_INVOKABLE void moveSelectedRowsUp();
     Q_INVOKABLE void moveSelectedRowsDown();
     Q_INVOKABLE void removeSelectedRows();
+    Q_INVOKABLE void toggleVisibilityOfSelectedRows(bool visible);
 
     Q_INVOKABLE bool moveRows(const QModelIndex& sourceParent, int sourceRow, int count, const QModelIndex& destinationParent,
                               int destinationChild) override;
 
+    Q_INVOKABLE QItemSelectionModel* selectionModel() const;
+
 signals:
-    void selectionChanged();
     void isMovingUpAvailableChanged(bool isMovingUpAvailable);
     void isMovingDownAvailableChanged(bool isMovingDownAvailable);
     void isAddingAvailableChanged(bool isAddingAvailable);
     void isRemovingAvailableChanged(bool isRemovingAvailable);
     void isEmptyChanged();
+    void addInstrumentsKeyboardShortcutChanged();
 
 private slots:
     void updateRearrangementAvailability();
@@ -99,12 +104,14 @@ private slots:
     void updateRemovingAvailability();
 
 private:
-    bool canReceiveAction(const actions::ActionCode&) const override;
     bool removeRows(int row, int count, const QModelIndex& parent) override;
 
     enum RoleNames {
         ItemRole = Qt::UserRole + 1
     };
+
+    void onMasterNotationChanged();
+    void onNotationChanged();
 
     void initPartOrders();
     void onBeforeChangeNotation();
@@ -113,7 +120,7 @@ private:
 
     void setupPartsConnections();
     void setupStavesConnections(const ID& stavesPartId);
-    void listenSelectionChanged();
+    void listenNotationSelectionChanged();
 
     void clear();
     void deleteItems();
@@ -121,6 +128,8 @@ private:
     void setIsMovingUpAvailable(bool isMovingUpAvailable);
     void setIsMovingDownAvailable(bool isMovingDownAvailable);
     void setIsRemovingAvailable(bool isRemovingAvailable);
+
+    void setItemsSelected(const QModelIndexList& indexes, bool selected);
 
     AbstractInstrumentsPanelTreeItem* loadMasterPart(const notation::Part* masterPart);
     AbstractInstrumentsPanelTreeItem* buildPartItem(const mu::notation::Part* masterPart);

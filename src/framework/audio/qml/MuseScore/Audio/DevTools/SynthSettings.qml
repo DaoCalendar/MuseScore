@@ -76,25 +76,33 @@ Rectangle {
         SoundFontsPanel {
             id: fluidPanel
             selectedSoundFonts: settingsModel.selectedSoundFonts("Fluid")
-            avalaibleSoundFonts: settingsModel.avalaibleSoundFonts("Fluid")
-            onSelectedUpClicked: settingsModel.soundFontUp(index, "Fluid")
-            onSelectedDownClicked: settingsModel.soundFontDown(index, "Fluid")
-            onSelectedRemoveClicked: settingsModel.removeSoundFont(index, "Fluid")
-            onAddClicked: settingsModel.addSoundFont(index, "Fluid")
+            availableSoundFonts: settingsModel.availableSoundFonts("Fluid")
+            onSelectedUpClicked: function(index) {
+                settingsModel.soundFontUp(index, "Fluid")
+            }
+            onSelectedDownClicked: function(index) {
+                settingsModel.soundFontDown(index, "Fluid")
+            }
+            onSelectedRemoveClicked: function(index) {
+                settingsModel.removeSoundFont(index, "Fluid")
+            }
+            onAddClicked: function(index) {
+                settingsModel.addSoundFont(index, "Fluid")
+            }
 
             Connections {
                 target: settingsModel
-                onSelectedChanged: {
+                onSelectedChanged: function(name) {
                     if (name === "Fluid") {
                         fluidPanel.selectedSoundFonts = []
                         fluidPanel.selectedSoundFonts = settingsModel.selectedSoundFonts("Fluid")
                     }
                 }
 
-                onAvalaibleChanged: {
+                onAvailableChanged: function(name) {
                     if (name === "Fluid") {
-                        fluidPanel.avalaibleSoundFonts = []
-                        fluidPanel.avalaibleSoundFonts = settingsModel.avalaibleSoundFonts("Fluid")
+                        fluidPanel.availableSoundFonts = []
+                        fluidPanel.availableSoundFonts = settingsModel.availableSoundFonts("Fluid")
                     }
                 }
             }

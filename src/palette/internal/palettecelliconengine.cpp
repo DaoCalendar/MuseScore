@@ -21,9 +21,9 @@
  */
 #include "palettecelliconengine.h"
 
-#include "engraving/infrastructure/draw/geometry.h"
-#include "engraving/infrastructure/draw/painter.h"
-#include "engraving/infrastructure/draw/pen.h"
+#include "draw/types/geometry.h"
+#include "draw/painter.h"
+#include "draw/types/pen.h"
 #include "engraving/libmscore/actionicon.h"
 #include "engraving/libmscore/engravingitem.h"
 #include "engraving/libmscore/masterscore.h"
@@ -33,7 +33,7 @@
 
 using namespace mu::palette;
 using namespace mu::draw;
-using namespace Ms;
+using namespace mu::engraving;
 
 PaletteCellIconEngine::PaletteCellIconEngine(PaletteCellConstPtr cell, qreal extraMag)
     : QIconEngine(), m_cell(cell), m_extraMag(extraMag)
@@ -111,16 +111,11 @@ void PaletteCellIconEngine::paintActionIcon(Painter& painter, const RectF& rect,
 
     painter.save();
 
-    constexpr qreal margin = 4.0;
-    qreal extent = qMin(rect.height(), rect.width()) - margin;
-
     ActionIcon* action = toActionIcon(element);
-    action->setExtent(extent);
+    action->setFontSize(ActionIcon::DEFAULT_FONT_SIZE * m_cell->mag * m_extraMag);
+    action->layout();
 
-    extent /= 2.0;
-    PointF iconCenter(extent, extent);
-
-    painter.translate(rect.center() - iconCenter);
+    painter.translate(rect.center() - action->bbox().center());
     action->draw(&painter);
     painter.restore();
 }
@@ -131,8 +126,10 @@ qreal PaletteCellIconEngine::paintStaff(Painter& painter, const RectF& rect, qre
 {
     painter.save();
 
-    Pen pen(configuration()->elementsColor());
-    pen.setWidthF(engraving::DefaultStyle::defaultStyle().value(Sid::staffLineWidth).toDouble() * spatium);
+    Color staffLinesColor(configuration()->elementsColor());
+    staffLinesColor.setAlpha(127);//reduce alpha of staff lines to half
+    Pen pen(staffLinesColor);
+    pen.setWidthF(engraving::DefaultStyle::defaultStyle().styleS(Sid::staffLineWidth).val() * spatium);
     painter.setPen(pen);
 
     constexpr int numStaffLines = 5;
@@ -167,6 +164,8 @@ void PaletteCellIconEngine::paintScoreElement(Painter& painter, EngravingItem* e
 
     painter.save();
 
+    mu::engraving::MScore::pixelRatio = mu::engraving::DPI / uiConfiguration()->logicalDpi();
+
     const qreal sizeRatio = spatium / gpaletteScore->spatium();
     painter.scale(sizeRatio, sizeRatio); // scale coordinates so element is drawn at correct size
 
@@ -182,27 +181,38 @@ void PaletteCellIconEngine::paintScoreElement(Painter& painter, EngravingItem* e
 
     painter.translate(-1.0 * origin); // shift coordinates so element is drawn at correct position
 
-    element->scanElements(&painter, paintPaletteElement);
+    PaintContext ctx;
+    ctx.painter = &painter;
+
+    element->scanElements(&ctx, paintPaletteElement);
     painter.restore();
 }
 
-void PaletteCellIconEngine::paintPaletteElement(void* data, EngravingItem* element)
+void PaletteCellIconEngine::paintPaletteElement(void* context, EngravingItem* element)
 {
-    Painter* painter = static_cast<Painter*>(data);
+    PaintContext* ctx = static_cast<PaintContext*>(context);
+    Painter* painter = ctx->painter;
+
     painter->save();
     painter->translate(element->pos()); // necessary for drawing child elements
 
-    auto colorBackup = Color::fromQColor(element->getProperty(Pid::COLOR).value<QColor>());
-    auto frameColorBackup = Color::fromQColor(element->getProperty(Pid::FRAME_FG_COLOR).value<QColor>());
+    Color colorBackup = element->getProperty(Pid::COLOR).value<Color>();
+    Color frameColorBackup = element->getProperty(Pid::FRAME_FG_COLOR).value<Color>();
+    bool colorsInversionEnabledBackup = element->colorsInversionEnabled();
 
-    auto color = Color::fromQColor(configuration()->elementsColor());
-    element->setProperty(Pid::COLOR, QVariant::fromValue(color));
-    element->setProperty(Pid::FRAME_FG_COLOR, QVariant::fromValue(color));
+    element->setColorsInverionEnabled(ctx->colorsInversionEnabled);
+
+    if (!ctx->useElementColors) {
+        Color color = configuration()->elementsColor();
+        element->setProperty(Pid::COLOR, color);
+        element->setProperty(Pid::FRAME_FG_COLOR, color);
+    }
 
     element->draw(painter);
 
-    element->setProperty(Pid::COLOR, QVariant::fromValue(colorBackup));
-    element->setProperty(Pid::FRAME_FG_COLOR, QVariant::fromValue(frameColorBackup));
+    element->setColorsInverionEnabled(colorsInversionEnabledBackup);
+    element->setProperty(Pid::COLOR, colorBackup);
+    element->setProperty(Pid::FRAME_FG_COLOR, frameColorBackup);
 
     painter->restore();
 }

@@ -21,6 +21,8 @@
  */
 #include "abstractnavigation.h"
 
+#include <QQuickWindow>
+
 #include "qmlaccessible.h"
 
 #include "log.h"
@@ -44,6 +46,10 @@ void AbstractNavigation::componentComplete()
         m_accessible->setState(IAccessible::State::Active, active());
         m_accessible->componentComplete();
     }
+
+    navigationController()->highlightChanged().onNotify(this, [this](){
+        emit highlightChanged();
+    });
 }
 
 void AbstractNavigation::setName(QString name)
@@ -164,6 +170,7 @@ void AbstractNavigation::setActive(bool active)
 
     m_active = active;
     emit activeChanged(m_active);
+    emit highlightChanged();
 
     if (m_activeChanged.isConnected()) {
         m_activeChanged.send(m_active);
@@ -184,6 +191,21 @@ void AbstractNavigation::onEvent(INavigation::EventPtr e)
 {
     NavigationEvent ev(e);
     emit navigationEvent(QVariant::fromValue(ev));
+}
+
+QWindow* AbstractNavigation::window() const
+{
+    QObject* prn = parent();
+    while (prn) {
+        QQuickItem* vitem = qobject_cast<QQuickItem*>(prn);
+        if (vitem) {
+            return vitem->window();
+        }
+
+        prn = prn->parent();
+    }
+
+    return nullptr;
 }
 
 AccessibleItem* AbstractNavigation::accessible() const
@@ -221,4 +243,9 @@ void AbstractNavigation::setAccessibleParent(AccessibleItem* p)
     if (m_accessible) {
         m_accessible->setAccessibleParent(p);
     }
+}
+
+bool AbstractNavigation::highlight() const
+{
+    return active() && navigationController()->isHighlight();
 }

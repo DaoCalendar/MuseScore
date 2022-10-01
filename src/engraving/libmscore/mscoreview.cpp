@@ -23,10 +23,11 @@
 #include "mscoreview.h"
 #include "score.h"
 #include "page.h"
+#include "text.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   elementLower
 //---------------------------------------------------------
@@ -46,12 +47,12 @@ static bool elementLower(const EngravingItem* e1, const EngravingItem* e2)
 //   elementAt
 //---------------------------------------------------------
 
-EngravingItem* MuseScoreView::elementAt(const mu::PointF& p)
+EngravingItem* MuseScoreView::elementAt(const mu::PointF& p) const
 {
-    QList<EngravingItem*> el = elementsAt(p);
-    EngravingItem* e = el.value(0);
+    std::vector<EngravingItem*> el = elementsAt(p);
+    EngravingItem* e = el.front();
     if (e && e->isPage()) {
-        e = el.value(1);
+        e = *std::next(el.begin());
     }
     return e;
 }
@@ -60,12 +61,12 @@ EngravingItem* MuseScoreView::elementAt(const mu::PointF& p)
 //   point2page
 //---------------------------------------------------------
 
-Page* MuseScoreView::point2page(const mu::PointF& p)
+Page* MuseScoreView::point2page(const mu::PointF& p) const
 {
     if (score()->linearMode()) {
-        return score()->pages().isEmpty() ? 0 : score()->pages().front();
+        return score()->pages().empty() ? 0 : score()->pages().front();
     }
-    foreach (Page* page, score()->pages()) {
+    for (Page* page : score()->pages()) {
         if (page->bbox().translated(page->pos()).contains(p)) {
             return page;
         }
@@ -78,15 +79,77 @@ Page* MuseScoreView::point2page(const mu::PointF& p)
 //    p is in canvas coordinates
 //---------------------------------------------------------
 
-const QList<EngravingItem*> MuseScoreView::elementsAt(const mu::PointF& p)
+const std::vector<EngravingItem*> MuseScoreView::elementsAt(const mu::PointF& p) const
 {
-    QList<EngravingItem*> el;
+    std::vector<EngravingItem*> el;
 
     Page* page = point2page(p);
     if (page) {
         el = page->items(p - page->pos());
         std::sort(el.begin(), el.end(), elementLower);
     }
+
     return el;
+}
+
+EngravingItem* MuseScoreView::elementNear(const mu::PointF& pos) const
+{
+    std::vector<EngravingItem*> near = elementsNear(pos);
+    if (near.empty()) {
+        return nullptr;
+    }
+    return near.front();
+}
+
+const std::vector<EngravingItem*> MuseScoreView::elementsNear(const mu::PointF& pos) const
+{
+    std::vector<EngravingItem*> ll;
+    Page* page = point2page(pos);
+    if (!page) {
+        return ll;
+    }
+
+    mu::PointF p = pos - page->pos();
+    double w = selectionProximity();
+    RectF r(p.x() - w, p.y() - w, 3.0 * w, 3.0 * w);
+
+    std::vector<EngravingItem*> el = page->items(r);
+    for (int i = 0; i < MAX_HEADERS; i++) {
+        if (score()->headerText(i) != nullptr) {
+            el.push_back(score()->headerText(i));
+        }
+    }
+    for (int i = 0; i < MAX_FOOTERS; i++) {
+        if (score()->footerText(i) != nullptr) {
+            el.push_back(score()->footerText(i));
+        }
+    }
+    for (EngravingItem* e : el) {
+        e->itemDiscovered = 0;
+        if (!e->selectable() || e->isPage()) {
+            continue;
+        }
+        if (e->contains(p)) {
+            ll.push_back(e);
+        }
+    }
+    size_t n = ll.size();
+    if ((n == 0) || ((n == 1) && (ll[0]->isMeasure()))) {
+        //
+        // if no relevant element hit, look nearby
+        //
+        for (EngravingItem* e : el) {
+            if (e->isPage() || !e->selectable()) {
+                continue;
+            }
+            if (e->intersects(r)) {
+                ll.push_back(e);
+            }
+        }
+    }
+    if (!ll.empty()) {
+        std::sort(ll.begin(), ll.end(), elementLower);
+    }
+    return ll;
 }
 }

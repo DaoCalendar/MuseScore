@@ -20,23 +20,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQml.Models 2.3
 import QtQuick.Controls 2.15
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
-import "common"
-import "general"
-import "notation"
-import "text"
-import "score"
+import "."
 
 Rectangle {
     id: root
 
     property alias model: inspectorRepeater.model
+    property alias notationView: popupController.notationView
 
     property NavigationSection navigationSection: null
 
@@ -49,26 +45,26 @@ Rectangle {
         }
     }
 
-    InspectorListModel {
-        id: inspectorListModel
+    QtObject {
+        id: prv
+
+        function closePreviousOpenedPopup(newOpenedPopup, visualControl) {
+            if (Boolean(popupController.popup) && popupController.popup !== newOpenedPopup) {
+                popupController.popup.close()
+            }
+
+            popupController.visualControl = visualControl
+            popupController.popup = newOpenedPopup
+        }
     }
 
-    StyledScrollBar {
-        id: scrollBar
-
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-
-        visible: flickableArea.contentHeight > flickableArea.height
-        z: 1
+    InspectorPopupController {
+        id: popupController
     }
 
-    Flickable {
+    StyledFlickable {
         id: flickableArea
-
         anchors.fill: parent
-        anchors.margins: 12
 
         function ensureContentVisible(invisibleContentHeight) {
             if (flickableArea.contentY + invisibleContentHeight > 0) {
@@ -78,143 +74,59 @@ Rectangle {
             }
         }
 
-        clip: true
         flickableDirection: Flickable.VerticalFlick
-        boundsBehavior: Flickable.StopAtBounds
-        maximumFlickVelocity: 1000
 
-        contentHeight: contentItem.childrenRect.height
+        contentHeight: contentColumn.childrenRect.height + 2 * contentColumn.anchors.margins
 
         Behavior on contentY {
             NumberAnimation { duration: 250 }
         }
 
-        ScrollBar.vertical: scrollBar
+        ScrollBar.vertical: StyledScrollBar {}
 
         Column {
-            anchors.left: parent.left
-            anchors.right: parent.right
+            id: contentColumn
 
-            spacing: 6
+            anchors.fill: parent
+            anchors.margins: 12
+
+            height: childrenRect.height
+            spacing: 12
 
             Repeater {
                 id: inspectorRepeater
 
-                model: inspectorListModel
+                model: InspectorListModel {
+                    id: inspectorListModel
+                }
 
-                delegate: ExpandableBlank {
-                    id: expandableDelegate
+                delegate: Column {
+                    width: parent.width
 
-                    property var contentHeight: implicitHeight
+                    spacing: contentColumn.spacing
 
-                    NavigationPanel {
-                        id: navPanel
-                        name: expandableDelegate.title
-                        section: root.navigationSection
-                        direction: NavigationPanel.Vertical
-                        accessible.name: expandableDelegate.title
-                        enabled: root.visible
-                        order: model.index + 2
+                    SeparatorLine {
+                        anchors.margins: -12
+
+                        visible: model.index !== 0
                     }
 
-                    navigation.panel: navPanel
-                    navigation.row: 0
+                    InspectorSectionDelegate {
+                        sectionModel: model.inspectorSectionModel
+                        index: model.index
+                        anchorItem: root
+                        navigationSection: root.navigationSection
 
-                    function viewBySectionType() {
-                        flickableArea.contentY = 0
-
-                        switch (inspectorData.sectionType) {
-                        case Inspector.SECTION_GENERAL: return generalInspector
-                        case Inspector.SECTION_TEXT: return textInspector
-                        case Inspector.SECTION_NOTATION:
-                            if (inspectorData.isMultiModel()) {
-                                return notationInspectorMultiElements
-                            } else {
-                                return notationInspectorSingleElement
-                            }
-                        case Inspector.SECTION_SCORE_DISPLAY: return scoreInspector
-                        case Inspector.SECTION_SCORE_APPEARANCE: return scoreAppearanceInspector
+                        onReturnToBoundsRequested: {
+                            flickableArea.returnToBounds()
                         }
-                    }
 
-                    contentItemComponent: viewBySectionType()
-
-                    Component.onCompleted: {
-                        title = inspectorData.title
-                    }
-
-                    Component {
-                        id: generalInspector
-
-                        GeneralInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                            anchorItem: root
-
-                            onEnsureContentVisibleRequested: {
-                                flickableArea.ensureContentVisible(-invisibleContentHeight)
-                            }
+                        onEnsureContentVisibleRequested: function(invisibleContentHeight) {
+                            flickableArea.ensureContentVisible(invisibleContentHeight)
                         }
-                    }
 
-                    Component {
-                        id: textInspector
-
-                        TextInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                            anchorItem: root
-
-                            onEnsureContentVisibleRequested: {
-                                flickableArea.ensureContentVisible(-invisibleContentHeight)
-                            }
-                        }
-                    }
-
-                    Component {
-                        id: notationInspectorMultiElements
-
-                        NotationMultiElementView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                            anchorItem: root
-
-                            onEnsureContentVisibleRequested: {
-                                flickableArea.ensureContentVisible(-invisibleContentHeight)
-                            }
-                        }
-                    }
-
-                    Component {
-                        id: notationInspectorSingleElement
-
-                        NotationSingleElementView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                        }
-                    }
-
-                    Component {
-                        id: scoreInspector
-
-                        ScoreDisplayInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
-                        }
-                    }
-
-                    Component {
-                        id: scoreAppearanceInspector
-
-                        ScoreAppearanceInspectorView {
-                            model: inspectorData
-                            navigationPanel: navPanel
-                            navigationRowStart: expandableDelegate.navigation.row + 1
+                        onPopupOpened: {
+                            prv.closePreviousOpenedPopup(openedPopup, visualControl)
                         }
                     }
                 }

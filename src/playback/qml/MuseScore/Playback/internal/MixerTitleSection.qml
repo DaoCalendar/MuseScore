@@ -19,8 +19,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick 2.15
+
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Audio 1.0
@@ -31,10 +31,10 @@ MixerPanelSection {
     headerTitle: qsTrc("playback", "Name")
 
     Rectangle {
-        width: root.delegateDefaultWidth
+        width: root.channelItemWidth
         height: 22
 
-        color: Utils.colorWithAlpha(ui.theme.accentColor, 0.5)
+        color: Utils.colorWithAlpha(ui.theme.accentColor, channelItem.isPrimaryChannel ? 0.5 : 0.25)
         border.color: ui.theme.accentColor
         border.width: 1
 
@@ -46,7 +46,7 @@ MixerPanelSection {
             readonly property int margin: -8
             width: margin + parent.width + margin
 
-            text: item.title
+            text: channelItem.title
         }
     }
 }

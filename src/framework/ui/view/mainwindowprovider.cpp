@@ -41,27 +41,6 @@ QWindow* MainWindowProvider::qWindow() const
     return m_window;
 }
 
-QWindow* MainWindowProvider::topWindow() const
-{
-    if (m_windows.isEmpty()) {
-        return qWindow();
-    }
-    return m_windows.top();
-}
-
-void MainWindowProvider::pushWindow(QWindow* w)
-{
-    m_windows.push(w);
-}
-
-void MainWindowProvider::popWindow(QWindow* w)
-{
-    IF_ASSERT_FAILED(m_windows.top() == w) {
-        return;
-    }
-    m_windows.pop();
-}
-
 void MainWindowProvider::setWindow(QWindow* window)
 {
     if (m_window != nullptr) {
@@ -134,8 +113,7 @@ void MainWindowProvider::requestShowOnFront()
 
 bool MainWindowProvider::isFullScreen() const
 {
-    Qt::WindowStates states = m_window ? m_window->windowStates() : Qt::WindowStates();
-    return states.testFlag(Qt::WindowFullScreen);
+    return m_window ? m_window->visibility() == QWindow::FullScreen : false;
 }
 
 void MainWindowProvider::toggleFullScreen()
@@ -145,13 +123,24 @@ void MainWindowProvider::toggleFullScreen()
     }
 
     if (isFullScreen()) {
-        m_window->showNormal();
+        m_window->setVisibility(m_windowVisibility);
     } else {
-        m_window->showFullScreen();
+        m_windowVisibility = m_window->visibility();
+        m_window->setVisibility(QWindow::FullScreen);
     }
 }
 
-const QScreen* MainWindowProvider::screen() const
+QScreen* MainWindowProvider::screen() const
 {
     return m_window ? m_window->screen() : nullptr;
+}
+
+void MainWindowProvider::showMinimizedWithSavePreviousState()
+{
+    // On Windows, QWindow::showMinimized() doesn't store the previous state of the window.
+    // Thus, it will always be restored to a windowed state once clicked on from the task bar, even
+    // if it was maximized before.
+    // Using setWindowStates, we can remember the previous state and restore it correctly
+    // when the window is shown again.
+    m_window->setWindowStates(Qt::WindowMinimized | m_window->windowStates());
 }

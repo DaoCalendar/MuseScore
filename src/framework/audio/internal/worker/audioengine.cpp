@@ -63,7 +63,7 @@ mu::Ret AudioEngine::init(IAudioBufferPtr bufferPtr)
     m_mixer = std::make_shared<Mixer>();
 
     m_buffer = std::move(bufferPtr);
-    m_buffer->setSource(m_mixer->mixedSource());
+    setMode(RenderMode::RealTimeMode);
 
     m_inited = true;
 
@@ -81,6 +81,13 @@ void AudioEngine::deinit()
     }
 }
 
+sample_rate_t AudioEngine::sampleRate() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return m_sampleRate;
+}
+
 void AudioEngine::setSampleRate(unsigned int sampleRate)
 {
     ONLY_AUDIO_WORKER_THREAD;
@@ -89,6 +96,11 @@ void AudioEngine::setSampleRate(unsigned int sampleRate)
         return;
     }
 
+    if (m_sampleRate == sampleRate) {
+        return;
+    }
+
+    m_sampleRate = sampleRate;
     m_mixer->mixedSource()->setSampleRate(sampleRate);
 }
 
@@ -112,6 +124,37 @@ void AudioEngine::setAudioChannelsCount(const audioch_t count)
     }
 
     m_mixer->setAudioChannelsCount(count);
+}
+
+RenderMode AudioEngine::mode() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return m_currentMode;
+}
+
+void AudioEngine::setMode(const RenderMode newMode)
+{
+    if (newMode == m_currentMode) {
+        return;
+    }
+
+    m_currentMode = newMode;
+
+    if (m_currentMode == RenderMode::RealTimeMode) {
+        m_buffer->setSource(m_mixer->mixedSource());
+    } else {
+        m_buffer->setSource(nullptr);
+    }
+
+    m_modeChanges.notify();
+}
+
+mu::async::Notification AudioEngine::modeChanged() const
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    return m_modeChanges;
 }
 
 MixerPtr AudioEngine::mixer() const

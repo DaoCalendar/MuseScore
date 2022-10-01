@@ -32,17 +32,13 @@ StyledPopupView {
 
     contentWidth: 280
     contentHeight: 600
-    margins: 12
 
     NoteInputBarCustomiseModel {
         id: customiseModel
     }
 
-    Component.onCompleted: {
-        customiseModel.load()
-    }
-
     onOpened: {
+        customiseModel.load()
         view.focusOnFirst()
     }
 
@@ -61,7 +57,7 @@ StyledPopupView {
             Layout.fillWidth: true
             Layout.topMargin: 8
 
-            text: qsTrc("notation", "Customise toolbar")
+            text: qsTrc("notation", "Customize toolbar")
             horizontalAlignment: Text.AlignLeft
             font: ui.theme.largeBodyBoldFont
         }
@@ -110,12 +106,16 @@ StyledPopupView {
             navigationPanel.order: 2
             navigationPanel.accessible.name: titleLabel.text
 
-            onSelectRowRequested: {
+            onSelectRowRequested: function(index) {
                 customiseModel.selectRow(index)
             }
 
             onClearSelectionRequested: {
                 customiseModel.clearSelection()
+            }
+
+            onRemoveSelectionRequested: {
+                customiseModel.removeSelection()
             }
         }
     }

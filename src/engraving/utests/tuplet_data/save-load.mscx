@@ -25,7 +25,7 @@
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle"></metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -98,14 +98,13 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
-            <size>4</size>
             </Tuplet>
           <Beam>
-            <l1>19</l1>
-            <l2>19</l2>
+            <l1>38</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -134,16 +133,13 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
-            <size>12</size>
-            <italic>0</italic>
-            <underline>1</underline>
             </Tuplet>
           <Beam>
-            <l1>19</l1>
-            <l2>19</l2>
+            <l1>38</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -172,16 +168,15 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             <bracketType>1</bracketType>
             <lineWidth>0.6</lineWidth>
-            <size>11</size>
             </Tuplet>
           <Beam>
-            <l1>19</l1>
-            <l2>19</l2>
+            <l1>38</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -210,16 +205,15 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3:2</text>
               </Number>
             <numberType>1</numberType>
             <bracketType>1</bracketType>
-            <size>15</size>
             </Tuplet>
           <Beam>
-            <l1>19</l1>
-            <l2>19</l2>
+            <l1>38</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>

@@ -33,6 +33,7 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/commandlinecontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/commandlinecontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/iappshellconfiguration.h
+    ${CMAKE_CURRENT_LIST_DIR}/iapplicationactioncontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/appshelltypes.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/applicationuiactions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/applicationuiactions.h
@@ -40,13 +41,14 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/appshellconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/applicationactioncontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/applicationactioncontroller.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/appshellconfiguration.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/appshellconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/framelesswindowcontroller.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/framelesswindowcontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/istartupscenario.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/startupscenario.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/startupscenario.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/isessionsmanager.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/sessionsmanager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/sessionsmanager.h
     ${CMAKE_CURRENT_LIST_DIR}/view/devtools/settingslistmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/devtools/settingslistmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/appmenumodel.cpp
@@ -59,6 +61,10 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/notationstatusbarmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/aboutmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/aboutmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/firstlaunchsetup/firstlaunchsetupmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/firstlaunchsetup/firstlaunchsetupmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/firstlaunchsetup/themespagemodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/firstlaunchsetup/themespagemodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/preferences/preferencesmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/preferences/preferencesmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/preferences/preferencepageitem.cpp
@@ -91,6 +97,13 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/framelesswindow/framelesswindowmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/publish/publishtoolbarmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/publish/publishtoolbarmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/windowdroparea.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/windowdroparea.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/iappmenumodelhook.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/maintoolbarmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/maintoolbarmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/splashscreen.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/internal/splashscreen.h
     ${DOCKWINDOW_SRC}
     )
 
@@ -101,6 +114,19 @@ set(MODULE_LINK
     ${DOCK_LIBS}
     )
 
+if (OS_IS_MAC)
+    set(MODULE_SRC ${MODULE_SRC}
+        ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosappmenumodelhook.mm
+        ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosappmenumodelhook.h
+    )
+    set_source_files_properties(
+        ${CMAKE_CURRENT_LIST_DIR}/view/internal/platform/macos/macosappmenumodelhook.mm
+        PROPERTIES
+        SKIP_UNITY_BUILD_INCLUSION ON
+        SKIP_PRECOMPILE_HEADERS ON
+        )
+endif(OS_IS_MAC)
+
 if (OS_IS_WIN)
     set(MODULE_SRC ${MODULE_SRC}
         ${CMAKE_CURRENT_LIST_DIR}/internal/platform/win/winframelesswindowcontroller.cpp
@@ -109,5 +135,17 @@ if (OS_IS_WIN)
 
     set(MODULE_LINK ${MODULE_LINK} dwmapi)
 endif(OS_IS_WIN)
+
+if (NOT OS_IS_MAC)
+    set(MODULE_SRC ${MODULE_SRC}
+        ${CMAKE_CURRENT_LIST_DIR}/view/navigableappmenumodel.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/view/navigableappmenumodel.h
+    )
+
+    # we use QKeyMapper to fix https://github.com/musescore/MuseScore/issues/10181
+    set(MODULE_INCLUDE
+        ${Qt5Gui_PRIVATE_INCLUDE_DIRS}
+    )
+endif(NOT OS_IS_MAC)
 
 include(${PROJECT_SOURCE_DIR}/build/module.cmake)

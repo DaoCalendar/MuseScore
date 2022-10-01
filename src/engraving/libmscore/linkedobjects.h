@@ -22,13 +22,15 @@
 #ifndef MU_ENGRAVING_LINKEDOBJECTS_H
 #define MU_ENGRAVING_LINKEDOBJECTS_H
 
-#include <QList>
+#include <list>
 
 #include "engravingobject.h"
 
-namespace Ms {
-class LinkedObjects : public QList<EngravingObject*>
+namespace mu::engraving {
+class LinkedObjects : public std::list<EngravingObject*>
 {
+    OBJECT_ALLOCATOR(engraving, LinkedObjects)
+
     int _lid;           // unique id for every linked list
 
 public:
@@ -37,6 +39,8 @@ public:
 
     void setLid(Score*, int val);
     int lid() const { return _lid; }
+
+    bool contains(const EngravingObject* o) const;
 
     EngravingObject* mainElement();
 };

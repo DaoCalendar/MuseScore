@@ -35,12 +35,14 @@ using namespace mu::framework;
 
 static const Settings::Key BACKUP_KEY("global", "application/backup/subfolder");
 
-io::path GlobalConfiguration::appBinPath() const
+static const std::string MUSESCORE_URL("https://www.musescore.org/");
+
+io::path_t GlobalConfiguration::appBinPath() const
 {
-    return io::path(QCoreApplication::applicationDirPath());
+    return io::path_t(QCoreApplication::applicationDirPath());
 }
 
-io::path GlobalConfiguration::appDataPath() const
+io::path_t GlobalConfiguration::appDataPath() const
 {
     if (m_appDataPath.empty()) {
         m_appDataPath = resolveAppDataPath();
@@ -69,12 +71,12 @@ QString GlobalConfiguration::resolveAppDataPath() const
 #endif
 }
 
-io::path GlobalConfiguration::appConfigPath() const
+io::path_t GlobalConfiguration::appConfigPath() const
 {
     return QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
 }
 
-io::path GlobalConfiguration::userAppDataPath() const
+io::path_t GlobalConfiguration::userAppDataPath() const
 {
     if (m_userAppDataPath.empty()) {
         m_userAppDataPath = resolveUserAppDataPath();
@@ -85,9 +87,7 @@ io::path GlobalConfiguration::userAppDataPath() const
 QString GlobalConfiguration::resolveUserAppDataPath() const
 {
 #if defined(WIN_PORTABLE)
-    return QDir::cleanPath(QString("%1/../../../Data/settings")
-                           .arg(QCoreApplication::applicationDirPath())
-                           .arg(QCoreApplication::applicationName()));
+    return QDir::cleanPath(QString("%1/../../../Data/settings").arg(QCoreApplication::applicationDirPath()));
 #elif defined(Q_OS_WASM)
     return QString("/files/data");
 #else
@@ -95,20 +95,20 @@ QString GlobalConfiguration::resolveUserAppDataPath() const
 #endif
 }
 
-io::path GlobalConfiguration::userBackupPath() const
+io::path_t GlobalConfiguration::userBackupPath() const
 {
     return settings()->value(BACKUP_KEY).toString();
 }
 
-io::path GlobalConfiguration::userDataPath() const
+io::path_t GlobalConfiguration::userDataPath() const
 {
-    static io::path p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/MuseScore";
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/" + QCoreApplication::applicationName();
     return p;
 }
 
-io::path GlobalConfiguration::homePath() const
+io::path_t GlobalConfiguration::homePath() const
 {
-    static io::path p = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+    static io::path_t p = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
     return p;
 }
 
@@ -120,4 +120,9 @@ bool GlobalConfiguration::useFactorySettings() const
 bool GlobalConfiguration::enableExperimental() const
 {
     return false;
+}
+
+std::string GlobalConfiguration::museScoreUrl() const
+{
+    return MUSESCORE_URL;
 }

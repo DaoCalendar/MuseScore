@@ -29,19 +29,34 @@ import MuseScore.AppShell 1.0
 ApplicationWindow {
     id: root
 
+    default property alias windowContent: windowContentItem.data
+
+    objectName: "ApplicationWindow"
+
+    title: titleProvider.title
+
     width: 1150
     height: 800
 
-    minimumWidth: 1150
-    minimumHeight: 600
+    minimumWidth: 1050
+    minimumHeight: 500
 
-    visible: true
+    visible: false
+
+    color: ui.theme.backgroundPrimaryColor
+
+    Component.onCompleted: {
+        ui.rootItem = root.contentItem
+        titleProvider.load()
+    }
 
     MainWindowTitleProvider {
         id: titleProvider
     }
 
     MainWindowProvider {
+        id: windowProvider
+
         window: root
 
         //! NOTE These properties of QWindow (of which ApplicationWindow is derived)
@@ -50,15 +65,21 @@ ApplicationWindow {
         fileModified: titleProvider.fileModified
     }
 
-    title: titleProvider.title
-
     ToolTipProvider { }
 
     //! NOTE Need only create
     Shortcuts { }
 
-    Component.onCompleted: {
-        ui.rootItem = root.contentItem
-        titleProvider.load()
+    Item {
+        id: windowContentItem
+        anchors.fill: parent
+    }
+
+    WindowDropArea {
+        anchors.fill: parent
+    }
+
+    function showMinimizedWithSavePreviousState() {
+        windowProvider.showMinimizedWithSavePreviousState()
     }
 }

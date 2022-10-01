@@ -27,10 +27,6 @@
 
 namespace mu::palette {
 class PaletteWidget;
-}
-
-namespace Ms {
-class EngravingItem;
 
 //---------------------------------------------------------
 //   SymbolDialog
@@ -39,11 +35,8 @@ class EngravingItem;
 class SymbolDialog : public QWidget, Ui::SymbolDialogBase
 {
     Q_OBJECT
-
-    QString range;
-    mu::palette::PaletteWidget* sp;
-    void createSymbolPalette();
-    void createSymbols();
+public:
+    SymbolDialog(const QString&, QWidget* parent = 0);
 
 private slots:
     void systemFlagChanged(int);
@@ -55,8 +48,12 @@ protected:
     virtual void changeEvent(QEvent* event);
     void retranslate() { retranslateUi(this); }
 
-public:
-    SymbolDialog(const QString&, QWidget* parent = 0);
+private:
+    void createSymbolPalette();
+    void createSymbols();
+
+    QString range;
+    PaletteWidget* m_symbolsWidget = nullptr;
 };
 }
 

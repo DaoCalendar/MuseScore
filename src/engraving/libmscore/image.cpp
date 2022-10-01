@@ -22,21 +22,27 @@
 
 #include "image.h"
 
-#include "draw/pixmap.h"
-#include "draw/transform.h"
-#include "draw/svgrenderer.h"
-#include "io/xml.h"
+#include "io/file.h"
+#include "io/fileinfo.h"
 
-#include "score.h"
-#include "undo.h"
-#include "mscore.h"
+#include "draw/types/pixmap.h"
+#include "draw/types/transform.h"
+#include "draw/svgrenderer.h"
+#include "rw/xml.h"
+
 #include "imageStore.h"
 #include "masterscore.h"
+#include "mscore.h"
+#include "score.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::io;
 using namespace mu::draw;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   propertyList
 //---------------------------------------------------------
@@ -112,7 +118,7 @@ void Image::setImageType(ImageType t)
     } else if (imageType == ImageType::RASTER) {
         rasterDoc.reset();
     } else {
-        qDebug("illegal image type");
+        LOGD("illegal image type");
     }
 }
 
@@ -181,6 +187,7 @@ void Image::draw(mu::draw::Painter* painter) const
             painter->restore();
         }
     }
+
     if (emptyImage) {
         painter->setBrush(mu::draw::BrushStyle::NoBrush);
         painter->setPen(engravingConfiguration()->defaultColor());
@@ -201,18 +208,18 @@ void Image::draw(mu::draw::Painter* painter) const
 
 bool Image::isImageFramed() const
 {
-    if (!parent()) {
+    if (!explicitParent()) {
         return false;
     }
 
-    return parent()->isBox();
+    return explicitParent()->isBox();
 }
 
 //---------------------------------------------------------
 //   imageAspectRatio
 //---------------------------------------------------------
 
-qreal Image::imageAspectRatio() const
+double Image::imageAspectRatio() const
 {
     return _size.width() / _size.height();
 }
@@ -221,9 +228,9 @@ qreal Image::imageAspectRatio() const
 //   setImageHeight
 //---------------------------------------------------------
 
-void Image::updateImageHeight(const qreal& height)
+void Image::updateImageHeight(const double& height)
 {
-    qreal aspectRatio = imageAspectRatio();
+    double aspectRatio = imageAspectRatio();
 
     _size.setHeight(height);
 
@@ -236,9 +243,9 @@ void Image::updateImageHeight(const qreal& height)
 //   setImageWidth
 //---------------------------------------------------------
 
-void Image::updateImageWidth(const qreal& width)
+void Image::updateImageWidth(const double& width)
 {
-    qreal aspectRatio = imageAspectRatio();
+    double aspectRatio = imageAspectRatio();
 
     _size.setWidth(width);
 
@@ -251,7 +258,7 @@ void Image::updateImageWidth(const qreal& width)
 //   imageHeight
 //---------------------------------------------------------
 
-qreal Image::imageHeight() const
+double Image::imageHeight() const
 {
     return _size.height();
 }
@@ -260,7 +267,7 @@ qreal Image::imageHeight() const
 //   imageWidth
 //---------------------------------------------------------
 
-qreal Image::imageWidth() const
+double Image::imageWidth() const
 {
     return _size.width();
 }
@@ -276,20 +283,20 @@ void Image::write(XmlWriter& xml) const
     // TODO : on Save As, score()->fileInfo() still contains the old path and fname
     //          if the Save As path is different, image relative path will be wrong!
     //
-    QString relativeFilePath= QString();
+    String relativeFilePath;
     if (!_linkPath.isEmpty() && _linkIsValid) {
-        QFileInfo fi(_linkPath);
+        FileInfo fi(_linkPath);
         // score()->fileInfo()->canonicalPath() would be better
         // but we are saving under a temp file name and the 'final' file
         // might not exist yet, so canonicalFilePath() may return only "/"
         // OTOH, the score 'final' file name is practically always canonical, at this point
-        QString scorePath = score()->masterScore()->fileInfo()->absolutePath();
-        QString imgFPath  = fi.canonicalFilePath();
+        String scorePath = score()->masterScore()->fileInfo()->absoluteDirPath().toString();
+        String imgFPath  = fi.canonicalFilePath();
         // if imgFPath is in (or below) the directory of scorePath
-        if (imgFPath.startsWith(scorePath, Qt::CaseSensitive)) {
+        if (imgFPath.startsWith(scorePath, mu::CaseSensitive)) {
             // relative img path is the part exceeding scorePath
             imgFPath.remove(0, scorePath.size());
-            if (imgFPath.startsWith('/')) {
+            if (imgFPath.startsWith(u'/')) {
                 imgFPath.remove(0, 1);
             }
             relativeFilePath = imgFPath;
@@ -297,16 +304,16 @@ void Image::write(XmlWriter& xml) const
         // try 1 level up
         else {
             // reduce scorePath by one path level
-            fi.setFile(scorePath);
+            fi = FileInfo(scorePath);
             scorePath = fi.path();
             // if imgFPath is in (or below) the directory up the score directory
-            if (imgFPath.startsWith(scorePath, Qt::CaseSensitive)) {
+            if (imgFPath.startsWith(scorePath, mu::CaseSensitive)) {
                 // relative img path is the part exceeding new scorePath plus "../"
                 imgFPath.remove(0, scorePath.size());
-                if (!imgFPath.startsWith('/')) {
-                    imgFPath.prepend('/');
+                if (!imgFPath.startsWith(u'/')) {
+                    imgFPath.prepend(u'/');
                 }
-                imgFPath.prepend("..");
+                imgFPath.prepend(u"..");
                 relativeFilePath = imgFPath;
             }
         }
@@ -316,7 +323,7 @@ void Image::write(XmlWriter& xml) const
         relativeFilePath = _linkPath;
     }
 
-    xml.startObject(this);
+    xml.startElement(this);
     BSymbol::writeProperties(xml);
     // keep old "path" tag, for backward compatibility and because it is used elsewhere
     // (for instance by Box:read(), Measure:read(), Note:read(), ...)
@@ -328,7 +335,7 @@ void Image::write(XmlWriter& xml) const
     writeProperty(xml, Pid::LOCK_ASPECT_RATIO);
     writeProperty(xml, Pid::SIZE_IS_SPATIUM);
 
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -342,7 +349,7 @@ void Image::read(XmlReader& e)
     }
 
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "autoScale") {
             readProperty(e, Pid::AUTOSCALE);
         } else if (tag == "size") {
@@ -357,9 +364,9 @@ void Image::read(XmlReader& e)
             //    sp if size is spatium
             _sizeIsSpatium = e.readBool();
         } else if (tag == "path") {
-            _storePath = e.readElementText();
+            _storePath = e.readText();
         } else if (tag == "linkPath") {
-            _linkPath = e.readElementText();
+            _linkPath = e.readText();
         } else if (tag == "subtype") {    // obsolete
             e.skipCurrentElement();
         } else if (!BSymbol::readProperties(e)) {
@@ -370,10 +377,7 @@ void Image::read(XmlReader& e)
     // once all paths are read, load img or retrieve it from store
     // loading from file is tried first to update the stored image, if necessary
 
-    qDebug("linkPath <%s>", qPrintable(_linkPath));
-    qDebug("storePath <%s>", qPrintable(_storePath));
-
-    QString path;
+    io::path_t path;
     bool loaded = false;
     // if a store path is given, attempt to get the image from the store
     if (!_storePath.isEmpty()) {
@@ -394,7 +398,7 @@ void Image::read(XmlReader& e)
         path = _linkPath;
     }
 
-    if (path.endsWith(".svg", Qt::CaseInsensitive)) {
+    if (path.withSuffix("svg")) {
         setImageType(ImageType::SVG);
     } else {
         setImageType(ImageType::RASTER);
@@ -407,31 +411,30 @@ void Image::read(XmlReader& e)
 //    return true on success
 //---------------------------------------------------------
 
-bool Image::load(const QString& ss)
+bool Image::load(const io::path_t& ss)
 {
-    qDebug("Image::load <%s>", qPrintable(ss));
-    QString path(ss);
+    io::path_t path(ss);
     // if file path is relative, prepend score path
-    QFileInfo fi(path);
+    FileInfo fi(path);
     if (fi.isRelative()) {
-        path.prepend(score()->masterScore()->fileInfo()->absolutePath() + "/");
-        fi.setFile(path);
+        path = masterScore()->fileInfo()->absoluteDirPath() + '/' + path;
+        fi = FileInfo(path);
     }
 
     _linkIsValid = false;                       // assume link fname is invalid
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly)) {
-        qDebug("Image::load<%s> failed", qPrintable(path));
+    File f(path);
+    if (!f.open(IODevice::ReadOnly)) {
+        LOGD() << "failed load file: " << path;
         return false;
     }
-    QByteArray ba = f.readAll();
+    ByteArray ba = f.readAll();
     f.close();
 
     _linkIsValid = true;
     _linkPath = fi.canonicalFilePath();
     _storeItem = imageStore.add(_linkPath, ba);
     _storeItem->reference(this);
-    if (path.endsWith(".svg", Qt::CaseInsensitive)) {
+    if (path.withSuffix("svg")) {
         setImageType(ImageType::SVG);
     } else {
         setImageType(ImageType::RASTER);
@@ -445,15 +448,13 @@ bool Image::load(const QString& ss)
 //    return true on success
 //---------------------------------------------------------
 
-bool Image::loadFromData(const QString& ss, const QByteArray& ba)
+bool Image::loadFromData(const path_t& name, const ByteArray& ba)
 {
-    qDebug("Image::loadFromData <%s>", qPrintable(ss));
-
     _linkIsValid = false;
-    _linkPath = "";
-    _storeItem = imageStore.add(ss, ba);
+    _linkPath = u"";
+    _storeItem = imageStore.add(name, ba);
     _storeItem->reference(this);
-    if (ss.endsWith(".svg", Qt::CaseInsensitive)) {
+    if (name.withSuffix("svg")) {
         setImageType(ImageType::SVG);
     } else {
         setImageType(ImageType::RASTER);
@@ -468,7 +469,7 @@ bool Image::loadFromData(const QString& ss, const QByteArray& ba)
 void Image::startEditDrag(EditData& data)
 {
     BSymbol::startEditDrag(data);
-    ElementEditData* eed = data.getData(this);
+    ElementEditDataPtr eed = data.getData(this);
 
     eed->pushProperty(Pid::SIZE);
 }
@@ -479,11 +480,11 @@ void Image::startEditDrag(EditData& data)
 
 void Image::editDrag(EditData& ed)
 {
-    qreal ratio = _size.width() / _size.height();
-    qreal dx = ed.delta.x();
-    qreal dy = ed.delta.y();
+    double ratio = _size.width() / _size.height();
+    double dx = ed.delta.x();
+    double dy = ed.delta.y();
     if (_sizeIsSpatium) {
-        qreal _spatium = spatium();
+        double _spatium = spatium();
         dx /= _spatium;
         dy /= _spatium;
     } else {
@@ -559,13 +560,13 @@ void Image::layout()
     }
 
     // if autoscale && inside a box, scale to box relevant size
-    if (autoScale() && parent() && ((parent()->isHBox() || parent()->isVBox()))) {
+    if (autoScale() && explicitParent() && ((explicitParent()->isHBox() || explicitParent()->isVBox()))) {
         if (_lockAspectRatio) {
-            qreal f = _sizeIsSpatium ? spatium() : DPMM;
+            double f = _sizeIsSpatium ? spatium() : DPMM;
             SizeF size(imageSize());
-            qreal ratio = size.width() / size.height();
-            qreal w = parentItem()->width();
-            qreal h = parentItem()->height();
+            double ratio = size.width() / size.height();
+            double w = parentItem()->width();
+            double h = parentItem()->height();
             if ((w / h) < ratio) {
                 _size.setWidth(w / f);
                 _size.setHeight((w / ratio) / f);
@@ -586,13 +587,13 @@ void Image::layout()
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Image::getProperty(Pid propertyId) const
+PropertyValue Image::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::AUTOSCALE:
         return autoScale();
     case Pid::SIZE:
-        return QVariant::fromValue(size());
+        return PropertyValue::fromValue(size());
     case Pid::IMAGE_HEIGHT:
         return imageHeight();
     case Pid::IMAGE_WIDTH:
@@ -612,7 +613,7 @@ QVariant Image::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Image::setProperty(Pid propertyId, const QVariant& v)
+bool Image::setProperty(Pid propertyId, const PropertyValue& v)
 {
     bool rv = true;
     score()->addRefresh(canvasBoundingRect());
@@ -621,7 +622,7 @@ bool Image::setProperty(Pid propertyId, const QVariant& v)
         setAutoScale(v.toBool());
         break;
     case Pid::SIZE:
-        setSize(SizeF::fromVariant(v));
+        setSize(v.value<SizeF>());
         break;
     case Pid::IMAGE_HEIGHT:
         updateImageHeight(v.toDouble());
@@ -654,13 +655,13 @@ bool Image::setProperty(Pid propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Image::propertyDefault(Pid id) const
+PropertyValue Image::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::AUTOSCALE:
         return defaultAutoScale;
     case Pid::SIZE:
-        return QVariant::fromValue(pixel2size(imageSize()));
+        return PropertyValue::fromValue(pixel2size(imageSize()));
     case Pid::IMAGE_HEIGHT:
         return pixel2size(imageSize()).height();
     case Pid::IMAGE_WIDTH:

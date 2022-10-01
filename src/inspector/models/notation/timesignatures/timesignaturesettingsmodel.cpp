@@ -38,30 +38,30 @@ TimeSignatureSettingsModel::TimeSignatureSettingsModel(QObject* parent, IElement
 
 void TimeSignatureSettingsModel::createProperties()
 {
-    m_horizontalScale = buildPropertyItem(Ms::Pid::SCALE, [this](const Ms::Pid pid, const QVariant& newValue) {
-        onPropertyValueChanged(pid, SizeF(newValue.toDouble() / 100, m_verticalScale->value().toDouble() / 100));
+    m_horizontalScale = buildPropertyItem(mu::engraving::Pid::SCALE, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
+        onPropertyValueChanged(pid, QSizeF(newValue.toDouble() / 100, m_verticalScale->value().toDouble() / 100));
     });
 
-    m_verticalScale = buildPropertyItem(Ms::Pid::SCALE, [this](const Ms::Pid pid, const QVariant& newValue) {
-        onPropertyValueChanged(pid, SizeF(m_horizontalScale->value().toDouble() / 100, newValue.toDouble() / 100));
+    m_verticalScale = buildPropertyItem(mu::engraving::Pid::SCALE, [this](const mu::engraving::Pid pid, const QVariant& newValue) {
+        onPropertyValueChanged(pid, QSizeF(m_horizontalScale->value().toDouble() / 100, newValue.toDouble() / 100));
     });
 
-    m_shouldShowCourtesy = buildPropertyItem(Ms::Pid::SHOW_COURTESY);
+    m_shouldShowCourtesy = buildPropertyItem(mu::engraving::Pid::SHOW_COURTESY);
 }
 
 void TimeSignatureSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::TIMESIG);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::TIMESIG);
 }
 
 void TimeSignatureSettingsModel::loadProperties()
 {
     loadPropertyItem(m_horizontalScale, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.value<SizeF>().width()) * 100;
+        return DataFormatter::roundDouble(elementPropertyValue.value<QSizeF>().width()) * 100;
     });
 
     loadPropertyItem(m_verticalScale, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.value<SizeF>().height()) * 100;
+        return DataFormatter::roundDouble(elementPropertyValue.value<QSizeF>().height()) * 100;
     });
 
     loadPropertyItem(m_shouldShowCourtesy);

@@ -37,7 +37,7 @@ Column {
 
     NavigationPanel {
         id: navPanel
-        name: "ExportOptionsView"
+        name: "ExportOptions"
         enabled: root.visible && root.enabled
         direction: NavigationPanel.Vertical
     }
@@ -45,10 +45,10 @@ Column {
     ExportOptionItem {
         id: typeLabel
         width: parent.width
-        text: qsTrc("project", "Format:")
+        text: qsTrc("project/export", "Format:")
 
-        Dropdown {
-            id: typeComboBox
+        StyledDropdown {
+            id: typeDropdown
             Layout.fillWidth: true
 
             navigation.name: "ExportTypeDropdown"
@@ -57,7 +57,7 @@ Column {
             navigation.accessible.name: typeLabel.text + " " + currentText
 
             model: exportModel.exportTypeList()
-            popupItemsCount: typeComboBox.count
+            popupItemsCount: typeDropdown.count
 
             textRole: "name"
             valueRole: "id"
@@ -75,11 +75,11 @@ Column {
                 }
 
                 // Otherwise, it must be a toplevel type
-                return typeComboBox.indexOfValue(exportModel.selectedExportType.id)
+                return typeDropdown.indexOfValue(exportModel.selectedExportType.id)
             }
 
-            onCurrentValueChanged: {
-                exportModel.selectExportTypeById(typeComboBox.currentValue)
+            onActivated: function(index, value) {
+                exportModel.selectExportTypeById(value)
             }
         }
     }
@@ -88,9 +88,9 @@ Column {
         id: subtypeLabel
         width: parent.width
         visible: subtypeComboBox.count > 0
-        text: qsTrc("project", "File type:")
+        text: qsTrc("project/export", "File type:")
 
-        Dropdown {
+        StyledDropdown {
             id: subtypeComboBox
             Layout.fillWidth: true
 
@@ -100,8 +100,8 @@ Column {
             navigation.accessible.name: subtypeLabel.text + " " + currentText
 
             model: {
-                if (typeComboBox.currentIndex > -1) {
-                    return typeComboBox.model[typeComboBox.currentIndex].subtypes
+                if (typeDropdown.currentIndex > -1) {
+                    return typeDropdown.model[typeDropdown.currentIndex].subtypes
                 }
 
                 return []
@@ -111,8 +111,9 @@ Column {
             valueRole: "id"
 
             currentIndex: subtypeComboBox.indexOfValue(exportModel.selectedExportType.id)
-            onCurrentValueChanged: {
-                exportModel.selectExportTypeById(subtypeComboBox.currentValue)
+
+            onActivated: function(index, value) {
+                exportModel.selectExportTypeById(value)
             }
         }
     }
@@ -125,6 +126,10 @@ Column {
             target: root.exportModel
 
             function onSelectedExportTypeChanged() {
+                if (!root.exportModel.selectedExportType.settingsPagePath) {
+                    pageLoader.setSource("")
+                }
+
                 var properties = {
                     model: Qt.binding(() => root.exportModel),
                     navigationPanel: navPanel,
@@ -137,6 +142,8 @@ Column {
     }
 
     RadioButtonGroup {
+        id: exportType
+
         width: parent.width
         visible: count > 1
         spacing: 12
@@ -147,7 +154,7 @@ Column {
         delegate: RoundedRadioButton {
             text: modelData["text"]
 
-            navigation.name: "ExportUnitType " + text
+            navigation.name: "ExportType_" + text
             navigation.panel: navPanel
             navigation.row: 100000 + model.index
 
@@ -155,6 +162,25 @@ Column {
             onToggled: {
                 exportModel.selectedUnitType = modelData["value"]
             }
+        }
+    }
+
+    SeparatorLine {
+        anchors.topMargin: 24
+        anchors.bottomMargin: 24
+    }
+
+    CheckBox {
+        width: parent.width
+        text: qsTrc("project/export", "Open destination folder on export")
+
+        navigation.name: "OpenDestinationFolderOnExportCheckbox"
+        navigation.panel: navPanel
+        navigation.row: 100000 + exportType.count
+
+        checked: exportModel.shouldDestinationFolderBeOpenedOnExport
+        onClicked: {
+            exportModel.shouldDestinationFolderBeOpenedOnExport = !checked
         }
     }
 }

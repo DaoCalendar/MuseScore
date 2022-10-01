@@ -22,11 +22,8 @@
 #ifndef MU_UI_IINTERACTIVEURIREGISTER_H
 #define MU_UI_IINTERACTIVEURIREGISTER_H
 
-#include <QVariantMap>
-#include <QDialog>
-
 #include "modularity/imoduleexport.h"
-#include "global/uri.h"
+#include "types/uri.h"
 #include "uitypes.h"
 
 namespace mu::ui {
@@ -40,7 +37,7 @@ public:
     virtual void registerUri(const Uri& uri, const ContainerMeta& meta) = 0;
     virtual ContainerMeta meta(const Uri& uri) const = 0;
 
-    // userfull
+    // useful
     void registerQmlUri(const Uri& uri, const QString& qmlPath)
     {
         registerUri(uri, ContainerMeta(ContainerType::Type::QmlDialog, qmlPath));

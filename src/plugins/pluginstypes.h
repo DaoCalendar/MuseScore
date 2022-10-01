@@ -40,16 +40,17 @@ struct PluginInfo
     QUrl detailsUrl;
     QString name;
     QString description;
-    QString category;
-    bool installed = false;
+    QString categoryCode;
+    bool enabled = false;
     bool hasUpdate = false;
     QVersionNumber version;
+    std::string shortcuts;
 
     bool isValid() const { return !codeKey.isEmpty(); }
     bool operator==(const PluginInfo& other) const { return other.codeKey == codeKey; }
 };
 
-using PluginInfoList = QList<PluginInfo>;
+using PluginInfoMap = std::map<CodeKey, PluginInfo>;
 }
 
 #endif // MU_PLUGINS_IPLUGINSCONFIGURATION_H

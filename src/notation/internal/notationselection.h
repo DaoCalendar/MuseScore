@@ -26,7 +26,7 @@
 
 #include "igetscore.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
 }
 
@@ -38,8 +38,9 @@ public:
 
     bool isNone() const override;
     bool isRange() const override;
+    SelectionState state() const override;
 
-    bool canCopy() const override;
+    Ret canCopy() const override;
     QMimeData* mimeData() const override;
 
     EngravingItem* element() const override;
@@ -47,12 +48,17 @@ public:
 
     std::vector<Note*> notes(NoteFilter filter) const override;
 
-    QRectF canvasBoundingRect() const override;
+    RectF canvasBoundingRect() const override;
 
     INotationSelectionRangePtr range() const override;
 
+    EngravingItem* lastElementHit() const override;
+
+    void onElementHit(EngravingItem*);
+
 private:
-    Ms::Score* score() const;
+    mu::engraving::Score* score() const;
+    EngravingItem* m_lastElementHit;
 
     IGetScore* m_getScore = nullptr;
     INotationSelectionRangePtr m_range;

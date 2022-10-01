@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.12
+import QtQuick 2.15
 
 Text {
     id: root
@@ -39,11 +39,25 @@ Text {
         pixelSize: ui.theme.bodyFont.pixelSize
     }
 
-    onLinkActivated: Qt.openUrlExternally(link)
+    onLinkActivated: function(link) {
+        Qt.openUrlExternally(link)
+    }
 
-    MouseArea {
+    onHoveredLinkChanged: {
+        if (Boolean(hoveredLink)) {
+            mouseAreaLoader.active = true
+        }
+    }
+
+    Loader {
+        id: mouseAreaLoader
         anchors.fill: parent
-        acceptedButtons: Qt.NoButton
-        cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+        active: false
+
+        sourceComponent: MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.NoButton
+            cursorShape: root.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+        }
     }
 }

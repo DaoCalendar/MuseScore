@@ -43,6 +43,7 @@ public:
 
     void reg(const IUiActionsModulePtr& actions) override;
     const UiAction& action(const actions::ActionCode& code) const override;
+    const std::vector<UiAction> getActions() const override;
     UiActionState actionState(const actions::ActionCode& code) const override;
     async::Channel<actions::ActionCodeList> actionStateChanged() const override;
 
@@ -63,7 +64,8 @@ private:
     Info& info(const actions::ActionCode& code);
     const Info& info(const actions::ActionCode& code) const;
 
-    void updateShortcuts();
+    void updateShortcuts(const actions::ActionCodeList& codes);
+    void updateShortcutsAll();
 
     void updateEnabled(const actions::ActionCodeList& codes);
     void updateEnabledAll();

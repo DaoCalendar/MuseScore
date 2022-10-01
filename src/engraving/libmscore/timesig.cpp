@@ -22,22 +22,23 @@
 
 #include "timesig.h"
 
-#include "translation.h"
+#include "rw/xml.h"
 #include "style/style.h"
-#include "io/xml.h"
+#include "translation.h"
 
 #include "score.h"
-#include "scorefont.h"
-#include "symbol.h"
+#include "segment.h"
 #include "staff.h"
 #include "stafftype.h"
-#include "segment.h"
+#include "symbolfont.h"
 #include "utils.h"
-#include "masterscore.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 static const ElementStyle timesigStyle {
     { Sid::timesigScale,                       Pid::SCALE },
 };
@@ -71,7 +72,7 @@ void TimeSig::setParent(Segment* parent)
 //   mag
 //---------------------------------------------------------
 
-qreal TimeSig::mag() const
+double TimeSig::mag() const
 {
     return staff() ? staff()->staffMag(tick()) : 1.0;
 }
@@ -122,7 +123,7 @@ EngravingItem* TimeSig::drop(EditData& data)
 //    setSig() has to be called first
 //---------------------------------------------------------
 
-void TimeSig::setNumeratorString(const QString& a)
+void TimeSig::setNumeratorString(const String& a)
 {
     if (_timeSigType == TimeSigType::NORMAL) {
         _numeratorString = a;
@@ -134,7 +135,7 @@ void TimeSig::setNumeratorString(const QString& a)
 //    setSig() has to be called first
 //---------------------------------------------------------
 
-void TimeSig::setDenominatorString(const QString& a)
+void TimeSig::setDenominatorString(const String& a)
 {
     if (_timeSigType == TimeSigType::NORMAL) {
         _denominatorString = a;
@@ -147,7 +148,7 @@ void TimeSig::setDenominatorString(const QString& a)
 
 void TimeSig::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     writeProperty(xml, Pid::TIMESIG_TYPE);
     EngravingItem::writeProperties(xml);
 
@@ -165,7 +166,7 @@ void TimeSig::write(XmlWriter& xml) const
     writeProperty(xml, Pid::SHOW_COURTESY);
     writeProperty(xml, Pid::SCALE);
 
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -178,7 +179,7 @@ void TimeSig::read(XmlReader& e)
     bool old = false;
 
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
 
         if (tag == "den") {
             old = true;
@@ -219,9 +220,9 @@ void TimeSig::read(XmlReader& e)
         } else if (tag == "stretchD") {
             _stretch.setDenominator(e.readInt());
         } else if (tag == "textN") {
-            setNumeratorString(e.readElementText());
+            setNumeratorString(e.readText());
         } else if (tag == "textD") {
-            setDenominatorString(e.readElementText());
+            setDenominatorString(e.readText());
         } else if (tag == "Groups") {
             _groups.read(e);
         } else if (readStyledProperty(e, tag)) {
@@ -236,37 +237,16 @@ void TimeSig::read(XmlReader& e)
 
     // HACK: handle time signatures from scores before 3.5 differently on some special occasions.
     // See https://musescore.org/node/308139.
-    QString version = mscoreVersion();
-    if (!version.isEmpty() && (version >= "3.0") && (version < "3.5")) {
+    String version = score()->mscoreVersion();
+    if (!version.isEmpty() && (version >= u"3.0") && (version < u"3.5")) {
         if ((_timeSigType == TimeSigType::NORMAL) && !_numeratorString.isEmpty() && _denominatorString.isEmpty()) {
-            if (_numeratorString == QString::number(_sig.numerator())) {
+            if (_numeratorString == String::number(_sig.numerator())) {
                 _numeratorString.clear();
             } else {
-                setDenominatorString(QString::number(_sig.denominator()));
+                setDenominatorString(String::number(_sig.denominator()));
             }
         }
     }
-}
-
-//---------------------------------------------------------
-//   propertyId
-//---------------------------------------------------------
-
-Pid TimeSig::propertyId(const QStringRef& name) const
-{
-    if (name == "subtype") {
-        return Pid::TIMESIG_TYPE;
-    }
-    if (name == "sigN" || name == "sigD") {
-        return Pid::TIMESIG;
-    }
-    if (name == "stretchN" || name == "stretchD") {
-        return Pid::TIMESIG_STRETCH;
-    }
-    if (name == "Groups") {
-        return Pid::GROUPS;
-    }
-    return EngravingItem::propertyId(name);
 }
 
 //---------------------------------------------------------
@@ -276,7 +256,7 @@ Pid TimeSig::propertyId(const QStringRef& name) const
 void TimeSig::layout()
 {
     setPos(0.0, 0.0);
-    qreal _spatium = spatium();
+    double _spatium = spatium();
 
     setbbox(RectF());                    // prepare for an empty time signature
     pointLargeLeftParen = PointF();
@@ -284,7 +264,7 @@ void TimeSig::layout()
     pn = PointF();
     pointLargeRightParen = PointF();
 
-    qreal lineDist;
+    double lineDist;
     int numOfLines;
     TimeSigType sigType = timeSigType();
     const Staff* _staff       = staff();
@@ -293,7 +273,7 @@ void TimeSig::layout()
         // if staff is without time sig, format as if no text at all
         if (!_staff->staffTypeForElement(this)->genTimesig()) {
             // reset position and box sizes to 0
-            // qDebug("staff: no time sig");
+            // LOGD("staff: no time sig");
             pointLargeLeftParen.rx() = 0.0;
             pn.rx() = 0.0;
             pz.rx() = 0.0;
@@ -315,7 +295,7 @@ void TimeSig::layout()
     // compute vert. displacement to center in the staff height
     // determine middle staff position:
 
-    qreal yoff = _spatium * (numOfLines - 1) * .5 * lineDist;
+    double yoff = _spatium * (numOfLines - 1) * .5 * lineDist;
 
     // C and Ccut are placed at the middle of the staff: use yoff directly
     if (sigType == TimeSigType::FOUR_FOUR) {
@@ -344,14 +324,14 @@ void TimeSig::layout()
         ds.clear();
     } else {
         if (_numeratorString.isEmpty()) {
-            ns = timeSigSymIdsFromString(_numeratorString.isEmpty() ? QString::number(_sig.numerator()) : _numeratorString);
-            ds = timeSigSymIdsFromString(_denominatorString.isEmpty() ? QString::number(_sig.denominator()) : _denominatorString);
+            ns = timeSigSymIdsFromString(_numeratorString.isEmpty() ? String::number(_sig.numerator()) : _numeratorString);
+            ds = timeSigSymIdsFromString(_denominatorString.isEmpty() ? String::number(_sig.denominator()) : _denominatorString);
         } else {
             ns = timeSigSymIdsFromString(_numeratorString);
             ds = timeSigSymIdsFromString(_denominatorString);
         }
 
-        ScoreFont* font = score()->scoreFont();
+        SymbolFont* font = score()->symbolFont();
         SizeF mag(magS() * _scale);
 
         RectF numRect = font->bbox(ns, mag);
@@ -361,11 +341,11 @@ void TimeSig::layout()
         // number of lines is odd: 0.0 (strings are directly above and below the middle line)
         // number of lines even:   0.05 (strings are moved up/down to leave 1/10sp between them)
 
-        qreal displ = (numOfLines & 1) ? 0.0 : (0.05 * _spatium);
+        double displ = (numOfLines & 1) ? 0.0 : (0.05 * _spatium);
 
         //align on the wider
-        qreal pzY = yoff - (denRect.width() < 0.01 ? 0.0 : (displ + numRect.height() * .5));
-        qreal pnY = yoff + displ + denRect.height() * .5;
+        double pzY = yoff - (denRect.width() < 0.01 ? 0.0 : (displ + numRect.height() * .5));
+        double pnY = yoff + displ + denRect.height() * .5;
 
         if (numRect.width() >= denRect.width()) {
             // numerator: one space above centre line, unless denomin. is empty (if so, directly centre in the middle)
@@ -434,18 +414,18 @@ void TimeSig::setFrom(const TimeSig* ts)
 //   ssig
 //---------------------------------------------------------
 
-QString TimeSig::ssig() const
+String TimeSig::ssig() const
 {
-    return QString("%1/%2").arg(_sig.numerator()).arg(_sig.denominator());
+    return String(u"%1/%2").arg(_sig.numerator()).arg(_sig.denominator());
 }
 
 //---------------------------------------------------------
 //   setSSig
 //---------------------------------------------------------
 
-void TimeSig::setSSig(const QString& s)
+void TimeSig::setSSig(const String& s)
 {
-    QStringList sl = s.split("/");
+    StringList sl = s.split(u'/');
     if (sl.size() == 2) {
         _sig.setNumerator(sl[0].toInt());
         _sig.setDenominator(sl[1].toInt());
@@ -456,7 +436,7 @@ void TimeSig::setSSig(const QString& s)
 //   getProperty
 //---------------------------------------------------------
 
-QVariant TimeSig::getProperty(Pid propertyId) const
+PropertyValue TimeSig::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::SHOW_COURTESY:
@@ -465,14 +445,14 @@ QVariant TimeSig::getProperty(Pid propertyId) const
         return numeratorString();
     case Pid::DENOMINATOR_STRING:
         return denominatorString();
-    case Pid::GROUPS:
-        return QVariant::fromValue(groups());
+    case Pid::GROUP_NODES:
+        return groups().nodes();
     case Pid::TIMESIG:
-        return QVariant::fromValue(_sig);
+        return PropertyValue::fromValue(_sig);
     case Pid::TIMESIG_GLOBAL:
-        return QVariant::fromValue(globalSig());
+        return PropertyValue::fromValue(globalSig());
     case Pid::TIMESIG_STRETCH:
-        return QVariant::fromValue(stretch());
+        return PropertyValue::fromValue(stretch());
     case Pid::TIMESIG_TYPE:
         return int(_timeSigType);
     case Pid::SCALE:
@@ -486,7 +466,7 @@ QVariant TimeSig::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool TimeSig::setProperty(Pid propertyId, const QVariant& v)
+bool TimeSig::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::SHOW_COURTESY:
@@ -496,13 +476,13 @@ bool TimeSig::setProperty(Pid propertyId, const QVariant& v)
         setShowCourtesySig(v.toBool());
         break;
     case Pid::NUMERATOR_STRING:
-        setNumeratorString(v.toString());
+        setNumeratorString(v.value<String>());
         break;
     case Pid::DENOMINATOR_STRING:
-        setDenominatorString(v.toString());
+        setDenominatorString(v.value<String>());
         break;
-    case Pid::GROUPS:
-        setGroups(v.value<Groups>());
+    case Pid::GROUP_NODES:
+        setGroups(v.value<GroupNodes>());
         break;
     case Pid::TIMESIG:
         setSig(v.value<Fraction>());
@@ -517,7 +497,7 @@ bool TimeSig::setProperty(Pid propertyId, const QVariant& v)
         _timeSigType = (TimeSigType)(v.toInt());
         break;
     case Pid::SCALE:
-        _scale = SizeF::fromVariant(v);
+        _scale = v.value<ScaleF>();
         break;
     default:
         if (!EngravingItem::setProperty(propertyId, v)) {
@@ -534,19 +514,19 @@ bool TimeSig::setProperty(Pid propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant TimeSig::propertyDefault(Pid id) const
+PropertyValue TimeSig::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::SHOW_COURTESY:
-        return true;
+        return 1;
     case Pid::NUMERATOR_STRING:
-        return QString();
+        return String();
     case Pid::DENOMINATOR_STRING:
-        return QString();
+        return String();
     case Pid::TIMESIG:
-        return QVariant::fromValue(Fraction(4, 4));
+        return PropertyValue::fromValue(Fraction(4, 4));
     case Pid::TIMESIG_GLOBAL:
-        return QVariant::fromValue(Fraction(1, 1));
+        return PropertyValue::fromValue(Fraction(1, 1));
     case Pid::TIMESIG_TYPE:
         return int(TimeSigType::NORMAL);
     case Pid::SCALE:
@@ -578,26 +558,26 @@ EngravingItem* TimeSig::prevSegmentElement()
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString TimeSig::accessibleInfo() const
+String TimeSig::accessibleInfo() const
 {
-    QString timeSigString;
+    String timeSigString;
     switch (timeSigType()) {
     case TimeSigType::FOUR_FOUR:
-        timeSigString = qtrc("symUserNames", "Common time");
+        timeSigString = mtrc("engraving/timesig", "Common time");
         break;
     case TimeSigType::ALLA_BREVE:
-        timeSigString = qtrc("symUserNames", "Cut time");
+        timeSigString = mtrc("engraving/timesig", "Cut time");
         break;
     case TimeSigType::CUT_BACH:
-        timeSigString = qtrc("symUserNames", "Cut time (Bach)");
+        timeSigString = mtrc("engraving/timesig", "Cut time (Bach)");
         break;
     case TimeSigType::CUT_TRIPLE:
-        timeSigString = qtrc("symUserNames", "Cut triple time (9/8)");
+        timeSigString = mtrc("engraving/timesig", "Cut triple time (9/8)");
         break;
     default:
-        timeSigString = qtrc("engraving", "%1/%2 time").arg(QString::number(numerator()), QString::number(denominator()));
+        timeSigString = mtrc("engraving/timesig", "%1/%2 time").arg(numerator(), denominator());
     }
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), timeSigString);
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), timeSigString);
 }
 
 //---------------------------------------------------------
@@ -613,5 +593,23 @@ bool TimeSig::operator==(const TimeSig& ts) const
            && (_numeratorString == ts._numeratorString)
            && (_denominatorString == ts._denominatorString)
     ;
+}
+
+void TimeSig::added()
+{
+    IF_ASSERT_FAILED(score()) {
+        return;
+    }
+
+    score()->setUpTempoMap();
+}
+
+void TimeSig::removed()
+{
+    IF_ASSERT_FAILED(score()) {
+        return;
+    }
+
+    score()->setUpTempoMap();
 }
 }

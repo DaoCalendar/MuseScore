@@ -23,15 +23,17 @@
 #ifndef __PART_H__
 #define __PART_H__
 
+#include <vector>
+
 #include "mscore.h"
 #include "instrument.h"
-#include "text.h"
+#include "types/types.h"
 
 namespace mu::engraving::compat {
 class Read206;
 }
 
-namespace Ms {
+namespace mu::engraving {
 class XmlWriter;
 class Staff;
 class Score;
@@ -67,25 +69,28 @@ enum class PreferSharpFlat : char {
 
 class Part final : public EngravingObject
 {
-    QString _partName;              ///< used in tracklist (mixer)
+    OBJECT_ALLOCATOR(engraving, Part)
+
+    String _partName;              ///< used in tracklist (mixer)
     InstrumentList _instruments;
-    QList<Staff*> _staves;
+    std::vector<Staff*> _staves;
     ID _id = INVALID_ID;             ///< used for MusicXml import
     bool _show = false;              ///< show part in partitur if true
     bool _soloist = false;           ///< used in score ordering
+    int _capoFret = 0;
 
     static const int DEFAULT_COLOR = 0x3399ff;
     int _color = 0;                  ///User specified color for helping to label parts
 
     PreferSharpFlat _preferSharpFlat = PreferSharpFlat::DEFAULT;
 
-    friend class mu::engraving::compat::Read206;
+    friend class compat::Read206;
 
 public:
     Part(Score* score = nullptr);
     void initFromInstrTemplate(const InstrumentTemplate*);
 
-    ID id() const;
+    const ID& id() const;
     void setId(const ID& id);
 
     Part* clone() const;
@@ -94,44 +99,50 @@ public:
     bool readProperties(XmlReader&);
     void write(XmlWriter& xml) const;
 
-    int nstaves() const;
-    const QList<Staff*>* staves() const;
+    size_t nstaves() const;
+    const std::vector<Staff*>& staves() const;
     void appendStaff(Staff* staff);
     void clearStaves();
 
-    Staff* staff(int idx) const;
-    QString familyId() const;
+    Staff* staff(staff_idx_t idx) const;
+    String familyId() const;
 
-    int startTrack() const;
-    int endTrack() const;
+    track_idx_t startTrack() const;
+    track_idx_t endTrack() const;
 
-    QString longName(const Fraction& tick = { -1, 1 }) const;
-    QString shortName(const Fraction& tick = { -1, 1 }) const;
-    QString instrumentName(const Fraction& tick = { -1, 1 }) const;
-    QString instrumentId(const Fraction& tick = { -1, 1 }) const;
+    InstrumentTrackIdList instrumentTrackIdList() const;
+    InstrumentTrackIdSet instrumentTrackIdSet() const;
 
-    const QList<StaffName>& longNames(const Fraction& tick = { -1, 1 }) const { return instrument(tick)->longNames(); }
-    const QList<StaffName>& shortNames(const Fraction& tick = { -1, 1 }) const { return instrument(tick)->shortNames(); }
+    String longName(const Fraction& tick = { -1, 1 }) const;
+    String shortName(const Fraction& tick = { -1, 1 }) const;
+    String instrumentName(const Fraction& tick = { -1, 1 }) const;
+    String instrumentId(const Fraction& tick = { -1, 1 }) const;
 
-    void setLongNames(QList<StaffName>& s,  const Fraction& tick = { -1, 1 });
-    void setShortNames(QList<StaffName>& s, const Fraction& tick = { -1, 1 });
+    const std::list<StaffName>& longNames(const Fraction& tick = { -1, 1 }) const { return instrument(tick)->longNames(); }
+    const std::list<StaffName>& shortNames(const Fraction& tick = { -1, 1 }) const { return instrument(tick)->shortNames(); }
 
-    void setLongName(const QString& s);
-    void setShortName(const QString& s);
+    void setLongNames(std::list<StaffName>& s,  const Fraction& tick = { -1, 1 });
+    void setShortNames(std::list<StaffName>& s, const Fraction& tick = { -1, 1 });
 
-    void setPlainLongName(const QString& s);
-    void setPlainShortName(const QString& s);
+    void setLongName(const String& s);
+    void setShortName(const String& s);
+
+    void setPlainLongName(const String& s);
+    void setPlainShortName(const String& s);
 
     void setStaves(int);
 
     int midiProgram() const;
     void setMidiProgram(int, int bank = 0);
 
+    int capoFret() const;
+    void setCapoFret(int capoFret);
+
     int midiChannel() const;
     int midiPort() const;
     void setMidiChannel(int ch, int port = -1, const Fraction& tick = { -1, 1 });  // tick != -1 for InstrumentChange
 
-    void insertStaff(Staff*, int idx);
+    void insertStaff(Staff*, staff_idx_t idx);
     void removeStaff(Staff*);
     bool show() const { return _show; }
     void setShow(bool val) { _show = val; }
@@ -140,24 +151,27 @@ public:
 
     Instrument* instrument(Fraction = { -1, 1 });
     const Instrument* instrument(Fraction = { -1, 1 }) const;
+    const Instrument* instrumentById(const std::string& id) const;
     void setInstrument(Instrument*, Fraction = { -1, 1 });         // transfer ownership
     void setInstrument(Instrument*, int tick);
     void setInstrument(const Instrument&&, Fraction = { -1, 1 });
     void setInstrument(const Instrument&, Fraction = { -1, 1 });
     void setInstruments(const InstrumentList& instruments);
     void removeInstrument(const Fraction&);
-    void removeInstrument(const QString&);
-    const InstrumentList* instruments() const;
+    void removeInstrument(const String&);
+    const InstrumentList& instruments() const;
 
     void insertTime(const Fraction& tick, const Fraction& len);
 
-    QString partName() const { return _partName; }
-    void setPartName(const QString& s) { _partName = s; }
+    String partName() const { return _partName; }
+    void setPartName(const String& s) { _partName = s; }
     int color() const { return _color; }
     void setColor(int value) { _color = value; }
 
-    QVariant getProperty(Pid) const override;
-    bool setProperty(Pid, const QVariant&) override;
+    bool isVisible() const;
+
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid, const PropertyValue&) override;
 
     int lyricCount() const;
     int harmonyCount() const;
@@ -166,7 +180,8 @@ public:
     bool hasDrumStaff() const;
 
     void updateHarmonyChannels(bool isDoOnInstrumentChanged, bool checkRemoval = false);
-    const Channel* harmonyChannel() const;
+    const InstrChannel* harmonyChannel() const;
+    bool hasChordSymbol() const;
 
     const Part* masterPart() const;
     Part* masterPart();
@@ -178,5 +193,5 @@ public:
     // TODO: do we need instruments info in parts at all?
     friend void readPart206(Part*, XmlReader&);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

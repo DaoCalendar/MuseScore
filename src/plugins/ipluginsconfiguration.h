@@ -24,7 +24,7 @@
 
 #include "pluginstypes.h"
 #include "modularity/imoduleexport.h"
-#include "retval.h"
+#include "types/retval.h"
 
 #include "io/path.h"
 #include "async/channel.h"
@@ -37,14 +37,28 @@ class IPluginsConfiguration : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IPluginsConfiguration() = default;
 
-    virtual io::paths availablePluginsPaths() const = 0;
+    virtual io::paths_t availablePluginsPaths() const = 0;
 
-    virtual io::path userPluginsPath() const = 0;
-    virtual void setUserPluginsPath(const io::path& path) = 0;
-    virtual async::Channel<io::path> userPluginsPathChanged() const = 0;
+    virtual io::path_t userPluginsPath() const = 0;
+    virtual void setUserPluginsPath(const io::path_t& path) = 0;
+    virtual async::Channel<io::path_t> userPluginsPathChanged() const = 0;
 
-    virtual ValCh<CodeKeyList> installedPlugins() const = 0;
-    virtual void setInstalledPlugins(const CodeKeyList& codeKeyList) = 0;
+    struct PluginConfiguration {
+        CodeKey codeKey;
+        bool enabled = false;
+        std::string shortcuts;
+
+        bool isValid() const
+        {
+            return !codeKey.isEmpty();
+        }
+    };
+    using PluginsConfigurationHash = QHash<CodeKey, PluginConfiguration>;
+
+    virtual const PluginsConfigurationHash& pluginsConfiguration() const = 0;
+    virtual mu::Ret setPluginsConfiguration(const PluginsConfigurationHash& configuration) = 0;
+
+    virtual QColor viewBackgroundColor() const = 0;
 };
 }
 

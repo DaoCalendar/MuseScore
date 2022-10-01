@@ -21,15 +21,21 @@
  */
 
 #include "location.h"
-#include "io/xml.h"
+
+#include "rw/xml.h"
+
 #include "chord.h"
 #include "engravingitem.h"
 #include "measure.h"
 #include "mscore.h"
+#include "note.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 static constexpr Location absDefaults = Location::absolute();
 static constexpr Location relDefaults = Location::relative();
 
@@ -42,7 +48,7 @@ int Location::track() const
     if ((_staff == absDefaults._staff) || (_voice == absDefaults._voice)) {
         return INT_MIN;
     }
-    return VOICES * _staff + _voice;
+    return static_cast<int>(VOICES) * _staff + _voice;
 }
 
 //---------------------------------------------------------
@@ -62,15 +68,15 @@ void Location::setTrack(int track)
 
 void Location::write(XmlWriter& xml) const
 {
-    Q_ASSERT(isRelative());
-    xml.startObject("location");
+    assert(isRelative());
+    xml.startElement("location");
     xml.tag("staves", _staff, relDefaults._staff);
     xml.tag("voices", _voice, relDefaults._voice);
     xml.tag("measures", _measure, relDefaults._measure);
-    xml.tag("fractions", _frac.reduced(), relDefaults._frac);
+    xml.tagFraction("fractions", _frac.reduced(), relDefaults._frac);
     xml.tag("grace", _graceIndex, relDefaults._graceIndex);
     xml.tag("notes", _note, relDefaults._note);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -80,7 +86,7 @@ void Location::write(XmlWriter& xml) const
 void Location::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
 
         if (tag == "staves") {
             _staff = e.readInt();
@@ -144,9 +150,9 @@ void Location::toRelative(const Location& ref)
 
 void Location::fillPositionForElement(const EngravingItem* e, bool absfrac)
 {
-    Q_ASSERT(isAbsolute());
+    assert(isAbsolute());
     if (!e) {
-        qWarning("Location::fillPositionForElement: element is nullptr");
+        LOGW("Location::fillPositionForElement: element is nullptr");
         return;
     }
     if (track() == absDefaults.track()) {
@@ -169,9 +175,9 @@ void Location::fillPositionForElement(const EngravingItem* e, bool absfrac)
 
 void Location::fillForElement(const EngravingItem* e, bool absfrac)
 {
-    Q_ASSERT(isAbsolute());
+    assert(isAbsolute());
     if (!e) {
-        qWarning("Location::fillForElement: element is nullptr");
+        LOGW("Location::fillForElement: element is nullptr");
         return;
     }
 
@@ -208,7 +214,7 @@ Location Location::positionForElement(const EngravingItem* e, bool absfrac)
 
 int Location::track(const EngravingItem* e)
 {
-    int track = e->track();
+    int track = static_cast<int>(e->track());
     if (track < 0) {
         const MeasureBase* mb = e->findMeasureBase();
         if (mb && !mb->isMeasure()) {
@@ -230,7 +236,7 @@ int Location::measure(const EngravingItem* e)
     if (m) {
         return m->measureIndex();
     }
-    qWarning("Location::measure: cannot find element's measure (%s)", e->name());
+    LOGW("Location::measure: cannot find element's measure (%s)", e->typeName());
     return 0;
 }
 
@@ -240,10 +246,10 @@ int Location::measure(const EngravingItem* e)
 
 int Location::graceIndex(const EngravingItem* e)
 {
-    if (e->isChord() || (e->parent() && e->parent()->isChord())) {
-        const Chord* ch = e->isChord() ? toChord(e) : toChord(e->parent());
+    if (e->isChord() || (e->explicitParent() && e->explicitParent()->isChord())) {
+        const Chord* ch = e->isChord() ? toChord(e) : toChord(e->explicitParent());
         if (ch->isGrace()) {
-            return ch->graceIndex();
+            return static_cast<int>(ch->graceIndex());
         }
     }
     return absDefaults.graceIndex();
@@ -276,7 +282,7 @@ int Location::note(const EngravingItem* e)
 //   Location::getLocationProperty
 //---------------------------------------------------------
 
-QVariant Location::getLocationProperty(Pid pid, const EngravingItem* start, const EngravingItem* end)
+PropertyValue Location::getLocationProperty(Pid pid, const EngravingItem* start, const EngravingItem* end)
 {
     switch (pid) {
     case Pid::LOCATION_STAVES:
@@ -292,7 +298,7 @@ QVariant Location::getLocationProperty(Pid pid, const EngravingItem* start, cons
     case Pid::LOCATION_NOTE:
         return note(start) - note(end);
     default:
-        return QVariant();
+        return PropertyValue();
     }
 }
 

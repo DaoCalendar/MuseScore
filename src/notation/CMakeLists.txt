@@ -26,14 +26,16 @@ set(MODULE_QML_IMPORT ${CMAKE_CURRENT_LIST_DIR}/qml)
 find_package(Qt5 COMPONENTS Svg REQUIRED)
 
 include(${CMAKE_CURRENT_LIST_DIR}/view/widgets/widgets.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/view/styledialog/styledialog.cmake)
 
 set(MODULE_SRC
-    ${WIDGETS_SRC}
     ${CMAKE_CURRENT_LIST_DIR}/notationmodule.cpp
     ${CMAKE_CURRENT_LIST_DIR}/notationmodule.h
     ${CMAKE_CURRENT_LIST_DIR}/imasternotation.h
     ${CMAKE_CURRENT_LIST_DIR}/iexcerptnotation.h
     ${CMAKE_CURRENT_LIST_DIR}/inotation.h
+    ${CMAKE_CURRENT_LIST_DIR}/inotationpainting.h
+    ${CMAKE_CURRENT_LIST_DIR}/inotationviewstate.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationnoteinput.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationselection.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationinteraction.h
@@ -41,7 +43,6 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/inotationstyle.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationaccessibility.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationmidiinput.h
-    ${CMAKE_CURRENT_LIST_DIR}/imasternotationmididata.h
     ${CMAKE_CURRENT_LIST_DIR}/notationtypes.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/notationerrors.h
@@ -60,6 +61,10 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/excerptnotation.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notation.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationpainting.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationpainting.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationviewstate.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/notationviewstate.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationundostack.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationundostack.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationstyle.cpp
@@ -83,10 +88,12 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/positionswriter.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/positionswriter.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/mscnotationwriter.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/mscnotationwriter.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationplayback.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationplayback.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/midiinputcontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/midiinputcontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/midiinputoutputcontroller.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/midiinputoutputcontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationmidiinput.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationmidiinput.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationparts.cpp
@@ -96,11 +103,11 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/searchcommandsparser.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/searchcommandsparser.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/inotationselectionrange.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/masternotationmididata.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/masternotationmididata.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/instrumentsrepository.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/instrumentsrepository.h
 
+    ${CMAKE_CURRENT_LIST_DIR}/view/abstractnotationpaintview.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/abstractnotationpaintview.h
     ${CMAKE_CURRENT_LIST_DIR}/view/notationpaintview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/notationpaintview.h
     ${CMAKE_CURRENT_LIST_DIR}/view/notationviewinputcontroller.cpp
@@ -129,6 +136,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/notationnavigator.h
     ${CMAKE_CURRENT_LIST_DIR}/view/noteinputbarcustomiseitem.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/noteinputbarcustomiseitem.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/continuouspanel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/continuouspanel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/internal/undoredomodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/internal/undoredomodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/internal/noteflagstypeselectormodel.cpp
@@ -137,6 +146,17 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/selectionfiltermodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/editgridsizedialogmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/editgridsizedialogmodel.h
+    
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardtypes.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardcontroller.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardcontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardview.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardview.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardpanelcontextmenumodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/pianokeyboard/pianokeyboardpanelcontextmenumodel.h
+
+    ${WIDGETS_SRC}
+    ${STYLEDIALOG_SRC}
     )
 
 set(MODULE_UI
@@ -150,21 +170,10 @@ else (USE_SYSTEM_FREETYPE)
     set(FREETYPE_LIB mscore_freetype)
 endif (USE_SYSTEM_FREETYPE)
 
-set(Z_LIB )
-if (MSVC)
-    include(FindStaticLibrary)
-    set(Z_LIB zlibstat)
-elseif (CC_IS_EMSCRIPTEN)
-    #zlib included in main linker
-else ()
-    set(Z_LIB z)
-endif ()
-
 set(MODULE_LINK
     Qt5::Svg
     ${FREETYPE_LIB}
-    qzip
-    ${Z_LIB}
+    draw
     engraving
     commonscene
     uicomponents

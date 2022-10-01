@@ -20,7 +20,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 
 import MuseScore.Ui 1.0
@@ -31,6 +30,8 @@ import "internal"
 
 PreferencesPage {
     id: root
+
+    contentFillsAvailableHeight: true
 
     Component.onCompleted: {
         preferencesModel.load()
@@ -63,9 +64,9 @@ PreferencesPage {
             Layout.fillHeight: true
 
             keyRoleName: "keyRole"
-            keyTitle: qsTrc("appshell", "Preference")
+            keyTitle: qsTrc("appshell/preferences", "Preference")
             valueRoleName: "valueRole"
-            valueTitle: qsTrc("appshell", "Value")
+            valueTitle: qsTrc("appshell/preferences", "Value")
             valueTypeRole: "typeRole"
 
             navigationSection: root.navigationSection

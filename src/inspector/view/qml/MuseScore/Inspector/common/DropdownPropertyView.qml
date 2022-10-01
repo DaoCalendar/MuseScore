@@ -32,32 +32,29 @@ InspectorPropertyView {
     property alias dropdown: dropdownItem
     property alias model: dropdownItem.model
 
+    navigationName: "DropdownPropertyView"
     navigationRowEnd: dropdownItem.navigation.row
 
     function focusOnFirst() {
         dropdownItem.navigation.requestActive()
     }
 
-    Dropdown {
+    StyledDropdown {
         id: dropdownItem
+
         width: parent.width
 
-        navigation.name: root.titleText + " Value"
+        navigation.name: root.navigationName + " Dropdown"
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRowStart + 1
-        navigation.enabled: root.enabled && root.navigationEnabled && root.visible
         navigation.accessible.name: root.titleText + " " + currentText
 
         currentIndex: root.propertyItem && !root.propertyItem.isUndefined
-                      ? indexOfValue(root.propertyItem.value)
+                      ? dropdownItem.indexOfValue(root.propertyItem.value)
                       : -1
 
-        onCurrentValueChanged: {
-            if (!root.propertyItem || currentIndex === -1) {
-                return
-            }
-
-            root.propertyItem.value = currentValue
+        onActivated: function(index, value) {
+            root.propertyItem.value = value
         }
     }
 }

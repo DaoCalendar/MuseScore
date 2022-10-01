@@ -21,12 +21,10 @@
  */
 #include "scoreappearancesettingsmodel.h"
 
-#include "log.h"
 #include "translation.h"
-#include "dataformatter.h"
-#include "types/scoreappearancetypes.h"
 
 using namespace mu::inspector;
+using namespace mu::notation;
 
 ScoreAppearanceSettingsModel::ScoreAppearanceSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
@@ -35,9 +33,69 @@ ScoreAppearanceSettingsModel::ScoreAppearanceSettingsModel(QObject* parent, IEle
     setTitle(qtrc("inspector", "Score appearance"));
 }
 
+bool ScoreAppearanceSettingsModel::hideEmptyStaves() const
+{
+    return styleValue(StyleId::hideEmptyStaves).toBool();
+}
+
+void ScoreAppearanceSettingsModel::setHideEmptyStaves(bool hide)
+{
+    if (updateStyleValue(StyleId::hideEmptyStaves, hide)) {
+        emit hideEmptyStavesChanged();
+    }
+}
+
+bool ScoreAppearanceSettingsModel::dontHideEmptyStavesInFirstSystem() const
+{
+    return styleValue(StyleId::dontHideStavesInFirstSystem).toBool();
+}
+
+void ScoreAppearanceSettingsModel::setDontHideEmptyStavesInFirstSystem(bool dont)
+{
+    if (updateStyleValue(StyleId::dontHideStavesInFirstSystem, dont)) {
+        emit dontHideEmptyStavesInFirstSystemChanged();
+    }
+}
+
+bool ScoreAppearanceSettingsModel::showBracketsWhenSpanningSingleStaff() const
+{
+    return styleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden).toBool();
+}
+
+void ScoreAppearanceSettingsModel::setShowBracketsWhenSpanningSingleStaff(bool show)
+{
+    if (updateStyleValue(StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden, show)) {
+        emit showBracketsWhenSpanningSingleStaffChanged();
+    }
+}
+
 bool ScoreAppearanceSettingsModel::isEmpty() const
 {
     return !isNotationExisting();
+}
+
+void ScoreAppearanceSettingsModel::onCurrentNotationChanged()
+{
+    AbstractInspectorModel::onCurrentNotationChanged();
+
+    emit hideEmptyStavesChanged();
+    emit dontHideEmptyStavesInFirstSystemChanged();
+    emit showBracketsWhenSpanningSingleStaffChanged();
+}
+
+void ScoreAppearanceSettingsModel::onNotationChanged(const engraving::PropertyIdSet&, const engraving::StyleIdSet& changedStyleIdSet)
+{
+    if (mu::contains(changedStyleIdSet, StyleId::hideEmptyStaves)) {
+        emit hideEmptyStavesChanged();
+    }
+
+    if (mu::contains(changedStyleIdSet, StyleId::dontHideStavesInFirstSystem)) {
+        emit dontHideEmptyStavesInFirstSystemChanged();
+    }
+
+    if (mu::contains(changedStyleIdSet, StyleId::alwaysShowBracketsWhenEmptyStavesAreHidden)) {
+        emit showBracketsWhenSpanningSingleStaffChanged();
+    }
 }
 
 void ScoreAppearanceSettingsModel::showPageSettings()

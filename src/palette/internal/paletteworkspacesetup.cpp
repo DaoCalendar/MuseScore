@@ -21,26 +21,28 @@
  */
 #include "paletteworkspacesetup.h"
 
-#include <QBuffer>
+#include "io/buffer.h"
 
 #include "paletteprovider.h"
 #include "palettecreator.h"
 
-#include "engraving/infrastructure/io/xml.h"
+#include "engraving/rw/xml.h"
 
 #include "log.h"
 
+using namespace mu;
+using namespace mu::io;
 using namespace mu::palette;
 using namespace mu::workspace;
 
-static const QString PALETTE_XML_TAG("PaletteBox");
+static const AsciiStringView PALETTE_XML_TAG("PaletteBox");
 
-static PaletteTreePtr readPalette(const QByteArray& data)
+static PaletteTreePtr readPalette(const ByteArray& data)
 {
-    QBuffer buf;
-    buf.setData(data);
-    buf.open(QIODevice::ReadOnly);
-    Ms::XmlReader reader(&buf);
+    ByteArray ba = ByteArray::fromRawData(data.constData(), data.size());
+    Buffer buf(&ba);
+    buf.open(IODevice::ReadOnly);
+    mu::engraving::XmlReader reader(&buf);
 
     while (!reader.atEnd()) {
         reader.readNextStartElement();
@@ -57,10 +59,11 @@ static PaletteTreePtr readPalette(const QByteArray& data)
 
 static void writePalette(const PaletteTreePtr& tree, QByteArray& data)
 {
-    QBuffer buf(&data);
-    buf.open(QIODevice::WriteOnly);
-    Ms::XmlWriter writer(nullptr, &buf);
+    Buffer buf;
+    buf.open(IODevice::WriteOnly);
+    mu::engraving::XmlWriter writer(&buf);
     tree->write(writer);
+    data = buf.data().toQByteArray();
 }
 
 void PaletteWorkspaceSetup::setup()
@@ -68,6 +71,8 @@ void PaletteWorkspaceSetup::setup()
     if (!workspacesDataProvider()) {
         return;
     }
+
+    paletteProvider()->setDefaultPaletteTree(PaletteCreator::newDefaultPaletteTree());
 
     paletteProvider()->userPaletteTreeChanged().onNotify(this, [this]() {
         PaletteTreePtr tree = paletteProvider()->userPaletteTree();
@@ -81,15 +86,14 @@ void PaletteWorkspaceSetup::setup()
     auto loadData = [this]() {
         RetVal<QByteArray> data = workspacesDataProvider()->rawData(DataKey::Palettes);
         PaletteTreePtr tree;
-        if (data.ret) {
+        if (data.ret && !data.val.isEmpty()) {
             LOGD() << "there is palette data in the workspace, we will use it";
-            tree = readPalette(data.val);
+            ByteArray ba = ByteArray::fromQByteArrayNoCopy(data.val);
+            tree = readPalette(ba);
         } else {
             LOGD() << "no palette data in workspace, will use default";
             tree = PaletteCreator::newDefaultPaletteTree();
         }
-
-        paletteProvider()->setDefaultPaletteTree(tree);
         paletteProvider()->setUserPaletteTree(tree);
     };
 

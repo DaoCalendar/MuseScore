@@ -33,8 +33,8 @@ Item {
     property alias genres: genreBox.model
     property alias groups: groupsView.model
 
-    property alias currentGenreIndex: genreBox.currentIndex
-    property alias currentGroupIndex: groupsView.currentIndex
+    property int currentGenreIndex: -1
+    property int currentGroupIndex: -1
 
     property alias navigation: navPanel
 
@@ -45,21 +45,44 @@ Item {
         groupsView.positionViewAtIndex(groupIndex, ListView.Beginning)
     }
 
-    QtObject {
-        id: prv
+    function focusOnFirst() {
+        root.groupSelected(0)
+    }
 
-        property var currentItemNavigationIndex: []
+    function groupName(index) {
+        var item = groupsView.itemAtIndex(index)
+        if (item) {
+            return item.groupName
+        }
+
+        return undefined
+    }
+
+    function restoreGroupNavigationActive(groupName) {
+        for (var i = 0; i < groupsView.count; ++i) {
+            var item = groupsView.itemAtIndex(i)
+             if (item.groupName === groupName && navigation.active) {
+                 item.navigation.requestActive()
+                 return
+            }
+        }
     }
 
     NavigationPanel {
         id: navPanel
         name: "FamilyView"
         direction: NavigationPanel.Vertical
-        enabled: root.visible
+        enabled: root.enabled && root.visible
 
-        onNavigationEvent: {
+        onNavigationEvent: function(event) {
             if (event.type === NavigationEvent.AboutActive) {
-                event.setData("controlIndex", prv.currentItemNavigationIndex)
+                for (var i = 0; i < groupsView.count; ++i) {
+                    var item = groupsView.itemAtIndex(i)
+                    if (item.isSelected) {
+                        event.setData("controlIndex", [item.navigation.row, item.navigation.column])
+                        return
+                    }
+                }
             }
         }
     }
@@ -74,7 +97,7 @@ Item {
         text: qsTrc("instruments", "Family")
     }
 
-    Dropdown {
+    StyledDropdown {
         id: genreBox
 
         anchors.top: titleLabel.bottom
@@ -86,13 +109,14 @@ Item {
         navigation.panel: navPanel
         navigation.row: 1
 
-        onActivated: {
-            prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-            root.genreSelected(genreBox.currentIndex)
+        currentIndex: root.currentGenreIndex
+
+        onActivated: function(index, value) {
+            root.genreSelected(index)
         }
     }
 
-    ListView {
+    StyledListView {
         id: groupsView
 
         anchors.top: genreBox.bottom
@@ -101,17 +125,14 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        boundsBehavior: ListView.StopAtBounds
-        clip: true
-
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
+        onModelChanged: {
+            groupsView.currentIndex = Qt.binding(() => (root.currentGroupIndex))
         }
 
         delegate: ListItemBlank {
             id: item
+
+            property string groupName: modelData
 
             isSelected: groupsView.currentIndex === model.index
 
@@ -120,11 +141,6 @@ Item {
             navigation.row: 2 + model.index
             navigation.accessible.name: itemTitleLabel.text
 
-            onNavigationActived: {
-                prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-                item.clicked(null)
-            }
-
             StyledTextLabel {
                 id: itemTitleLabel
                 anchors.fill: parent
@@ -132,7 +148,7 @@ Item {
 
                 font: ui.theme.bodyBoldFont
                 horizontalAlignment: Text.AlignLeft
-                text: modelData
+                text: groupName
             }
 
             onClicked: {

@@ -23,21 +23,22 @@
 #include "symboldialog.h"
 
 #include "engraving/style/style.h"
+#include "engraving/types/symnames.h"
+#include "engraving/infrastructure/smufl.h"
 
 #include "libmscore/masterscore.h"
-#include "libmscore/scorefont.h"
-#include "libmscore/symnames.h"
+#include "infrastructure/symbolfonts.h"
 #include "libmscore/engravingitem.h"
 #include "libmscore/symbol.h"
 
 #include "palettewidget.h"
 
-#include "smuflranges.h"
-
+using namespace mu::engraving;
 using namespace mu::palette;
 
-namespace Ms {
+namespace mu::engraving {
 extern MasterScore* gpaletteScore;
+}
 
 //---------------------------------------------------------
 //   createSymbolPalette
@@ -45,7 +46,7 @@ extern MasterScore* gpaletteScore;
 
 void SymbolDialog::createSymbolPalette()
 {
-    sp = new PaletteWidget();
+    m_symbolsWidget = new PaletteWidget(this);
     createSymbols();
 }
 
@@ -56,17 +57,17 @@ void SymbolDialog::createSymbolPalette()
 void SymbolDialog::createSymbols()
 {
     int currentIndex = fontList->currentIndex();
-    const ScoreFont* f = &ScoreFont::scoreFonts()[currentIndex];
+    const SymbolFont* f = &SymbolFonts::scoreFonts()[currentIndex];
     // init the font if not done yet
-    ScoreFont::fontByName(f->name());
-    sp->clear();
-    for (auto name : (*mu::smuflRanges())[range]) {
+    SymbolFonts::fontByName(f->name());
+    m_symbolsWidget->clear();
+    for (auto name : Smufl::smuflRanges().at(range)) {
         SymId id = SymNames::symIdByName(name);
         if (search->text().isEmpty()
-            || SymNames::translatedUserNameForSymId(id).contains(search->text(), Qt::CaseInsensitive)) {
+            || SymNames::translatedUserNameForSymId(id).toQString().contains(search->text(), Qt::CaseInsensitive)) {
             auto s = std::make_shared<Symbol>(gpaletteScore->dummy());
             s->setSym(SymId(id), f);
-            sp->appendElement(s, SymNames::translatedUserNameForSymId(SymId(id)));
+            m_symbolsWidget->appendElement(s, SymNames::translatedUserNameForSymId(SymId(id)));
         }
     }
 }
@@ -82,7 +83,7 @@ SymbolDialog::SymbolDialog(const QString& s, QWidget* parent)
     range = s;          // smufl symbol range
     int idx = 0;
     int currentIndex = 0;
-    for (const ScoreFont& f : ScoreFont::scoreFonts()) {
+    for (const SymbolFont& f : SymbolFonts::scoreFonts()) {
         fontList->addItem(f.name());
         if (f.name() == "Leland" || f.name() == "Bravura") {
             currentIndex = idx;
@@ -91,21 +92,26 @@ SymbolDialog::SymbolDialog(const QString& s, QWidget* parent)
     }
     fontList->setCurrentIndex(currentIndex);
 
-    QLayout* l = new QVBoxLayout();
-    frame->setLayout(l);
+    QLayout* layout = new QVBoxLayout();
+    frame->setLayout(layout);
     createSymbolPalette();
 
-    QScrollArea* sa = new PaletteScrollArea(sp);
-    l->addWidget(sa);
+    QScrollArea* symbolsArea = new PaletteScrollArea(m_symbolsWidget);
+    symbolsArea->setFocusProxy(m_symbolsWidget);
+    symbolsArea->setFocusPolicy(Qt::TabFocus);
+    layout->addWidget(symbolsArea);
 
-    sp->setAcceptDrops(false);
-    sp->setDrawGrid(true);
-    sp->setSelectable(true);
+    m_symbolsWidget->setAcceptDrops(false);
+    m_symbolsWidget->setDrawGrid(true);
+    m_symbolsWidget->setSelectable(true);
 
     connect(systemFlag, &QCheckBox::stateChanged, this, &SymbolDialog::systemFlagChanged);
     connect(fontList, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SymbolDialog::systemFontChanged);
 
-    sa->setWidget(sp);
+    symbolsArea->setWidget(m_symbolsWidget);
+
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
 }
 
 //---------------------------------------------------------
@@ -115,8 +121,8 @@ SymbolDialog::SymbolDialog(const QString& s, QWidget* parent)
 void SymbolDialog::systemFlagChanged(int state)
 {
     bool sysFlag = state == Qt::Checked;
-    for (int i = 0; i < sp->actualCellCount(); ++i) {
-        ElementPtr e = sp->elementForCellAt(i);
+    for (int i = 0; i < m_symbolsWidget->actualCellCount(); ++i) {
+        ElementPtr e = m_symbolsWidget->elementForCellAt(i);
         if (e && e->type() == ElementType::SYMBOL) {
             std::dynamic_pointer_cast<Symbol>(e)->setSystemFlag(sysFlag);
         }
@@ -154,5 +160,4 @@ void SymbolDialog::changeEvent(QEvent* event)
     if (event->type() == QEvent::LanguageChange) {
         retranslate();
     }
-}
 }

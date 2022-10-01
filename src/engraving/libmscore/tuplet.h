@@ -23,10 +23,10 @@
 #ifndef __TUPLET_H__
 #define __TUPLET_H__
 
-#include "duration.h"
+#include "durationelement.h"
 #include "property.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Text;
 class Spanner;
 enum class TupletNumberType : char;
@@ -44,17 +44,20 @@ enum class TupletBracketType : char;
 
 class Tuplet final : public DurationElement
 {
+    OBJECT_ALLOCATOR(engraving, Tuplet)
+
     std::vector<DurationElement*> _elements;
-    Direction _direction;
+    DirectionV _direction;
     TupletNumberType _numberType;
     TupletBracketType _bracketType;
-    Spatium _bracketWidth;
+    Millimetre _bracketWidth;
 
     bool _hasBracket;
     Fraction _ratio;
     TDuration _baseLen;        // 1/8 for a triplet of 1/8
 
     bool _isUp;
+    bool _isSmall;
 
     Fraction _tick;
 
@@ -68,6 +71,8 @@ class Tuplet final : public DurationElement
 
     Fraction addMissingElement(const Fraction& startTick, const Fraction& endTick);
 
+    bool calcHasBracket(const DurationElement* cr1, const DurationElement* cr2) const;
+
 public:
     Tuplet(Measure* parent);
     Tuplet(const Tuplet&);
@@ -77,11 +82,10 @@ public:
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
 
     Tuplet* clone() const override { return new Tuplet(*this); }
-    void setTrack(int val) override;
+    void setTrack(track_idx_t val) override;
 
     void add(EngravingItem*) override;
     void remove(EngravingItem*) override;
@@ -96,7 +100,7 @@ public:
 
     void setSelected(bool f) override;
 
-    Measure* measure() const override { return toMeasure(parent()); }
+    Measure* measure() const override { return toMeasure(explicitParent()); }
 
     TupletNumberType numberType() const { return _numberType; }
     TupletBracketType bracketType() const { return _bracketType; }
@@ -104,8 +108,8 @@ public:
     void setBracketType(TupletBracketType val) { _bracketType = val; }
     bool hasBracket() const { return _hasBracket; }
     void setHasBracket(bool b) { _hasBracket = b; }
-    Spatium bracketWidth() const { return _bracketWidth; }
-    void setBracketWidth(Spatium s) { _bracketWidth = s; }
+    Millimetre bracketWidth() const { return _bracketWidth; }
+    void setBracketWidth(Millimetre s) { _bracketWidth = s; }
 
     Fraction ratio() const { return _ratio; }
     void setRatio(const Fraction& r) { _ratio = r; }
@@ -135,9 +139,10 @@ public:
 
     void dump() const override;
 
-    void setDirection(Direction d) { _direction = d; }
-    Direction direction() const { return _direction; }
+    void setDirection(DirectionV d) { _direction = d; }
+    DirectionV direction() const { return _direction; }
     bool isUp() const { return _isUp; }
+    bool isSmall() const { return _isSmall; }
     Fraction tick() const override { return _tick; }
     Fraction rtick() const override;
     void setTick(const Fraction& v) { _tick = v; }
@@ -147,13 +152,13 @@ public:
 
     void setVisible(bool f) override;
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant& v) override;
-    QVariant propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue& v) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
     Shape shape() const override;
 
-    EngravingItem::EditBehavior normalModeEditBehavior() const override { return EngravingItem::EditBehavior::Edit; }
+    bool needStartEditingAfterSelecting() const override { return true; }
     int gripsCount() const override { return 2; }
     Grip initialEditModeGrip() const override { return Grip::END; }
     Grip defaultGrip() const override { return Grip::START; }
@@ -162,5 +167,5 @@ public:
     void sanitizeTuplet();
     void addMissingElements();
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

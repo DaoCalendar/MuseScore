@@ -25,25 +25,28 @@
 #include <QObject>
 
 class QOAuth2AuthorizationCodeFlow;
-class QOAuthHttpServerReplyHandler;
 
 #include "iauthorizationservice.h"
 #include "iuploadingservice.h"
 
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
 #include "icloudconfiguration.h"
-#include "system/ifilesystem.h"
+#include "io/ifilesystem.h"
 #include "network/inetworkmanagercreator.h"
 #include "multiinstances/imultiinstancesprovider.h"
 #include "iinteractive.h"
 
 namespace mu::cloud {
-class CloudService : public QObject, public IAuthorizationService, public IUploadingService
+class OAuthHttpServerReplyHandler;
+
+class CloudService : public QObject, public IAuthorizationService, public IUploadingService, public async::Asyncable
 {
     Q_OBJECT
 
     INJECT(cloud, ICloudConfiguration, configuration)
-    INJECT(cloud, system::IFileSystem, fileSystem)
+    INJECT(cloud, io::IFileSystem, fileSystem)
     INJECT(cloud, network::INetworkManagerCreator, networkManagerCreator)
     INJECT(cloud, framework::IInteractive, interactive)
     INJECT(cloud, mi::IMultiInstancesProvider, multiInstancesProvider)
@@ -53,16 +56,20 @@ public:
 
     void init();
 
+    void signUp() override;
     void signIn() override;
     void signOut() override;
+
+    Ret requireAuthorization(const std::string& text = {}) override;
 
     ValCh<bool> userAuthorized() const override;
     ValCh<AccountInfo> accountInfo() const override;
 
-    void uploadScore(io::Device& scoreSourceDevice, const QString& title, const QUrl& sourceUrl = QUrl()) override;
+    Ret checkCloudIsAvailable() const override;
 
-    async::Channel<QUrl> sourceUrlReceived() const override;
-    framework::ProgressChannel progressChannel() const override;
+    framework::ProgressPtr uploadScore(QIODevice& scoreData, const QString& title, bool isPrivate = false,
+                                       const QUrl& sourceUrl = QUrl()) override;
+    framework::ProgressPtr uploadAudio(QIODevice& audioData, const QString& audioFormat, const QUrl& sourceUrl) override;
 
 private slots:
     void onUserAuthorized();
@@ -80,24 +87,21 @@ private:
 
     void openUrl(const QUrl& url);
 
-    enum class RequestStatus {
-        Ok,
-        UserUnauthorized,
-        Error
-    };
-
-    QUrl prepareUrlForRequest(QUrl apiUrl) const;
+    RetVal<QUrl> prepareUrlForRequest(QUrl apiUrl, const QVariantMap& params = QVariantMap()) const;
     network::RequestHeaders headers() const;
 
-    RequestStatus downloadUserInfo();
-    RequestStatus doUploadScore(io::Device& scoreSourceDevice, const QString& title, const QUrl& sourceUrl = QUrl());
+    Ret downloadAccountInfo();
+    RetVal<ScoreInfo> downloadScoreInfo(int scoreId);
 
-    using RequestCallback = std::function<RequestStatus()>;
+    mu::RetVal<mu::ValMap> doUploadScore(network::INetworkManagerPtr uploadManager, QIODevice& scoreData, const QString& title,
+                                         bool isPrivate = false, const QUrl& sourceUrl = QUrl());
+    Ret doUploadAudio(network::INetworkManagerPtr uploadManager, QIODevice& audioData, const QString& audioFormat, const QUrl& sourceUrl);
+
+    using RequestCallback = std::function<Ret()>;
     void executeRequest(const RequestCallback& requestCallback);
 
     QOAuth2AuthorizationCodeFlow* m_oauth2 = nullptr;
-    QOAuthHttpServerReplyHandler* m_replyHandler = nullptr;
-    network::INetworkManagerPtr m_networkManager;
+    OAuthHttpServerReplyHandler* m_replyHandler = nullptr;
 
     ValCh<bool> m_userAuthorized;
     ValCh<AccountInfo> m_accountInfo;
@@ -106,7 +110,6 @@ private:
     QString m_refreshToken;
 
     OnUserAuthorizedCallback m_onUserAuthorizedCallback;
-    async::Channel<QUrl> m_sourceUrlReceived;
 };
 }
 

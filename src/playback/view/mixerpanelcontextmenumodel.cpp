@@ -22,29 +22,33 @@
 
 #include "mixerpanelcontextmenumodel.h"
 
-#include "translation.h"
+#include "types/translatablestring.h"
 
+using namespace mu;
 using namespace mu::playback;
 using namespace mu::ui;
+using namespace mu::uicomponents;
 using namespace mu::actions;
 
 static const ActionCode TOGGLE_MIXER_SECTION_ACTION("toggle-mixer-section");
 
 static const QString VIEW_MENU_ID("view-menu");
 
-static QString mixerSectionTitle(MixerSectionType type)
+static TranslatableString mixerSectionTitle(MixerSectionType type)
 {
     switch (type) {
-    case MixerSectionType::Labels: return mu::qtrc("playback", "Labels");
-    case MixerSectionType::Sound: return mu::qtrc("playback", "Sound");
-    case MixerSectionType::AudioFX: return mu::qtrc("playback", "Audio FX");
-    case MixerSectionType::Balance: return mu::qtrc("playback", "Pan");
-    case MixerSectionType::Volume: return mu::qtrc("playback", "Volume");
-    case MixerSectionType::Title: return mu::qtrc("playback", "Name");
+    case MixerSectionType::Labels: return TranslatableString("playback", "Labels");
+    case MixerSectionType::Sound: return TranslatableString("playback", "Sound");
+    case MixerSectionType::AudioFX: return TranslatableString("playback", "Audio FX");
+    case MixerSectionType::Balance: return TranslatableString("playback", "Pan");
+    case MixerSectionType::Volume: return TranslatableString("playback", "Volume");
+    case MixerSectionType::Fader: return TranslatableString("playback", "Fader");
+    case MixerSectionType::MuteAndSolo: return TranslatableString("playback", "Mute and solo");
+    case MixerSectionType::Title: return TranslatableString("playback", "Name");
     case MixerSectionType::Unknown: break;
     }
 
-    return QString();
+    return {};
 }
 
 MixerPanelContextMenuModel::MixerPanelContextMenuModel(QObject* parent)
@@ -77,6 +81,16 @@ bool MixerPanelContextMenuModel::volumeSectionVisible() const
     return isSectionVisible(MixerSectionType::Volume);
 }
 
+bool MixerPanelContextMenuModel::faderSectionVisible() const
+{
+    return isSectionVisible(MixerSectionType::Fader);
+}
+
+bool MixerPanelContextMenuModel::muteAndSoloSectionVisible() const
+{
+    return isSectionVisible(MixerSectionType::MuteAndSolo);
+}
+
 bool MixerPanelContextMenuModel::titleSectionVisible() const
 {
     return isSectionVisible(MixerSectionType::Title);
@@ -92,7 +106,7 @@ void MixerPanelContextMenuModel::load()
     }
 
     MenuItemList viewMenu {
-        makeMenu(qtrc("playback", "View"), viewMenuItems, true /*enabled*/, VIEW_MENU_ID)
+        makeMenu(TranslatableString("playback", "View"), viewMenuItems, VIEW_MENU_ID)
     };
 
     setItems(viewMenu);
@@ -103,18 +117,24 @@ bool MixerPanelContextMenuModel::isSectionVisible(MixerSectionType sectionType) 
     return configuration()->isMixerSectionVisible(sectionType);
 }
 
-MenuItem MixerPanelContextMenuModel::buildViewMenuItem(MixerSectionType sectionType) const
+MenuItem* MixerPanelContextMenuModel::buildViewMenuItem(MixerSectionType sectionType)
 {
     int sectionTypeInt = static_cast<int>(sectionType);
 
-    MenuItem item;
-    item.id = QString::number(sectionTypeInt);
-    item.title = mixerSectionTitle(sectionType);
-    item.code = TOGGLE_MIXER_SECTION_ACTION;
-    item.state.enabled = true;
-    item.state.checked = isSectionVisible(sectionType);
-    item.args = ActionData::make_arg1<int>(sectionTypeInt);
-    item.checkable = Checkable::Yes;
+    MenuItem* item = new MenuItem(this);
+    item->setId(QString::number(sectionTypeInt));
+    item->setArgs(ActionData::make_arg1<int>(sectionTypeInt));
+
+    UiAction action;
+    action.title = mixerSectionTitle(sectionType);
+    action.code = TOGGLE_MIXER_SECTION_ACTION;
+    action.checkable = Checkable::Yes;
+    item->setAction(action);
+
+    UiActionState state;
+    state.enabled = true;
+    state.checked = isSectionVisible(sectionType);
+    item->setState(state);
 
     return item;
 }
@@ -147,6 +167,12 @@ void MixerPanelContextMenuModel::toggleMixerSection(const actions::ActionData& a
     case MixerSectionType::Volume:
         emit volumeSectionVisibleChanged();
         break;
+    case MixerSectionType::Fader:
+        emit faderSectionVisibleChanged();
+        break;
+    case MixerSectionType::MuteAndSolo:
+        emit muteAndSoloSectionVisibleChanged();
+        break;
     case MixerSectionType::Title:
         emit titleSectionVisibleChanged();
         break;
@@ -157,12 +183,12 @@ void MixerPanelContextMenuModel::toggleMixerSection(const actions::ActionData& a
     QString sectionItemId = QString::number(sectionTypeInt);
     MenuItem& viewMenu = findMenu(VIEW_MENU_ID);
 
-    for (MenuItem& item : viewMenu.subitems) {
-        if (item.id == sectionItemId) {
-            item.state.checked = newVisibilityValue;
+    for (MenuItem* item : viewMenu.subitems()) {
+        if (item->id() == sectionItemId) {
+            UiActionState state = item->state();
+            state.checked = newVisibilityValue;
+            item->setState(state);
             break;
         }
     }
-
-    emit itemChanged(viewMenu);
 }

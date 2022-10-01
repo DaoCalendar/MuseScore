@@ -23,10 +23,13 @@
 #ifndef MU_DOCK_MAINWINDOWPROVIDER_H
 #define MU_DOCK_MAINWINDOWPROVIDER_H
 
-#include "framework/ui/imainwindow.h"
-
 #include <QObject>
-#include <QStack>
+#include <QWindow>
+
+#include "modularity/ioc.h"
+#include "../iinteractiveprovider.h"
+
+#include "framework/ui/imainwindow.h"
 
 namespace mu::ui {
 class MainWindowProvider : public QObject, public IMainWindow
@@ -37,14 +40,12 @@ class MainWindowProvider : public QObject, public IMainWindow
     Q_PROPERTY(QString filePath READ filePath WRITE setFilePath NOTIFY filePathChanged)
     Q_PROPERTY(bool fileModified READ fileModified WRITE setFileModified NOTIFY fileModifiedChanged)
 
+    INJECT(ui, IInteractiveProvider, interactiveProvider)
+
 public:
     explicit MainWindowProvider(QObject* parent = nullptr);
 
     QWindow* qWindow() const override;
-
-    QWindow* topWindow() const override;
-    void pushWindow(QWindow* w) override;
-    void popWindow(QWindow* w) override;
 
     QString filePath() const;
     virtual bool fileModified() const;
@@ -54,7 +55,9 @@ public:
 
     bool isFullScreen() const override;
     void toggleFullScreen() override;
-    const QScreen* screen() const override;
+    QScreen* screen() const override;
+
+    Q_INVOKABLE void showMinimizedWithSavePreviousState();
 
 signals:
     void windowChanged();
@@ -66,13 +69,12 @@ protected:
 
     QWindow* m_window = nullptr;
 
+    QWindow::Visibility m_windowVisibility = QWindow::AutomaticVisibility;
+
 private slots: // Should only be used from QML
     void setWindow(QWindow* window);
     void setFilePath(const QString& filePath);
     virtual void setFileModified(bool modified);
-
-private:
-    QStack<QWindow*> m_windows;
 };
 }
 

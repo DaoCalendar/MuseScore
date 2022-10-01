@@ -24,37 +24,75 @@
 
 #include <QAbstractListModel>
 #include <QList>
+#include <QMap>
 
 #include "modularity/ioc.h"
 #include "../iautobotscriptsrepository.h"
 #include "../iautobot.h"
+#include "async/asyncable.h"
 
 namespace mu::autobot {
-class AutobotScriptsModel : public QAbstractListModel
+class AutobotScriptsModel : public QAbstractListModel, public async::Asyncable
 {
     Q_OBJECT
+    Q_PROPERTY(bool isRunAllTCMode READ isRunAllTCMode WRITE setIsRunAllTCMode NOTIFY isRunAllTCModeChanged)
+    Q_PROPERTY(QString speedMode READ speedMode WRITE setSpeedMode NOTIFY speedModeChanged)
 
     INJECT(autobot, IAutobotScriptsRepository, scriptsRepository)
     INJECT(autobot, IAutobot, autobot)
 
 public:
     explicit AutobotScriptsModel(QObject* parent = nullptr);
+    ~AutobotScriptsModel();
 
     QVariant data(const QModelIndex& index, int role) const override;
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QHash<int, QByteArray> roleNames() const override;
 
+    bool isRunAllTCMode() const;
+    QString speedMode() const;
+    void setSpeedMode(const QString& newSpeedMode);
+
     Q_INVOKABLE void load();
     Q_INVOKABLE void runScript(int scriptIndex);
+
+    Q_INVOKABLE void runAllTC();
+    Q_INVOKABLE bool tryRunNextTC();
+    Q_INVOKABLE void stopRunAllTC();
+
+    Q_INVOKABLE void toggleSelect(int index);
+    Q_INVOKABLE void toggleAllSelect(const QString& type);
+    Q_INVOKABLE bool isAllSelected(const QString& type) const;
+
+public slots:
+    void setIsRunAllTCMode(bool arg);
+
+signals:
+    void isRunAllTCModeChanged();
+    void requireStartTC(const QString& path);
+    void isAllSelectedChanged(const QString& type, bool arg);
+    void speedModeChanged();
 
 private:
 
     enum Roles {
-        ScriptTitle = Qt::UserRole + 1,
-        ScriptIndex,
+        rTitle = Qt::UserRole + 1,
+        rDescription,
+        rType,
+        rPath,
+        rIndex,
+        rStatus,
+        rSelected
     };
 
+    void setStatus(const io::path_t& path, IAutobot::Status st);
+    bool isAllSelected(const ScriptType& type) const;
+
     Scripts m_scripts;
+    int m_currentTCIndex = -1;
+    bool m_isRunAllTCMode = false;
+    QMap<io::path_t, IAutobot::Status> m_statuses;
+    QMap<int, bool> m_selected;
 };
 }
 

@@ -25,6 +25,10 @@
 
 #include <QObject>
 
+#include "audio/audiotypes.h"
+
+#include "types/uri.h"
+
 namespace mu::playback {
 class AbstractAudioResourceItem : public QObject
 {
@@ -32,10 +36,12 @@ class AbstractAudioResourceItem : public QObject
 
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(bool isBlank READ isBlank NOTIFY isBlankChanged)
+    Q_PROPERTY(bool isActive READ isActive NOTIFY isActiveChanged)
     Q_PROPERTY(bool hasNativeEditorSupport READ hasNativeEditorSupport NOTIFY hasNativeEditorSupportChanged)
 
 public:
     explicit AbstractAudioResourceItem(QObject* parent);
+    ~AbstractAudioResourceItem() override;
 
     virtual Q_INVOKABLE void requestAvailableResources() {}
     virtual Q_INVOKABLE void requestToLaunchNativeEditorView();
@@ -43,14 +49,20 @@ public:
 
     virtual QString title() const;
     virtual bool isBlank() const;
+    virtual bool isActive() const;
     virtual bool hasNativeEditorSupport() const;
+
+    const UriQuery& editorUri() const;
+    void setEditorUri(const UriQuery& uri);
 
 signals:
     void titleChanged();
     void isBlankChanged();
+    void isActiveChanged();
     void hasNativeEditorSupportChanged();
 
     void nativeEditorViewLaunchRequested();
+    void nativeEditorViewCloseRequested();
     void availableResourceListResolved(const QVariantList& resources);
 
 protected:
@@ -58,6 +70,15 @@ protected:
                               const QVariantList& subItems = QVariantList()) const;
 
     QVariantMap buildSeparator() const;
+
+    void sortResourcesList(audio::AudioResourceMetaList& list);
+
+    void updateNativeEditorView();
+
+private:
+    void doRequestToLaunchNativeEditorView();
+
+    UriQuery m_editorUri;
 };
 }
 

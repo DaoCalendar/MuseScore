@@ -42,7 +42,7 @@ DockPage {
 
     property NavigationSection publishToolBarKeyNavSec: NavigationSection {
         id: keynavSec
-        name: "PublushToolBarSection"
+        name: "PublishToolBarSection"
         order: 2
     }
 
@@ -55,9 +55,15 @@ DockPage {
             objectName: root.objectName + "_notationToolBar"
             title: qsTrc("appshell", "Notation toolbar")
 
-            minimumWidth: 198
+            floatable: false
+            closable: false
+            resizable: false
+            separatorsVisible: false
 
-            contentComponent: NotationToolBar {
+            alignment: DockToolBarAlignment.Center
+            contentBottomPadding: 2
+
+            NotationToolBar {
                 navigation.section: root.topToolKeyNavSec
                 navigation.order: 2
 
@@ -75,11 +81,11 @@ DockPage {
             objectName: root.objectName + "_playbackToolBar"
             title: qsTrc("appshell", "Playback controls")
 
-            width: root.width / 3
-            minimumWidth: floating ? 526 : 476
-            minimumHeight: floating ? 56 : 48
+            separatorsVisible: false
+            alignment: DockToolBarAlignment.Right
+            contentBottomPadding: 2
 
-            contentComponent: PlaybackToolBar {
+            PlaybackToolBar {
                 navigation.section: root.topToolKeyNavSec
                 navigation.order: 3
 
@@ -93,12 +99,15 @@ DockPage {
             objectName: root.objectName + "_undoRedoToolBar"
             title: qsTrc("appshell", "Undo/redo toolbar")
 
-            minimumWidth: 74
-            maximumWidth: 74
+            floatable: false
+            closable: false
+            resizable: false
+            separatorsVisible: false
 
-            movable: false
+            alignment: DockToolBarAlignment.Right
+            contentBottomPadding: 2
 
-            contentComponent: UndoRedoToolBar {
+            UndoRedoToolBar {
                 navigation.section: root.topToolKeyNavSec
                 navigation.order: 4
             }
@@ -109,14 +118,19 @@ DockPage {
         DockToolBar {
             objectName: "publishToolBar"
 
-            contentComponent: PublishToolBar {
+            floatable: false
+
+            PublishToolBar {
                 navigation.section: root.publishToolBarKeyNavSec
                 navigation.order: 1
             }
         }
     ]
 
-    central: NotationView {}
+    central: NotationView {
+        name: "PublishNotationView"
+        publishMode: true
+    }
 
     statusBar: DockStatusBar {
         objectName: "publishStatusBar"

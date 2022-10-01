@@ -29,14 +29,24 @@
 #include "view/sortfilterproxymodel.h"
 #include "view/popupview.h"
 #include "view/dialogview.h"
+#include "view/dropdownview.h"
+#include "view/menuview.h"
 #include "view/filepickermodel.h"
+#include "view/colorpickermodel.h"
 #include "view/itemmultiselectionmodel.h"
+#include "view/textinputfieldmodel.h"
+#include "view/selectmultipledirectoriesmodel.h"
 
 #include "modularity/ioc.h"
 #include "ui/iuiengine.h"
 
+#include "ui/uitypes.h"
+#include "ui/iinteractiveuriregister.h"
+
 using namespace mu::uicomponents;
 using namespace mu::framework;
+using namespace mu::ui;
+using namespace mu::modularity;
 
 static void uicomponents_init_qrc()
 {
@@ -52,6 +62,15 @@ void UiComponentsModule::registerExports()
 {
 }
 
+void UiComponentsModule::resolveImports()
+{
+    auto ir = ioc()->resolve<IInteractiveUriRegister>(moduleName());
+    if (ir) {
+        ir->registerUri(Uri("musescore://interactive/selectMultipleDirectories"),
+                        ContainerMeta(ContainerType::QmlDialog, "MuseScore/UiComponents/SelectMultipleDirectoriesDialog.qml"));
+    }
+}
+
 void UiComponentsModule::registerResources()
 {
     uicomponents_init_qrc();
@@ -61,7 +80,7 @@ void UiComponentsModule::registerUiTypes()
 {
     qmlRegisterType<SampleObject>("MuseScore.UiComponents", 1, 0, "SampleObject");
 
-    qmlRegisterUncreatableType<QAbstractItemModel>("MuseScore.UiComponents", 1, 0, "AbstractItemModel", "Cannot ...");
+    qmlRegisterUncreatableType<QAbstractItemModel>("MuseScore.UiComponents", 1, 0, "AbstractItemModel", "Cannot …");
 
     qmlRegisterType<DoubleInputValidator>("MuseScore.UiComponents", 1, 0, "DoubleInputValidator");
     qmlRegisterType<IntInputValidator>("MuseScore.UiComponents", 1, 0, "IntInputValidator");
@@ -76,8 +95,15 @@ void UiComponentsModule::registerUiTypes()
 
     qmlRegisterType<PopupView>("MuseScore.UiComponents", 1, 0, "PopupView");
     qmlRegisterType<DialogView>("MuseScore.UiComponents", 1, 0, "DialogView");
+    qmlRegisterType<DropdownView>("MuseScore.UiComponents", 1, 0, "DropdownView");
+    qmlRegisterType<MenuView>("MuseScore.UiComponents", 1, 0, "MenuView");
+
     qmlRegisterType<FilePickerModel>("MuseScore.UiComponents", 1, 0, "FilePickerModel");
+    qmlRegisterType<ColorPickerModel>("MuseScore.UiComponents", 1, 0, "ColorPickerModel");
     qmlRegisterType<ItemMultiSelectionModel>("MuseScore.UiComponents", 1, 0, "ItemMultiSelectionModel");
+
+    qmlRegisterType<TextInputFieldModel>("MuseScore.UiComponents", 1, 0, "TextInputFieldModel");
+    qmlRegisterType<SelectMultipleDirectoriesModel>("MuseScore.UiComponents", 1, 0, "SelectMultipleDirectoriesModel");
 
     auto ui = modularity::ioc()->resolve<ui::IUiEngine>(moduleName());
     if (ui) {

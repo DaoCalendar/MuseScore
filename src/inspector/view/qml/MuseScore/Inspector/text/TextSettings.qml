@@ -20,8 +20,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.3
-import QtQuick.Controls 2.2
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
@@ -41,7 +39,7 @@ Column {
 
     spacing: 12
 
-    function focusOnFirst() {
+    function forceFocusIn() {
         matchStaffSize.navigation.requestActive()
     }
 
@@ -49,7 +47,7 @@ Column {
         height: childrenRect.height
         width: parent.width
 
-        CheckBox {
+        CheckBoxPropertyView {
             id: matchStaffSize
             anchors.left: parent.left
             anchors.right: parent.horizontalCenter
@@ -60,11 +58,8 @@ Column {
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 1
 
-            isIndeterminate: root.model ? root.model.isSizeSpatiumDependent.isUndefined : false
-            checked: root.model && !isIndeterminate ? root.model.isSizeSpatiumDependent.value : false
             text: qsTrc("inspector", "Match staff size")
-
-            onClicked: { root.model.isSizeSpatiumDependent.value = !checked }
+            propertyItem: root.model ? root.model.isSizeSpatiumDependent : null
         }
 
         RadioButtonGroup {
@@ -109,12 +104,13 @@ Column {
         titleText: qsTrc("inspector", "Frame")
         propertyItem: root.model ? root.model.frameType : null
 
+        navigationName: "FrameMenu"
         navigationPanel: root.navigationPanel
         navigationRowStart: subscriptOptionsButtonList.navigationRowEnd + 1
 
         model: [
             { text: qsTrc("inspector", "None"), value: TextTypes.FRAME_TYPE_NONE, titleRole: qsTrc("inspector", "None") },
-            { iconCode: IconCode.FRAME_SQUARE, value: TextTypes.FRAME_TYPE_SQUARE, titleRole: qsTrc("inspector", "Square") },
+            { iconCode: IconCode.FRAME_SQUARE, value: TextTypes.FRAME_TYPE_SQUARE, titleRole: qsTrc("inspector", "Rectangle") },
             { iconCode: IconCode.FRAME_CIRCLE, value: TextTypes.FRAME_TYPE_CIRCLE, titleRole: qsTrc("inspector", "Circle") }
         ]
     }
@@ -129,6 +125,7 @@ Column {
             anchors.right: parent.horizontalCenter
             anchors.rightMargin: 2
 
+            navigationName: "BorderColorMenu"
             navigationPanel: root.navigationPanel
             navigationRowStart: frameSection.navigationRowEnd + 1
 
@@ -145,14 +142,15 @@ Column {
             anchors.leftMargin: 2
             anchors.right: parent.right
 
+            navigationName: "HighlightColorMenu"
             navigationPanel: root.navigationPanel
             navigationRowStart: borderColorSection.navigationRowEnd + 1
 
-            visible: root.model ? root.model.frameHighlightColor.isEnabled : false
+            visible: root.model ? root.model.frameFillColor.isEnabled : false
             height: visible ? implicitHeight : 0
 
-            titleText: qsTrc("inspector", "Highlight")
-            propertyItem: root.model ? root.model.frameHighlightColor : null
+            titleText: qsTrc("inspector", "Fill color")
+            propertyItem: root.model ? root.model.frameFillColor : null
         }
     }
 
@@ -166,6 +164,7 @@ Column {
             anchors.right: parent.horizontalCenter
             anchors.rightMargin: 2
 
+            navigationName: "Thickness"
             navigationPanel: root.navigationPanel
             navigationRowStart: highlightColorSection.navigationRowEnd + 1
 
@@ -186,6 +185,7 @@ Column {
             anchors.leftMargin: 2
             anchors.right: parent.right
 
+            navigationName: "Margin"
             navigationPanel: root.navigationPanel
             navigationRowStart: thicknessSection.navigationRowEnd + 1
 
@@ -207,6 +207,7 @@ Column {
         anchors.right: parent.horizontalCenter
         anchors.rightMargin: 2
 
+        navigationName: "Corner radius"
         navigationPanel: root.navigationPanel
         navigationRowStart: marginSection.navigationRowEnd + 1
 
@@ -221,13 +222,14 @@ Column {
         maxValue: 5
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     DropdownPropertyView {
         id: textStyleSection
         titleText: qsTrc("inspector", "Text style")
         propertyItem: root.model ? root.model.textType : null
 
+        navigationName: "Text style"
         navigationPanel: root.navigationPanel
         navigationRowStart: cornerRadiusSection.navigationRowEnd + 1
 
@@ -235,7 +237,7 @@ Column {
             { text: qsTrc("inspector", "Title"), value: TextTypes.TEXT_TYPE_TITLE },
             { text: qsTrc("inspector", "Subtitle"), value: TextTypes.TEXT_TYPE_SUBTITLE},
             { text: qsTrc("inspector", "Composer"), value: TextTypes.TEXT_TYPE_COMPOSER },
-            { text: qsTrc("inspector", "Lyricist"), value: TextTypes.TEXT_TYPE_LYRICS_ODD },
+            { text: qsTrc("inspector", "Lyricist"), value: TextTypes.TEXT_TYPE_POET },
             { text: qsTrc("inspector", "Translator"), value: TextTypes.TEXT_TYPE_TRANSLATOR },
             { text: qsTrc("inspector", "Frame"), value: TextTypes.TEXT_TYPE_FRAME },
             { text: qsTrc("inspector", "Header"), value: TextTypes.TEXT_TYPE_HEADER },
@@ -249,7 +251,7 @@ Column {
             { text: qsTrc("inspector", "Dynamics"), value: TextTypes.TEXT_TYPE_DYNAMICS },
             { text: qsTrc("inspector", "Hairpin"), value: TextTypes.TEXT_TYPE_HAIRPIN },
             { text: qsTrc("inspector", "Tempo"), value: TextTypes.TEXT_TYPE_TEMPO },
-            { text: qsTrc("inspector", "Rehearshal mark"), value: TextTypes.TEXT_TYPE_REHEARSAL_MARK },
+            { text: qsTrc("inspector", "Rehearsal mark"), value: TextTypes.TEXT_TYPE_REHEARSAL_MARK },
             { text: qsTrc("inspector", "Repeat text left"), value: TextTypes.TEXT_TYPE_REPEAT_LEFT },
             { text: qsTrc("inspector", "Repeat text right"), value: TextTypes.TEXT_TYPE_REPEAT_RIGHT },
             { text: qsTrc("inspector", "Lyrics odd lines"), value: TextTypes.TEXT_TYPE_LYRICS_ODD },

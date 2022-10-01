@@ -25,6 +25,8 @@ import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Inspector 1.0
 
+import "../../common"
+
 Column {
     id: root
 
@@ -41,17 +43,14 @@ Column {
         showCourtesyClef.navigation.requestActive()
     }
 
-    CheckBox {
+    CheckBoxPropertyView {
         id: showCourtesyClef
-        isIndeterminate: root.model ? root.model.shouldShowCourtesy.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.shouldShowCourtesy.value : false
-        text: qsTrc("inspector", "Show courtesy clef on previous measure")
 
         navigation.name: "ShowCourtesyClefCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRowStart
-        navigation.enabled: root.enabled
 
-        onClicked: { root.model.shouldShowCourtesy.value = !checked }
+        text: qsTrc("inspector", "Show courtesy clef on previous system")
+        propertyItem: root.model ? root.model.shouldShowCourtesy : null
     }
 }

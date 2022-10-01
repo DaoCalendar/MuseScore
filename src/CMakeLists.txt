@@ -35,6 +35,7 @@ add_subdirectory(appshell)
 add_subdirectory(context)
 add_subdirectory(notation)
 add_subdirectory(project)
+add_subdirectory(print)
 
 if (BUILD_LEARN_MODULE)
     add_subdirectory(learn)
@@ -55,10 +56,6 @@ if (NOT OS_IS_WASM)
     if (BUILD_CLOUD_MODULE)
         add_subdirectory(cloud)
     endif (BUILD_CLOUD_MODULE)
-
-    if (BUILD_EXTENSIONS_MODULE)
-        add_subdirectory(extensions)
-    endif (BUILD_EXTENSIONS_MODULE)
 
     if (BUILD_LANGUAGES_MODULE)
         add_subdirectory(languages)
@@ -97,6 +94,10 @@ if (BUILD_AUTOBOT_MODULE)
     add_subdirectory(autobot)
 endif()
 
+if (BUILD_UPDATE_MODULE)
+    add_subdirectory(update)
+endif (BUILD_UPDATE_MODULE)
+
 # Stubs
 add_subdirectory(stubs)
 
@@ -104,13 +105,12 @@ if (BUILD_UNIT_TESTS)
 #    add_subdirectory(notation/tests) no tests at moment
     add_subdirectory(project/tests)
 
-    add_subdirectory(engraving/tests)
     add_subdirectory(engraving/utests)
     add_subdirectory(importexport/bb/tests)
     add_subdirectory(importexport/braille/tests)
     add_subdirectory(importexport/bww/tests)
     add_subdirectory(importexport/capella/tests)
-#    add_subdirectory(importexport/guitarpro/tests)
+    add_subdirectory(importexport/guitarpro/tests)
     add_subdirectory(importexport/midi/tests)
     add_subdirectory(importexport/musicxml/tests)
 endif(BUILD_UNIT_TESTS)

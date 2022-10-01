@@ -24,10 +24,10 @@
  MusicXML font handling support.
  */
 
-#include "engraving/infrastructure/io/xml.h"
+#include "engraving/rw/xml.h"
 #include "musicxmlfonthandler.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MScoreTextToMXML
 //---------------------------------------------------------
@@ -65,7 +65,7 @@ QString MScoreTextToMXML::toPlainText(const QString& text)
             }
         }
     }
-    //qDebug("MScoreTextToMXML::toPlainText('%s') res '%s'", qPrintable(text), qPrintable(res));
+    //LOGD("MScoreTextToMXML::toPlainText('%s') res '%s'", qPrintable(text), qPrintable(res));
     return res;
 }
 
@@ -74,7 +74,7 @@ QString MScoreTextToMXML::toPlainText(const QString& text)
 //    convert to plain text plus <sym>[name]</sym> encoded symbols
 //---------------------------------------------------------
 
-QString MScoreTextToMXML::toPlainTextPlusSymbols(const QList<TextFragment>& list)
+QString MScoreTextToMXML::toPlainTextPlusSymbols(const std::list<TextFragment>& list)
 {
     QString res;
     for (const TextFragment& f : list) {
@@ -96,7 +96,7 @@ static int plainTextPlusSymbolsFragmentSize(const TextFragment& f)
 //   plainTextPlusSymbolsSize
 //---------------------------------------------------------
 
-static int plainTextPlusSymbolsListSize(const QList<TextFragment>& list)
+static int plainTextPlusSymbolsListSize(const std::list<TextFragment>& list)
 {
     int res = 0;
     for (const TextFragment& f : list) {
@@ -116,11 +116,11 @@ static int plainTextPlusSymbolsListSize(const QList<TextFragment>& list)
  Return true if OK, false on error.
  */
 
-bool MScoreTextToMXML::split(const QList<TextFragment>& in, const int pos, const int len,
-                             QList<TextFragment>& left, QList<TextFragment>& mid, QList<TextFragment>& right)
+bool MScoreTextToMXML::split(const std::list<TextFragment>& in, const int pos, const int len,
+                             std::list<TextFragment>& left, std::list<TextFragment>& mid, std::list<TextFragment>& right)
 {
-    //qDebug("MScoreTextToMXML::split in size %d pos %d len %d", plainTextPlusSymbolsListSize(in), pos, len);
-    //qDebug("-> in");
+    //LOGD("MScoreTextToMXML::split in size %d pos %d len %d", plainTextPlusSymbolsListSize(in), pos, len);
+    //LOGD("-> in");
     //dumpText(in);
 
     if (pos < 0 || len < 0) {
@@ -133,16 +133,16 @@ bool MScoreTextToMXML::split(const QList<TextFragment>& in, const int pos, const
     right.clear();
 
     // set pos to begin of first fragment
-    int fragmentNr = 0;
+    std::list<TextFragment>::const_iterator fragmentNr = in.begin();
     TextFragment fragment;
-    if (fragmentNr < in.size()) {
-        fragment = in.at(fragmentNr);
+    if (fragmentNr != in.end()) {
+        fragment = *fragmentNr;
     }
-    QList<TextFragment>* currentDest = &left;
+    std::list<TextFragment>* currentDest = &left;
     int currentMaxSize = pos;
 
     // while text left
-    while (fragmentNr < in.size()) {
+    while (fragmentNr != in.end()) {
         int destSize = plainTextPlusSymbolsListSize(*currentDest);
         int fragSize = plainTextPlusSymbolsFragmentSize(fragment);
         // if no room left in current destination (check applies only to left and mid)
@@ -160,27 +160,27 @@ bool MScoreTextToMXML::split(const QList<TextFragment>& in, const int pos, const
         if ((currentDest != &right && destSize + fragSize <= currentMaxSize)
             || currentDest == &right) {
             // add it
-            currentDest->append(fragment);
+            currentDest->push_back(fragment);
             // move to next fragment
             fragmentNr++;
-            if (fragmentNr < in.size()) {
-                fragment = in.at(fragmentNr);
+            if (fragmentNr != in.end()) {
+                fragment = *fragmentNr;
             }
         } else {
             // split current fragment
             TextFragment rightPart = fragment.split(currentMaxSize - plainTextPlusSymbolsListSize(*currentDest));
             // add first part to current destination
-            currentDest->append(fragment);
+            currentDest->push_back(fragment);
             fragment = rightPart;
         }
     }
 
     /*
-    qDebug("-> left");
+    LOGD("-> left");
     dumpText(left);
-    qDebug("-> mid");
+    LOGD("-> mid");
     dumpText(mid);
-    qDebug("-> right");
+    LOGD("-> right");
     dumpText(right);
      */
 
@@ -191,15 +191,15 @@ bool MScoreTextToMXML::split(const QList<TextFragment>& in, const int pos, const
 //   writeTextFragments
 //---------------------------------------------------------
 
-void MScoreTextToMXML::writeTextFragments(const QList<TextFragment>& fr, XmlWriter& xml)
+void MScoreTextToMXML::writeTextFragments(const std::list<TextFragment>& fr, XmlWriter& xml)
 {
-    //qDebug("MScoreTextToMXML::writeTextFragments defFmt %s", qPrintable(charFormat2QString(oldFormat)));
+    //LOGD("MScoreTextToMXML::writeTextFragments defFmt %s", qPrintable(charFormat2QString(oldFormat)));
     //dumpText(fr);
     bool firstTime = true;   // write additional attributes only the first time characters are written
     for (const TextFragment& f : fr) {
         newFormat = f.format;
         QString formatAttr = updateFormat();
-        xml.tag(tagname + (firstTime ? attribs : "") + formatAttr, f.text);
+        xml.tagRaw(tagname + (firstTime ? attribs : "") + formatAttr, f.text);
         firstTime = false;
     }
 }
@@ -237,10 +237,11 @@ QString MScoreTextToMXML::updateFormat()
     res += attribute(newFormat.bold() != oldFormat.bold(), newFormat.bold(), "font-weight=\"bold\"", "font-weight=\"normal\"");
     res += attribute(newFormat.italic() != oldFormat.italic(), newFormat.italic(), "font-style=\"italic\"", "font-style=\"normal\"");
     res += attribute(newFormat.underline() != oldFormat.underline(), newFormat.underline(), "underline=\"1\"", "underline=\"0\"");
+    res += attribute(newFormat.strike() != oldFormat.strike(), newFormat.strike(), "line-through=\"1\"", "line-though=\"0\"");
     res += attribute(newFormat.fontFamily() != oldFormat.fontFamily(), true, QString("font-family=\"%1\"").arg(newFormat.fontFamily()), "");
     bool needSize = newFormat.fontSize() < 0.99 * oldFormat.fontSize() || newFormat.fontSize() > 1.01 * oldFormat.fontSize();
     res += attribute(needSize, true, QString("font-size=\"%1\"").arg(newFormat.fontSize()), "");
-    //qDebug("updateFormat() res '%s'", qPrintable(res));
+    //LOGD("updateFormat() res '%s'", qPrintable(res));
     oldFormat = newFormat;
     return res;
 }

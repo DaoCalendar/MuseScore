@@ -21,14 +21,42 @@
  */
 
 #include "vstconfiguration.h"
+
 #include "settings.h"
 
 using namespace mu::vst;
 using namespace mu::framework;
 
-static const Settings::Key CUSTOM_SEARCH_PATH_KEY = Settings::Key("vst", "custom_search_path");
+static const std::string module_name("vst");
 
-mu::io::path VstConfiguration::customSearchPath() const
+static const Settings::Key USER_VST_PATHS = Settings::Key(module_name, "application/paths/myVSTs");
+static const mu::io::path_t KNOWN_PLUGINS_DIR("/vst");
+
+void VstConfiguration::init()
 {
-    return mu::io::path(settings()->value(CUSTOM_SEARCH_PATH_KEY).toString());
+    settings()->setDefaultValue(USER_VST_PATHS, Val(""));
+    settings()->valueChanged(USER_VST_PATHS).onReceive(nullptr, [this](const Val&) {
+        m_userVstDirsChanged.send(userVstDirectories());
+    });
+}
+
+mu::io::paths_t VstConfiguration::userVstDirectories() const
+{
+    std::string pathsStr = settings()->value(USER_VST_PATHS).toString();
+    return io::pathsFromString(pathsStr);
+}
+
+void VstConfiguration::setUserVstDirectories(const io::paths_t& paths)
+{
+    settings()->setSharedValue(USER_VST_PATHS, Val(io::pathsToString(paths)));
+}
+
+mu::async::Channel<mu::io::paths_t> VstConfiguration::userVstDirectoriesChanged() const
+{
+    return m_userVstDirsChanged;
+}
+
+mu::io::path_t VstConfiguration::knownPluginsDir() const
+{
+    return globalConfig()->userAppDataPath() + KNOWN_PLUGINS_DIR;
 }

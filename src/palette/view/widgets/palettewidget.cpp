@@ -34,15 +34,17 @@
 #include <QResizeEvent>
 #include <QToolTip>
 
-#include "thirdparty/qzip/qzipreader_p.h"
-#include "thirdparty/qzip/qzipwriter_p.h"
+#include "translation.h"
+#include "types/bytearray.h"
+#include "global/deprecated/qzipreader_p.h"
+#include "global/deprecated/qzipwriter_p.h"
 
 #include "actions/actiontypes.h"
 #include "commonscene/commonscenetypes.h"
 
-#include "engraving/infrastructure/draw/color.h"
-#include "engraving/infrastructure/draw/pen.h"
-#include "engraving/infrastructure/io/xml.h"
+#include "draw/types/color.h"
+#include "draw/types/pen.h"
+#include "engraving/rw/xml.h"
 #include "engraving/libmscore/actionicon.h"
 #include "engraving/libmscore/chord.h"
 #include "engraving/libmscore/engravingitem.h"
@@ -55,33 +57,56 @@
 #include "engraving/style/defaultstyle.h"
 #include "engraving/style/style.h"
 #include "engraving/compat/dummyelement.h"
+#include "engraving/accessibility/accessibleitem.h"
 
 #include "internal/palettecelliconengine.h"
 
-#include "translation.h"
+#include "log.h"
 
 using namespace mu;
+using namespace mu::io;
 using namespace mu::palette;
 using namespace mu::engraving;
 using namespace mu::framework;
 using namespace mu::draw;
-using namespace Ms;
 
-PaletteWidget::PaletteWidget(PalettePtr palette, QWidget* parent)
+PaletteWidget::PaletteWidget(QWidget* parent)
     : QWidget(parent)
 {
-    m_palette = palette;
+    m_palette = std::make_shared<Palette>();
 
-    setObjectName("PaletteWidget_" + name());
-    setMouseTracking(true);
+    //! NOTE: need for accessibility
+    m_palette->setParent(this);
+
     setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Ignored);
 
     setReadOnly(false);
+    setMouseTracking(true);
 }
 
-PaletteWidget::PaletteWidget(QWidget* parent)
-    : PaletteWidget(std::make_shared<Palette>(), parent)
+void PaletteWidget::setPalette(PalettePtr palette)
 {
+    if (!palette) {
+        return;
+    }
+
+    m_palette = palette;
+    setObjectName("PaletteWidget_" + name());
+
+    //! NOTE: need for accessibility
+    m_palette->setParent(this);
+
+    update();
+}
+
+QAccessibleInterface* PaletteWidget::accessibleInterface(QObject* object)
+{
+    PaletteWidget* widget = qobject_cast<PaletteWidget*>(object);
+    IF_ASSERT_FAILED(widget) {
+        return nullptr;
+    }
+
+    return static_cast<QAccessibleInterface*>(new AccessiblePaletteWidget(widget));
 }
 
 QString PaletteWidget::name() const
@@ -128,9 +153,10 @@ ElementPtr PaletteWidget::elementForCellAt(int idx) const
     return cell ? cell->element : nullptr;
 }
 
-PaletteCellPtr PaletteWidget::insertElement(int idx, ElementPtr element, const QString& name, qreal mag)
+PaletteCellPtr PaletteWidget::insertElement(int idx, ElementPtr element, const QString& name, qreal mag, const QPointF offset,
+                                            const QString& tag)
 {
-    PaletteCellPtr cell = m_palette->insertElement(idx, element, name, mag);
+    PaletteCellPtr cell = m_palette->insertElement(idx, element, name, mag, offset, tag);
 
     update();
     updateGeometry();
@@ -138,22 +164,24 @@ PaletteCellPtr PaletteWidget::insertElement(int idx, ElementPtr element, const Q
     return cell;
 }
 
-PaletteCellPtr PaletteWidget::appendElement(ElementPtr element, const QString& name, qreal mag)
+PaletteCellPtr PaletteWidget::appendElement(ElementPtr element, const QString& name, qreal mag, const QPointF offset, const QString& tag)
 {
-    PaletteCellPtr cell = m_palette->appendElement(element, name, mag);
+    PaletteCellPtr cell = m_palette->appendElement(element, name, mag, offset, tag);
 
     setFixedHeight(heightForWidth(width()));
     updateGeometry();
+    update();
 
     return cell;
 }
 
-PaletteCellPtr PaletteWidget::appendActionIcon(Ms::ActionIconType type, actions::ActionCode code)
+PaletteCellPtr PaletteWidget::appendActionIcon(mu::engraving::ActionIconType type, actions::ActionCode code)
 {
     PaletteCellPtr cell = m_palette->appendActionIcon(type, code);
 
     setFixedHeight(heightForWidth(width()));
     updateGeometry();
+    update();
 
     return cell;
 }
@@ -320,7 +348,13 @@ int PaletteWidget::selectedIdx() const
 
 void PaletteWidget::setSelected(int idx)
 {
+    if (m_selectedIdx == idx) {
+        return;
+    }
+
+    int previous = m_selectedIdx;
     m_selectedIdx = idx;
+    emit selectedChanged(idx, previous);
 }
 
 int PaletteWidget::currentIdx() const
@@ -553,6 +587,12 @@ QPixmap PaletteWidget::pixmapForCellAt(int paletteIdx) const
 
     qreal cellMag = cell->mag * mag;
     ElementPtr element = cell->element;
+
+    if (element->isActionIcon()) {
+        toActionIcon(element.get())->setFontSize(ActionIcon::DEFAULT_FONT_SIZE * cell->mag);
+        cellMag = 1.0;
+    }
+
     element->layout();
 
     RectF r = element->bbox();
@@ -560,7 +600,7 @@ QPixmap PaletteWidget::pixmapForCellAt(int paletteIdx) const
     int h = lrint(r.height() * cellMag);
 
     if (w * h == 0) {
-        qDebug("zero pixmap %d %d %s", w, h, element->name());
+        LOGD("zero pixmap %d %d %s", w, h, element->typeName());
         return QPixmap();
     }
 
@@ -570,9 +610,6 @@ QPixmap PaletteWidget::pixmapForCellAt(int paletteIdx) const
     mu::draw::Painter painter(&pm, "palette");
     painter.setAntialiasing(true);
 
-    if (element->isActionIcon()) {
-        toActionIcon(element.get())->setExtent(w < h ? w : h);
-    }
     painter.scale(cellMag, cellMag);
 
     painter.translate(-r.topLeft());
@@ -592,7 +629,11 @@ QPixmap PaletteWidget::pixmapForCellAt(int paletteIdx) const
     }
 
     painter.setPen(Pen(color));
-    element->scanElements(&painter, PaletteCellIconEngine::paintPaletteElement);
+
+    PaletteCellIconEngine::PaintContext ctx;
+    ctx.painter = &painter;
+
+    element->scanElements(&ctx, PaletteCellIconEngine::paintPaletteElement);
 
     element->setPos(pos);
     return pm;
@@ -632,6 +673,10 @@ QSize PaletteWidget::sizeHint() const
 
 bool PaletteWidget::event(QEvent* ev)
 {
+    if (!m_palette) {
+        return false;
+    }
+
     int hgridM = gridWidthScaled();
     int vgridM = gridHeightScaled();
     // disable mouse hover when keyboard navigation is enabled
@@ -681,9 +726,10 @@ void PaletteWidget::mousePressEvent(QMouseEvent* ev)
     if (m_selectable) {
         if (m_dragIdx != m_selectedIdx) {
             update(rectForCellAt(m_dragIdx) | rectForCellAt(m_selectedIdx));
-            m_selectedIdx = m_dragIdx;
         }
+
         emit boxClicked(m_dragIdx);
+        m_selectedIdx = m_dragIdx;
     }
 
     update();
@@ -706,7 +752,7 @@ void PaletteWidget::mouseMoveEvent(QMouseEvent* ev)
             QMimeData* mimeData = new QMimeData;
             const ElementPtr el   = cell->element;
 
-            mimeData->setData(mu::commonscene::MIME_SYMBOL_FORMAT, el->mimeData(PointF()));
+            mimeData->setData(mu::commonscene::MIME_SYMBOL_FORMAT, el->mimeData().toQByteArray());
             drag->setMimeData(mimeData);
 
             drag->setPixmap(pixmapForCellAt(m_currentIdx));
@@ -784,9 +830,9 @@ void PaletteWidget::dragEnterEvent(QDragEnterEvent* event)
     } else {
         event->ignore();
 #ifndef NDEBUG
-        qDebug("dragEnterEvent: formats:");
+        LOGD("dragEnterEvent: formats:");
         for (const QString& s : event->mimeData()->formats()) {
-            qDebug("   %s", qPrintable(s));
+            LOGD("   %s", qPrintable(s));
         }
 #endif
     }
@@ -831,7 +877,8 @@ void PaletteWidget::dropEvent(QDropEvent* event)
         }
     } else if (datap->hasFormat(mu::commonscene::MIME_SYMBOL_FORMAT)) {
         QByteArray dta(event->mimeData()->data(mu::commonscene::MIME_SYMBOL_FORMAT));
-        XmlReader xml(dta);
+        ByteArray ba = ByteArray::fromQByteArrayNoCopy(dta);
+        XmlReader xml(ba);
         PointF dragOffset;
         Fraction duration;
         ElementType type = EngravingItem::readType(xml, &dragOffset, &duration);
@@ -906,6 +953,10 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
     mu::draw::Painter painter(this, "palette");
     painter.setAntialiasing(true);
 
+    if (m_paintOptions.backgroundColor.isValid()) {
+        painter.setBrush(m_paintOptions.backgroundColor);
+    }
+
     painter.setPen(configuration()->gridColor());
     painter.drawRoundedRect(RectF(0, 0, width(), height()), 2, 2);
 
@@ -935,12 +986,36 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
 
     qreal dy = lrint(2 * magS);
 
+    Color linesColor = m_paintOptions.linesColor.isValid() ? m_paintOptions.linesColor
+                       : configuration()->elementsColor();
+
+    Color selectionColor = m_paintOptions.selectionColor.isValid() ? m_paintOptions.selectionColor
+                           : configuration()->accentColor();
+
     //
     // draw symbols
     //
     for (int idx = 0; idx < int(actualCellsList().size()); ++idx) {
+        int yoffset = _spatium * yOffset();
         RectF r = RectF::fromQRectF(rectForCellAt(idx));
-        QColor c(configuration()->accentColor());
+        RectF rShift = r.translated(0, yoffset);
+        QColor c = selectionColor.toQColor();
+
+        PaletteCellPtr currentCell = actualCellsList().at(idx);
+        if (!currentCell) {
+            continue;
+        }
+
+        if (currentCell->focused) {
+            painter.setPen(QColor(uiConfiguration()->currentTheme().values[ui::FONT_PRIMARY_COLOR].toString()));
+            painter.setBrush(QColor(Qt::transparent));
+
+            int borderWidth = uiConfiguration()->currentTheme().values[ui::NAVIGATION_CONTROL_BORDER_WIDTH].toInt();
+            qreal border = borderWidth / 2;
+
+            painter.drawRoundedRect(r.adjusted(border, border, -border, -border), borderWidth, borderWidth);
+            r.adjust(borderWidth, borderWidth, -borderWidth, -borderWidth);
+        }
 
         if (idx == m_selectedIdx) {
             c.setAlphaF(0.5);
@@ -953,13 +1028,17 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
             painter.fillRect(r, c);
         }
 
-        PaletteCellPtr currentCell = actualCellsList().at(idx);
-        if (!currentCell) {
-            continue;
+        QString tag = currentCell->tag;
+        if (!tag.isEmpty()) {
+            painter.setPen(QColor(Qt::darkGray));
+            Font font(painter.font());
+            font.setPixelSize(uiConfiguration()->fontSize(ui::FontSizeType::BODY));
+            painter.setFont(font);
+            painter.drawText(rShift, Qt::AlignLeft | Qt::AlignTop, tag);
         }
 
-        draw::Pen pen(configuration()->elementsColor());
-        pen.setWidthF(engraving::DefaultStyle::defaultStyle().value(Sid::staffLineWidth).toDouble() * magS);
+        draw::Pen pen(linesColor);
+        pen.setWidthF(engraving::DefaultStyle::defaultStyle().styleS(Sid::staffLineWidth).val() * magS);
         painter.setPen(pen);
 
         ElementPtr el = currentCell->element;
@@ -973,7 +1052,7 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
 
         qreal cellMag = currentCell->mag * mag;
         if (el->isActionIcon()) {
-            toActionIcon(el.get())->setExtent((hhgrid < vgridM ? hhgrid : vgridM) - 4);
+            toActionIcon(el.get())->setFontSize(ActionIcon::DEFAULT_FONT_SIZE * currentCell->mag);
             cellMag = 1.0;
         }
         el->layout();
@@ -984,7 +1063,7 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
             qreal w = hhgrid - 6;
             for (int i = 0; i < 5; ++i) {
                 qreal yy = y + i * magS;
-                painter.setPen(configuration()->elementsColor());
+                painter.setPen(linesColor);
                 painter.drawLine(LineF(x, yy, x + w, yy));
             }
         }
@@ -1024,7 +1103,13 @@ void PaletteWidget::paintEvent(QPaintEvent* /*event*/)
         }
 
         painter.setPen(Pen(color));
-        el->scanElements(&painter, PaletteCellIconEngine::paintPaletteElement);
+
+        PaletteCellIconEngine::PaintContext ctx;
+        ctx.painter = &painter;
+        ctx.useElementColors = m_paintOptions.useElementColors;
+        ctx.colorsInversionEnabled = m_paintOptions.colorsInverionsEnabled;
+
+        el->scanElements(&ctx, PaletteCellIconEngine::paintPaletteElement);
         painter.restore();
     }
 }
@@ -1120,6 +1205,16 @@ bool PaletteWidget::handleEvent(QEvent* event)
     return QWidget::event(event);
 }
 
+const PaletteWidget::PaintOptions& PaletteWidget::paintOptions() const
+{
+    return m_paintOptions;
+}
+
+void PaletteWidget::setPaintOptions(const PaintOptions& options)
+{
+    m_paintOptions = options;
+}
+
 // ====================================================
 // PaletteScrollArea
 // ====================================================
@@ -1166,23 +1261,19 @@ void PaletteScrollArea::keyPressEvent(QKeyEvent* event)
         } else if (idx >= p->actualCellCount()) {
             idx = 0;
         }
+
         p->setSelected(idx);
         p->setCurrentIdx(idx);
-        // set widget name to name of selected element
-        // we could set the description, but some screen readers ignore it
-        QString name = p->cellAt(idx)->translatedName();
-        setAccessibleName(name);
-        QAccessibleEvent aev(this, QAccessible::NameChanged);
-        QAccessible::updateAccessibility(&aev);
+
         p->update();
-        break;
+        return;
     }
     case Qt::Key_Enter:
     case Qt::Key_Return:
         if (!p->isApplyingElementsDisabled()) {
             p->applyCurrentElementToScore();
         }
-        break;
+        return;
     default:
         break;
     }
@@ -1199,4 +1290,93 @@ void PaletteScrollArea::resizeEvent(QResizeEvent* re)
     if (m_restrictHeight) {
         setMaximumHeight(h + 6);
     }
+}
+
+AccessiblePaletteWidget::AccessiblePaletteWidget(PaletteWidget* palette)
+    : QAccessibleWidget(palette)
+{
+    m_palette = palette;
+
+    connect(m_palette, &PaletteWidget::selectedChanged, this, [this](int index, int previous) {
+        PaletteCellPtr curCell = m_palette->cellAt(index);
+        PaletteCellPtr previousCell = m_palette->cellAt(previous);
+
+        if (previousCell) {
+            previousCell->focused = false;
+
+            QAccessible::State qstate;
+            qstate.active = false;
+            qstate.focused = false;
+            qstate.selected = false;
+
+            QAccessibleEvent ev(previousCell.get(), QAccessible::Focus);
+            QAccessible::updateAccessibility(&ev);
+        }
+
+        if (curCell) {
+            curCell->focused = true;
+
+            QAccessible::State qstate;
+            qstate.active = true;
+            qstate.focused = true;
+            qstate.selected = true;
+
+            QAccessibleEvent ev(curCell.get(), QAccessible::Focus);
+            QAccessible::updateAccessibility(&ev);
+        }
+    });
+}
+
+QObject* AccessiblePaletteWidget::object() const
+{
+    return m_palette;
+}
+
+QAccessibleInterface* AccessiblePaletteWidget::child(int index) const
+{
+    PaletteCellPtr cell = m_palette->cellAt(index);
+    if (!cell) {
+        return nullptr;
+    }
+
+    return QAccessible::queryAccessibleInterface(cell.get());
+}
+
+int AccessiblePaletteWidget::childCount() const
+{
+    return m_palette->actualCellCount();
+}
+
+int AccessiblePaletteWidget::indexOfChild(const QAccessibleInterface* child) const
+{
+    for (int i = 0; i < childCount(); ++i) {
+        auto childAccessible = QAccessible::queryAccessibleInterface(m_palette->cellAt(i).get());
+        if (childAccessible == child) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+QAccessible::Role AccessiblePaletteWidget::role() const
+{
+    return QAccessible::StaticText;
+}
+
+QAccessible::State AccessiblePaletteWidget::state() const
+{
+    QAccessible::State state = QAccessibleWidget::state();
+    state.selectable = true;
+    state.active = true;
+    state.focusable = true;
+    state.focused = m_palette->hasFocus();
+
+    return state;
+}
+
+QAccessibleInterface* AccessiblePaletteWidget::focusChild() const
+{
+    int selectIndex = m_palette->selectedIdx();
+    return QAccessible::queryAccessibleInterface(m_palette->cellAt(selectIndex).get());
 }

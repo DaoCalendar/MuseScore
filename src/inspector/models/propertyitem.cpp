@@ -24,18 +24,12 @@
 #include "property.h"
 
 using namespace mu::inspector;
+using namespace mu::engraving;
 
-PropertyItem::PropertyItem(const Ms::Pid propertyId, QObject* parent)
+PropertyItem::PropertyItem(const mu::engraving::Pid propertyId, QObject* parent)
     : QObject(parent), m_isVisible(true)
 {
     m_propertyId = propertyId;
-
-    Ms::P_TYPE propertyType = Ms::propertyType(propertyId);
-
-    if (propertyType != Ms::P_TYPE::COLOR) {
-        m_currentValue = 0;
-        m_defaultValue = 0;
-    }
 }
 
 void PropertyItem::fillValues(const QVariant& currentValue, const QVariant& defaultValue)
@@ -49,6 +43,10 @@ void PropertyItem::fillValues(const QVariant& currentValue, const QVariant& defa
 
 void PropertyItem::updateCurrentValue(const QVariant& currentValue)
 {
+    if (m_currentValue == currentValue) {
+        return;
+    }
+
     m_currentValue = currentValue;
 
     emit isUndefinedChanged(isUndefined());
@@ -65,7 +63,7 @@ void PropertyItem::applyToStyle()
     emit applyToStyleRequested(m_styleId, m_currentValue);
 }
 
-Ms::Pid PropertyItem::propertyId() const
+mu::engraving::Pid PropertyItem::propertyId() const
 {
     return m_propertyId;
 }
@@ -97,7 +95,7 @@ bool PropertyItem::isVisible() const
 
 bool PropertyItem::isStyled() const
 {
-    return m_styleId != Ms::Sid::NOSTYLE;
+    return m_styleId != mu::engraving::Sid::NOSTYLE;
 }
 
 bool PropertyItem::isModified() const
@@ -105,7 +103,7 @@ bool PropertyItem::isModified() const
     return m_currentValue != m_defaultValue;
 }
 
-void PropertyItem::setStyleId(const Ms::Sid styleId)
+void PropertyItem::setStyleId(const mu::engraving::Sid styleId)
 {
     if (m_styleId == styleId) {
         return;
@@ -129,6 +127,10 @@ void PropertyItem::setValue(const QVariant& value)
 
 void PropertyItem::setDefaultValue(const QVariant& defaultValue)
 {
+    if (m_defaultValue == defaultValue) {
+        return;
+    }
+
     m_defaultValue = defaultValue;
     emit defaultValueChanged(m_defaultValue);
 }

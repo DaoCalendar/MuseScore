@@ -21,23 +21,27 @@
  */
 
 #include "stafftextbase.h"
-#include "io/xml.h"
-#include "system.h"
+
+#include "rw/xml.h"
+#include "types/typesconv.h"
+
+#include "segment.h"
 #include "staff.h"
-#include "score.h"
-#include "measure.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   StaffTextBase
 //---------------------------------------------------------
 
-StaffTextBase::StaffTextBase(const ElementType& type, Segment* parent, Tid tid, ElementFlags flags)
+StaffTextBase::StaffTextBase(const ElementType& type, Segment* parent, TextStyleType tid, ElementFlags flags)
     : TextBase(type, parent, tid, flags)
 {
-    setSwingParameters(MScore::division / 2, 60);
+    setSwingParameters(Constants::division / 2, 60);
 }
 
 //---------------------------------------------------------
@@ -46,45 +50,45 @@ StaffTextBase::StaffTextBase(const ElementType& type, Segment* parent, Tid tid, 
 
 void StaffTextBase::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
 
     for (const ChannelActions& s : _channelActions) {
         int channel = s.channel;
-        for (const QString& name : qAsConst(s.midiActionNames)) {
-            xml.tagE(QString("MidiAction channel=\"%1\" name=\"%2\"").arg(channel).arg(name));
+        for (const String& name : s.midiActionNames) {
+            xml.tag("MidiAction", { { "channel", channel }, { "name", name } });
         }
     }
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         if (!_channelNames[voice].isEmpty()) {
-            xml.tagE(QString("channelSwitch voice=\"%1\" name=\"%2\"").arg(voice).arg(_channelNames[voice]));
+            xml.tag("channelSwitch", { { "voice", voice }, { "name", _channelNames[voice] } });
         }
     }
     if (_setAeolusStops) {
         for (int i = 0; i < 4; ++i) {
-            xml.tag(QString("aeolus group=\"%1\"").arg(i), aeolusStops[i]);
+            xml.tag("aeolus", { { "group", i } }, aeolusStops[i]);
         }
     }
     if (swing()) {
-        QString swingUnit;
-        if (swingParameters()->swingUnit == MScore::division / 2) {
-            swingUnit = TDuration(TDuration::DurationType::V_EIGHTH).name();
-        } else if (swingParameters()->swingUnit == MScore::division / 4) {
-            swingUnit = TDuration(TDuration::DurationType::V_16TH).name();
+        DurationType swingUnit;
+        if (swingParameters().swingUnit == Constants::division / 2) {
+            swingUnit = DurationType::V_EIGHTH;
+        } else if (swingParameters().swingUnit == Constants::division / 4) {
+            swingUnit = DurationType::V_16TH;
         } else {
-            swingUnit = TDuration(TDuration::DurationType::V_ZERO).name();
+            swingUnit = DurationType::V_ZERO;
         }
-        int swingRatio = swingParameters()->swingRatio;
-        xml.tagE(QString("swing unit=\"%1\" ratio= \"%2\"").arg(swingUnit).arg(swingRatio));
+        int swingRatio = swingParameters().swingRatio;
+        xml.tag("swing", { { "unit", TConv::toXml(swingUnit) }, { "ratio", swingRatio } });
     }
     if (capo() != 0) {
-        xml.tagE(QString("capo fretId=\"%1\"").arg(capo()));
+        xml.tag("capo", { { "fretId", capo() } });
     }
     TextBase::writeProperties(xml);
 
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -93,7 +97,7 @@ void StaffTextBase::write(XmlWriter& xml) const
 
 void StaffTextBase::read(XmlReader& e)
 {
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         _channelNames[voice].clear();
     }
     clearAeolusStops();
@@ -110,14 +114,14 @@ void StaffTextBase::read(XmlReader& e)
 
 bool StaffTextBase::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (tag == "MidiAction") {
         int channel = e.intAttribute("channel", 0);
-        QString name = e.attribute("name");
+        String name = e.attribute("name");
         bool found = false;
-        int n = _channelActions.size();
-        for (int i = 0; i < n; ++i) {
+        size_t n = _channelActions.size();
+        for (size_t i = 0; i < n; ++i) {
             ChannelActions* a = &_channelActions[i];
             if (a->channel == channel) {
                 a->midiActionNames.append(name);
@@ -129,17 +133,17 @@ bool StaffTextBase::readProperties(XmlReader& e)
             ChannelActions a;
             a.channel = channel;
             a.midiActionNames.append(name);
-            _channelActions.append(a);
+            _channelActions.push_back(a);
         }
         e.readNext();
     } else if (tag == "channelSwitch" || tag == "articulationChange") {
-        int voice = e.intAttribute("voice", -1);
-        if (voice >= 0 && voice < VOICES) {
+        voice_idx_t voice = static_cast<voice_idx_t>(e.intAttribute("voice", -1));
+        if (voice < VOICES) {
             _channelNames[voice] = e.attribute("name");
-        } else if (voice == -1) {
+        } else if (voice == mu::nidx) {
             // no voice applies channel to all voices for
             // compatibility
-            for (int i = 0; i < VOICES; ++i) {
+            for (voice_idx_t i = 0; i < VOICES; ++i) {
                 _channelNames[i] = e.attribute("name");
             }
         }
@@ -153,13 +157,13 @@ bool StaffTextBase::readProperties(XmlReader& e)
         }
         _setAeolusStops = true;
     } else if (tag == "swing") {
-        QString swingUnit = e.attribute("unit", "");
+        DurationType swingUnit = TConv::fromXml(e.asciiAttribute("unit"), DurationType::V_INVALID);
         int unit = 0;
-        if (swingUnit == TDuration(TDuration::DurationType::V_EIGHTH).name()) {
-            unit = MScore::division / 2;
-        } else if (swingUnit == TDuration(TDuration::DurationType::V_16TH).name()) {
-            unit = MScore:: division / 4;
-        } else if (swingUnit == TDuration(TDuration::DurationType::V_ZERO).name()) {
+        if (swingUnit == DurationType::V_EIGHTH) {
+            unit = Constants::division / 2;
+        } else if (swingUnit == DurationType::V_16TH) {
+            unit = Constants::division / 4;
+        } else if (swingUnit == DurationType::V_ZERO) {
             unit = 0;
         }
         int ratio = e.intAttribute("ratio", 60);
@@ -215,11 +219,11 @@ bool StaffTextBase::getAeolusStop(int group, int idx) const
 
 Segment* StaffTextBase::segment() const
 {
-    if (!parent()->isSegment()) {
-        qDebug("parent %s", parent()->name());
+    if (!explicitParent()->isSegment()) {
+        LOGD("parent %s", explicitParent()->typeName());
         return 0;
     }
-    Segment* s = toSegment(parent());
+    Segment* s = toSegment(explicitParent());
     return s;
 }
 }

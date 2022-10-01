@@ -23,25 +23,24 @@
 #ifndef __STAFFTEXT_H__
 #define __STAFFTEXT_H__
 
-#include "text.h"
-#include "part.h"
-#include "staff.h"
 #include "stafftextbase.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   StaffText
 //---------------------------------------------------------
 
 class StaffText final : public StaffTextBase
 {
-    QVariant propertyDefault(Pid id) const override;
+    OBJECT_ALLOCATOR(engraving, StaffText)
+
+    PropertyValue propertyDefault(Pid id) const override;
 
 public:
-    StaffText(Segment* parent = 0, Tid = Tid::STAFF);
+    StaffText(Segment* parent = 0, TextStyleType = TextStyleType::STAFF);
 
     StaffText* clone() const override { return new StaffText(*this); }
     void layout() override;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

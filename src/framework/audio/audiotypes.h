@@ -28,15 +28,19 @@
 #include <set>
 #include <string>
 
+#include "types/string.h"
 #include "realfn.h"
 #include "midi/miditypes.h"
+#include "mpe/events.h"
 #include "io/path.h"
-#include "io/device.h"
+#include "io/iodevice.h"
 #include "async/channel.h"
 
 namespace mu::audio {
-using msecs_t = uint64_t;
+using msecs_t = int64_t;
+using secs_t = int64_t;
 using samples_t = uint64_t;
+using sample_rate_t = uint64_t;
 using audioch_t = uint8_t;
 using volume_db_t = float;
 using volume_dbfs_t = float;
@@ -50,22 +54,70 @@ using TrackId = int32_t;
 using TrackIdList = std::vector<TrackId>;
 using TrackName = std::string;
 
+using PlaybackData = std::variant<mpe::PlaybackData, io::IODevice*>;
+using PlaybackSetupData = mpe::PlaybackSetupData;
+
+enum class SoundTrackType {
+    Undefined = -1,
+    MP3,
+    OGG,
+    FLAC,
+    WAV
+};
+
+struct SoundTrackFormat {
+    SoundTrackType type = SoundTrackType::Undefined;
+    sample_rate_t sampleRate = 0;
+    audioch_t audioChannelsNumber = 0;
+    int bitRate = 0;
+
+    bool operator==(const SoundTrackFormat& other) const
+    {
+        return type == other.type
+               && sampleRate == other.sampleRate
+               && audioChannelsNumber == other.audioChannelsNumber
+               && bitRate == other.bitRate;
+    }
+
+    bool isValid() const
+    {
+        return type != SoundTrackType::Undefined
+               && sampleRate != 0
+               && audioChannelsNumber != 0;
+    }
+};
+
 using AudioSourceName = std::string;
 using AudioResourceId = std::string;
 using AudioResourceIdList = std::vector<AudioResourceId>;
 using AudioResourceVendor = std::string;
+using AudioResourceAttributes = std::map<String, String>;
 using AudioUnitConfig = std::map<std::string, std::string>;
 
 enum class AudioResourceType {
     Undefined = -1,
     FluidSoundfont,
-    VstPlugin
+    VstPlugin,
+    MuseSamplerSoundPack,
+    SoundTrack,
 };
 
 struct AudioResourceMeta {
     AudioResourceId id;
     AudioResourceType type = AudioResourceType::Undefined;
     AudioResourceVendor vendor;
+    AudioResourceAttributes attributes;
+
+    const String& attributeVal(const String& key) const
+    {
+        auto search = attributes.find(key);
+        if (search != attributes.cend()) {
+            return search->second;
+        }
+
+        static String empty;
+        return empty;
+    }
 
     bool hasNativeEditorSupport = false;
 
@@ -81,18 +133,19 @@ struct AudioResourceMeta {
         return id == other.id
                && vendor == other.vendor
                && type == other.type
-               && hasNativeEditorSupport == other.hasNativeEditorSupport;
+               && hasNativeEditorSupport == other.hasNativeEditorSupport
+               && attributes == other.attributes;
     }
 
     bool operator<(const AudioResourceMeta& other) const
     {
         return id < other.id
-               && type < other.type
-               && vendor < other.vendor;
+               || vendor < other.vendor;
     }
 };
 
 using AudioResourceMetaList = std::vector<AudioResourceMeta>;
+using AudioResourceMetaSet = std::set<AudioResourceMeta>;
 
 enum class AudioFxType {
     Undefined = -1,
@@ -144,6 +197,11 @@ struct AudioFxParams {
                && configuration == other.configuration;
     }
 
+    bool operator !=(const AudioFxParams& other) const
+    {
+        return !(*this == other);
+    }
+
     bool operator<(const AudioFxParams& other) const
     {
         return resourceMeta < other.resourceMeta
@@ -163,22 +221,21 @@ struct AudioOutputParams {
     volume_db_t volume = 0.f;
     balance_t balance = 0.f;
     bool muted = false;
-    bool solo = false;
 
     bool operator ==(const AudioOutputParams& other) const
     {
         return fxChain == other.fxChain
                && volume == other.volume
                && balance == other.balance
-               && muted == other.muted
-               && solo == other.solo;
+               && muted == other.muted;
     }
 };
 
 enum class AudioSourceType {
     Undefined = -1,
     Fluid,
-    Vsti
+    Vsti,
+    MuseSampler
 };
 
 struct AudioSourceParams {
@@ -187,6 +244,7 @@ struct AudioSourceParams {
         switch (resourceMeta.type) {
         case AudioResourceType::FluidSoundfont: return AudioSourceType::Fluid;
         case AudioResourceType::VstPlugin: return AudioSourceType::Vsti;
+        case AudioResourceType::MuseSamplerSoundPack: return AudioSourceType::MuseSampler;
         default: return AudioSourceType::Undefined;
         }
     }
@@ -255,12 +313,29 @@ private:
     std::map<audioch_t, AudioSignalVal> m_signalValuesMap;
 };
 
-using PlaybackData = std::variant<midi::MidiData, io::Device*>;
-
 enum class PlaybackStatus {
     Stopped = 0,
     Paused,
     Running
+};
+
+using AudioDeviceID = std::string;
+struct AudioDevice {
+    AudioDeviceID id;
+    std::string name;
+
+    bool operator==(const AudioDevice& other) const
+    {
+        return id == other.id;
+    }
+};
+
+using AudioDeviceList = std::vector<AudioDevice>;
+
+enum class RenderMode {
+    Undefined = -1,
+    RealTimeMode,
+    OfflineMode
 };
 }
 

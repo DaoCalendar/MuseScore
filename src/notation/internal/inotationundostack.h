@@ -24,9 +24,13 @@
 #define MU_SCENE_NOTATION_INOTATIONUNDOSTACK_H
 
 #include "async/notification.h"
+#include "async/channel.h"
 
-namespace Ms {
+#include "notation/notationtypes.h"
+
+namespace mu::engraving {
 class EditData;
+enum class ElementType;
 }
 
 namespace mu::notation {
@@ -36,11 +40,11 @@ public:
     virtual ~INotationUndoStack() = default;
 
     virtual bool canUndo() const = 0;
-    virtual void undo(Ms::EditData*) = 0;
+    virtual void undo(mu::engraving::EditData*) = 0;
     virtual async::Notification undoNotification() const = 0;
 
     virtual bool canRedo() const = 0;
-    virtual void redo(Ms::EditData*) = 0;
+    virtual void redo(mu::engraving::EditData*) = 0;
     virtual async::Notification redoNotification() const = 0;
 
     virtual void prepareChanges() = 0;
@@ -52,6 +56,7 @@ public:
     virtual bool isLocked() const = 0;
 
     virtual async::Notification stackChanged() const = 0;
+    virtual async::Channel<ChangesRange> changesChannel() const = 0;
 };
 
 using INotationUndoStackPtr = std::shared_ptr<INotationUndoStack>;

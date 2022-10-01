@@ -23,24 +23,21 @@
 
 #include <cmath>
 
-#include "io/xml.h"
-#include "draw/brush.h"
+#include "rw/xml.h"
+#include "draw/types/brush.h"
 
-#include "staff.h"
+#include "beam.h"
 #include "chord.h"
-#include "score.h"
-#include "stafftype.h"
 #include "hook.h"
-#include "tremolo.h"
 #include "note.h"
-
-// Part of the dot-drawing hack in Stem::draw()
-#include "symid.h"
-//--
+#include "score.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "tremolo.h"
 
 using namespace mu;
 using namespace mu::draw;
-using namespace Ms;
+using namespace mu::engraving;
 
 static const ElementStyle stemStyle {
     { Sid::stemWidth, Pid::LINE_WIDTH }
@@ -58,7 +55,7 @@ EngravingItem* Stem::elementBase() const
     return parentItem();
 }
 
-int Stem::vStaffIdx() const
+staff_idx_t Stem::vStaffIdx() const
 {
     return staffIdx() + chord()->staffMove();
 }
@@ -68,11 +65,6 @@ bool Stem::up() const
     return chord() ? chord()->up() : true;
 }
 
-//! For beamed notes this is called twice. The final stem length
-//! can only be calculated after stretching of the measure. We
-//! need a guessed stem shape to calculate the minimal distance
-//! between segments. The guessed stem must have at least the
-//! right direction.
 void Stem::layout()
 {
     const bool up = this->up();
@@ -113,11 +105,15 @@ void Stem::layout()
                 y1 = note->stemDownNW().y();
             }
 
-            rypos() = note->rypos();
+            setPosY(note->ypos());
         }
 
         if (chord()->hook() && !chord()->beam()) {
             y2 += chord()->hook()->smuflAnchor().y();
+        }
+
+        if (chord()->beam()) {
+            y2 -= _up * point(score()->styleS(Sid::beamWidth)) * .5 * chord()->beam()->mag();
         }
     }
 
@@ -125,14 +121,17 @@ void Stem::layout()
     double lineX = isTabStaff ? 0.0 : _up * lineWidthCorrection;
     m_line.setLine(lineX, y1, lineX, y2);
 
+    // HACK: if there is a beam, extend the bounding box of the stem (NOT the stem itself) by half beam width.
+    // This way the bbox of the stem covers also the beam position. Hugely helps with all the collision checks.
+    double beamCorrection = (chord() && chord()->beam()) ? _up * score()->styleMM(Sid::beamWidth) * mag() / 2 : 0.0;
     // compute line and bounding rectangle
-    RectF rect(m_line.p1(), m_line.p2());
+    RectF rect(m_line.p1(), m_line.p2() + PointF(0.0, beamCorrection));
     setbbox(rect.normalized().adjusted(-lineWidthCorrection, 0, lineWidthCorrection, 0));
 }
 
-void Stem::setBaseLength(double baseLength)
+void Stem::setBaseLength(Millimetre baseLength)
 {
-    m_baseLength = std::abs(baseLength);
+    m_baseLength = Millimetre(std::abs(baseLength.val()));
     layout();
 }
 
@@ -172,26 +171,26 @@ void Stem::draw(mu::draw::Painter* painter) const
     }
 
     // TODO: adjust bounding rectangle in layout() for dots and for slash
-    qreal sp = spatium();
+    double sp = spatium();
     bool isUp = up();
 
     // slashed half note stem
-    if (chord()->durationType().type() == TDuration::DurationType::V_HALF
+    if (chord()->durationType().type() == DurationType::V_HALF
         && staffType->minimStyle() == TablatureMinimStyle::SLASHED) {
         // position slashes onto stem
-        qreal y = isUp ? -length() + STAFFTYPE_TAB_SLASH_2STARTY_UP * sp
-                  : length() - STAFFTYPE_TAB_SLASH_2STARTY_DN * sp;
+        double y = isUp ? -length() + STAFFTYPE_TAB_SLASH_2STARTY_UP * sp
+                   : length() - STAFFTYPE_TAB_SLASH_2STARTY_DN * sp;
         // if stems through, try to align slashes within or across lines
         if (staffType->stemThrough()) {
-            qreal halfLineDist = staffType->lineDistance().val() * sp * 0.5;
-            qreal halfSlashHgt = STAFFTYPE_TAB_SLASH_2TOTHEIGHT * sp * 0.5;
+            double halfLineDist = staffType->lineDistance().val() * sp * 0.5;
+            double halfSlashHgt = STAFFTYPE_TAB_SLASH_2TOTHEIGHT * sp * 0.5;
             y = lrint((y + halfSlashHgt) / halfLineDist) * halfLineDist - halfSlashHgt;
         }
         // draw slashes
-        qreal hlfWdt= sp * STAFFTYPE_TAB_SLASH_WIDTH * 0.5;
-        qreal sln   = sp * STAFFTYPE_TAB_SLASH_SLANTY;
-        qreal thk   = sp * STAFFTYPE_TAB_SLASH_THICK;
-        qreal displ = sp * STAFFTYPE_TAB_SLASH_DISPL;
+        double hlfWdt= sp * STAFFTYPE_TAB_SLASH_WIDTH * 0.5;
+        double sln   = sp * STAFFTYPE_TAB_SLASH_SLANTY;
+        double thk   = sp * STAFFTYPE_TAB_SLASH_THICK;
+        double displ = sp * STAFFTYPE_TAB_SLASH_DISPL;
         PainterPath path;
         for (int i = 0; i < 2; ++i) {
             path.moveTo(hlfWdt, y);                   // top-right corner
@@ -211,9 +210,9 @@ void Stem::draw(mu::draw::Painter* painter) const
     // with tablatures and stems beside staves, dots are not drawn near 'notes', but near stems
     int nDots = chord()->dots();
     if (nDots > 0 && !staffType->stemThrough()) {
-        qreal x     = chord()->dotPosX();
-        qreal y     = ((STAFFTYPE_TAB_DEFAULTSTEMLEN_DN * 0.2) * sp) * (isUp ? -1.0 : 1.0);
-        qreal step  = score()->styleS(Sid::dotDotDistance).val() * sp;
+        double x     = chord()->dotPosX();
+        double y     = ((STAFFTYPE_TAB_DEFAULTSTEMLEN_DN * 0.2) * sp) * (isUp ? -1.0 : 1.0);
+        double step  = score()->styleS(Sid::dotDotDistance).val() * sp;
         for (int dot = 0; dot < nDots; dot++, x += step) {
             drawSymbol(SymId::augmentationDot, painter, PointF(x, y));
         }
@@ -222,11 +221,11 @@ void Stem::draw(mu::draw::Painter* painter) const
 
 void Stem::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     EngravingItem::writeProperties(xml);
     writeProperty(xml, Pid::USER_LEN);
     writeProperty(xml, Pid::LINE_WIDTH);
-    xml.endObject();
+    xml.endElement();
 }
 
 void Stem::read(XmlReader& e)
@@ -240,7 +239,7 @@ void Stem::read(XmlReader& e)
 
 bool Stem::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (readProperty(tag, e, Pid::USER_LEN)) {
     } else if (readStyledProperty(e, tag)) {
@@ -259,14 +258,21 @@ std::vector<mu::PointF> Stem::gripsPositions(const EditData&) const
 void Stem::startEdit(EditData& ed)
 {
     EngravingItem::startEdit(ed);
-    ElementEditData* eed = ed.getData(this);
+    ElementEditDataPtr eed = ed.getData(this);
+    eed->pushProperty(Pid::USER_LEN);
+}
+
+void Stem::startEditDrag(EditData& ed)
+{
+    EngravingItem::startEditDrag(ed);
+    ElementEditDataPtr eed = ed.getData(this);
     eed->pushProperty(Pid::USER_LEN);
 }
 
 void Stem::editDrag(EditData& ed)
 {
     double yDelta = ed.delta.y();
-    m_userLength += up() ? -yDelta : yDelta;
+    m_userLength += up() ? Millimetre(-yDelta) : Millimetre(yDelta);
     layout();
     Chord* c = chord();
     if (c->hook()) {
@@ -276,7 +282,7 @@ void Stem::editDrag(EditData& ed)
 
 void Stem::reset()
 {
-    undoChangeProperty(Pid::USER_LEN, 0.0);
+    undoChangeProperty(Pid::USER_LEN, Millimetre(0.0));
     EngravingItem::reset();
 }
 
@@ -306,7 +312,7 @@ EngravingItem* Stem::drop(EditData& data)
     return 0;
 }
 
-QVariant Stem::getProperty(Pid propertyId) const
+PropertyValue Stem::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::LINE_WIDTH:
@@ -314,23 +320,23 @@ QVariant Stem::getProperty(Pid propertyId) const
     case Pid::USER_LEN:
         return userLength();
     case Pid::STEM_DIRECTION:
-        return QVariant::fromValue<Direction>(chord()->stemDirection());
+        return PropertyValue::fromValue<DirectionV>(chord()->stemDirection());
     default:
         return EngravingItem::getProperty(propertyId);
     }
 }
 
-bool Stem::setProperty(Pid propertyId, const QVariant& v)
+bool Stem::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::LINE_WIDTH:
-        setLineWidth(v.toReal());
+        setLineWidth(v.value<Millimetre>());
         break;
     case Pid::USER_LEN:
-        setUserLength(v.toDouble());
+        setUserLength(v.value<Millimetre>());
         break;
     case Pid::STEM_DIRECTION:
-        chord()->setStemDirection(v.value<Direction>());
+        chord()->setStemDirection(v.value<DirectionV>());
         break;
     default:
         return EngravingItem::setProperty(propertyId, v);
@@ -339,13 +345,13 @@ bool Stem::setProperty(Pid propertyId, const QVariant& v)
     return true;
 }
 
-QVariant Stem::propertyDefault(Pid id) const
+PropertyValue Stem::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::USER_LEN:
         return 0.0;
     case Pid::STEM_DIRECTION:
-        return QVariant::fromValue<Direction>(Direction::AUTO);
+        return PropertyValue::fromValue<DirectionV>(DirectionV::AUTO);
     default:
         return EngravingItem::propertyDefault(id);
     }

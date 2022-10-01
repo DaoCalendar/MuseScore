@@ -21,9 +21,12 @@
  */
 #include "generalpreferencesmodel.h"
 
+#include "languages/languageserrors.h"
+
 #include "log.h"
 
 using namespace mu::appshell;
+using namespace mu::framework;
 using namespace mu::languages;
 
 GeneralPreferencesModel::GeneralPreferencesModel(QObject* parent)
@@ -37,42 +40,67 @@ void GeneralPreferencesModel::load()
         emit currentLanguageCodeChanged(languageCode);
     });
 
-    languagesService()->languages().ch.onReceive(this, [this](const LanguagesHash&) {
-        emit languagesChanged(languages());
+    setIsNeedRestart(languagesService()->needRestartToApplyLanguageChange());
+    languagesService()->needRestartToApplyLanguageChangeChanged().onReceive(this, [this](bool need) {
+        setIsNeedRestart(need);
     });
 
-    telemetryConfiguration()->isTelemetryAllowed().ch.onReceive(this, [this](bool) {
-        emit isTelemetryAllowedChanged(isTelemetryAllowed());
+    projectConfiguration()->autoSaveEnabledChanged().onReceive(this, [this](bool enabled) {
+        emit autoSaveEnabledChanged(enabled);
+    });
+
+    projectConfiguration()->autoSaveIntervalChanged().onReceive(this, [this](int minutes) {
+        emit autoSaveIntervalChanged(minutes);
     });
 }
 
-void GeneralPreferencesModel::openUpdateTranslationsPage()
+void GeneralPreferencesModel::checkUpdateForCurrentLanguage()
 {
-    interactive()->open("musescore://home?section=add-ons&subSection=languages");
+    QString languageCode = currentLanguageCode();
+
+    m_languageUpdateProgress = languagesService()->update(languageCode);
+
+    m_languageUpdateProgress.progressChanged.onReceive(this, [this](int64_t current, int64_t total, const std::string& status) {
+        emit receivingUpdateForCurrentLanguage(current, total, QString::fromStdString(status));
+    });
+
+    m_languageUpdateProgress.finished.onReceive(this, [this, languageCode](const ProgressResult& res) {
+        if (res.ret.code() == static_cast<int>(Err::AlreadyUpToDate)) {
+            QString msg = mu::qtrc("appshell/preferences", "Your version of %1 is up to date.")
+                          .arg(languagesService()->language(languageCode).name);
+            interactive()->info(msg.toStdString(), std::string());
+        }
+    });
 }
 
 QVariantList GeneralPreferencesModel::languages() const
 {
-    ValCh<LanguagesHash> languages = languagesService()->languages();
-    QList<Language> languageList = languages.val.values();
+    QList<Language> languages = languagesService()->languages().values();
+
+    std::sort(languages.begin(), languages.end(), [](const Language& l, const Language& r) {
+        return l.code < r.code;
+    });
 
     QVariantList result;
 
-    for (const Language& language: languageList) {
-        if (language.status == LanguageStatus::Status::NoInstalled
-            || language.status == LanguageStatus::Status::Undefined) {
-            continue;
-        }
-
+    for (const Language& language : languages) {
         QVariantMap languageObj;
         languageObj["code"] = language.code;
         languageObj["name"] = language.name;
         result << languageObj;
     }
 
-    std::sort(result.begin(), result.end(), [](const QVariant& l, const QVariant& r) {
-        return l.toMap().value("code").toString() < r.toMap().value("code").toString();
-    });
+    if (languagesService()->hasPlaceholderLanguage()) {
+        QVariantMap placeholderLanguageObj;
+        placeholderLanguageObj["code"] = PLACEHOLDER_LANGUAGE_CODE;
+        placeholderLanguageObj["name"] = "«Placeholder translations»";
+        result.prepend(placeholderLanguageObj);
+    }
+
+    QVariantMap systemLanguageObj;
+    systemLanguageObj["code"] = SYSTEM_LANGUAGE_CODE;
+    systemLanguageObj["name"] = mu::qtrc("appshell/preferences", "System default");
+    result.prepend(systemLanguageObj);
 
     return result;
 }
@@ -82,19 +110,25 @@ QString GeneralPreferencesModel::currentLanguageCode() const
     return languagesConfiguration()->currentLanguageCode().val;
 }
 
-bool GeneralPreferencesModel::isTelemetryAllowed() const
+QStringList GeneralPreferencesModel::keyboardLayouts() const
 {
-    return telemetryConfiguration()->isTelemetryAllowed().val;
+    NOT_IMPLEMENTED;
+    return { "US-QWERTY", "UK-QWERTY", "QWERTZ", "AZERTY" };
 }
 
-bool GeneralPreferencesModel::isAutoSave() const
+QString GeneralPreferencesModel::currentKeyboardLayout() const
 {
-    return false;
+    return shortcutsConfiguration()->currentKeyboardLayout();
 }
 
-int GeneralPreferencesModel::autoSavePeriod() const
+bool GeneralPreferencesModel::isAutoSaveEnabled() const
 {
-    return 0;
+    return projectConfiguration()->isAutoSaveEnabled();
+}
+
+int GeneralPreferencesModel::autoSaveInterval() const
+{
+    return projectConfiguration()->autoSaveIntervalMinutes();
 }
 
 bool GeneralPreferencesModel::isOSCRemoteControl() const
@@ -107,7 +141,7 @@ int GeneralPreferencesModel::oscPort() const
     return 0;
 }
 
-void GeneralPreferencesModel::setCurrentLanguageCode(QString currentLanguageCode)
+void GeneralPreferencesModel::setCurrentLanguageCode(const QString& currentLanguageCode)
 {
     if (currentLanguageCode == this->currentLanguageCode()) {
         return;
@@ -117,26 +151,34 @@ void GeneralPreferencesModel::setCurrentLanguageCode(QString currentLanguageCode
     emit currentLanguageCodeChanged(currentLanguageCode);
 }
 
-void GeneralPreferencesModel::setIsTelemetryAllowed(bool isTelemetryAllowed)
+void GeneralPreferencesModel::setCurrentKeyboardLayout(const QString& keyboardLayout)
 {
-    if (isTelemetryAllowed == this->isTelemetryAllowed()) {
+    if (keyboardLayout == this->currentKeyboardLayout()) {
         return;
     }
 
-    telemetryConfiguration()->setIsTelemetryAllowed(isTelemetryAllowed);
-    emit isTelemetryAllowedChanged(isTelemetryAllowed);
+    shortcutsConfiguration()->setCurrentKeyboardLayout(keyboardLayout);
+    emit currentKeyboardLayoutChanged();
 }
 
-void GeneralPreferencesModel::setIsAutoSave(bool isAutoSave)
+void GeneralPreferencesModel::setAutoSaveEnabled(bool enabled)
 {
-    NOT_IMPLEMENTED;
-    emit isAutoSaveChanged(isAutoSave);
+    if (enabled == isAutoSaveEnabled()) {
+        return;
+    }
+
+    projectConfiguration()->setAutoSaveEnabled(enabled);
+    emit autoSaveEnabledChanged(enabled);
 }
 
-void GeneralPreferencesModel::setAutoSavePeriod(int autoSavePeriod)
+void GeneralPreferencesModel::setAutoSaveInterval(int minutes)
 {
-    NOT_IMPLEMENTED;
-    emit autoSavePeriodChanged(autoSavePeriod);
+    if (minutes == autoSaveInterval()) {
+        return;
+    }
+
+    projectConfiguration()->setAutoSaveInterval(minutes);
+    emit autoSaveIntervalChanged(minutes);
 }
 
 void GeneralPreferencesModel::setIsOSCRemoteControl(bool isOSCRemoteControl)
@@ -149,4 +191,18 @@ void GeneralPreferencesModel::setOscPort(int oscPort)
 {
     NOT_IMPLEMENTED;
     emit oscPortChanged(oscPort);
+}
+
+bool GeneralPreferencesModel::isNeedRestart() const
+{
+    return m_isNeedRestart;
+}
+
+void GeneralPreferencesModel::setIsNeedRestart(bool newIsNeedRestart)
+{
+    if (m_isNeedRestart == newIsNeedRestart) {
+        return;
+    }
+    m_isNeedRestart = newIsNeedRestart;
+    emit isNeedRestartChanged();
 }

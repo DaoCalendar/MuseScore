@@ -23,33 +23,34 @@
 #include "rest.h"
 
 #include <cmath>
+#include <set>
 
-#include "style/style.h"
-#include "io/xml.h"
+#include "containers.h"
+#include "realfn.h"
+#include "translation.h"
 
-#include "factory.h"
-#include "score.h"
-#include "utils.h"
-#include "tuplet.h"
-#include "symid.h"
-#include "stafftext.h"
+#include "rw/xml.h"
+
+#include "actionicon.h"
 #include "articulation.h"
 #include "chord.h"
-#include "note.h"
+#include "factory.h"
+#include "image.h"
 #include "measure.h"
 #include "measurerepeat.h"
-#include "undo.h"
-#include "staff.h"
-#include "harmony.h"
+#include "note.h"
+#include "score.h"
 #include "segment.h"
+#include "staff.h"
 #include "stafftype.h"
-#include "actionicon.h"
-#include "image.h"
+#include "undo.h"
+
+#include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //    Rest
 //--------------------------------------------------------
@@ -62,7 +63,7 @@ Rest::Rest(Segment* parent)
 Rest::Rest(const ElementType& type, Segment* parent)
     : ChordRest(type, parent)
 {
-    _beamMode  = Beam::Mode::NONE;
+    _beamMode  = BeamMode::NONE;
     m_sym      = SymId::restQuarter;
 }
 
@@ -74,7 +75,7 @@ Rest::Rest(Segment* parent, const TDuration& d)
 Rest::Rest(const ElementType& type, Segment* parent, const TDuration& d)
     : ChordRest(type, parent)
 {
-    _beamMode  = Beam::Mode::NONE;
+    _beamMode  = BeamMode::NONE;
     m_sym      = SymId::restQuarter;
     setDurationType(d);
     if (d.fraction().isValid()) {
@@ -125,7 +126,7 @@ void Rest::draw(mu::draw::Painter* painter) const
 
 void Rest::setOffset(const mu::PointF& o)
 {
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     int line = lrint(o.y() / _spatium);
 
     if (m_sym == SymId::restWhole && (line <= -2 || line >= 3)) {
@@ -148,7 +149,7 @@ void Rest::setOffset(const mu::PointF& o)
 mu::RectF Rest::drag(EditData& ed)
 {
     // don't allow drag for Measure Rests, because they can't be easily laid out in correct position while dragging
-    if (measure() && durationType().type() == TDuration::DurationType::V_MEASURE) {
+    if (measure() && durationType().type() == DurationType::V_MEASURE) {
         return RectF();
     }
 
@@ -156,7 +157,7 @@ mu::RectF Rest::drag(EditData& ed)
     RectF r(abbox());
 
     // Limit horizontal drag range
-    static const qreal xDragRange = spatium() * 5;
+    static const double xDragRange = spatium() * 5;
     if (fabs(s.x()) > xDragRange) {
         s.rx() = xDragRange * (s.x() < 0 ? -1.0 : 1.0);
     }
@@ -174,19 +175,20 @@ bool Rest::acceptDrop(EditData& data) const
 {
     EngravingItem* e = data.dropElement;
     ElementType type = e->type();
-    if (
-        (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_START)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_MID)
+    if ((type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_AUTO)
         || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_NONE)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BEGIN_32)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BEGIN_64)
-        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_AUTO)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BREAK_LEFT)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BREAK_INNER_8TH)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_BREAK_INNER_16TH)
+        || (type == ElementType::ACTION_ICON && toActionIcon(e)->actionType() == ActionIconType::BEAM_JOIN)
         || (type == ElementType::FERMATA)
         || (type == ElementType::CLEF)
         || (type == ElementType::KEYSIG)
         || (type == ElementType::TIMESIG)
         || (type == ElementType::SYSTEM_TEXT)
+        || (type == ElementType::TRIPLET_FEEL)
         || (type == ElementType::STAFF_TEXT)
+        || (type == ElementType::PLAYTECH_ANNOTATION)
         || (type == ElementType::BAR_LINE)
         || (type == ElementType::BREATH)
         || (type == ElementType::CHORD)
@@ -201,19 +203,19 @@ bool Rest::acceptDrop(EditData& data) const
         || (type == ElementType::TREMOLOBAR)
         || (type == ElementType::IMAGE)
         || (type == ElementType::SYMBOL)
-        || (type == ElementType::MEASURE_REPEAT && durationType().type() == TDuration::DurationType::V_MEASURE)
+        || (type == ElementType::MEASURE_REPEAT && durationType().type() == DurationType::V_MEASURE)
         ) {
         return true;
     }
 
     // prevent 'hanging' slurs, avoid crash on tie
-    static const QSet<ElementType> ignoredTypes {
+    static const std::set<ElementType> ignoredTypes {
         ElementType::SLUR,
         ElementType::TIE,
         ElementType::GLISSANDO
     };
 
-    return e->isSpanner() && !ignoredTypes.contains(type);
+    return e->isSpanner() && !mu::contains(ignoredTypes, type);
 }
 
 //---------------------------------------------------------
@@ -227,7 +229,7 @@ EngravingItem* Rest::drop(EditData& data)
     case ElementType::ARTICULATION:
     {
         Articulation* a = toArticulation(e);
-        if (!a->isFermata() || !score()->addArticulation(this, a)) {
+        if (!a->isFermata() || !score()->toggleArticulation(this, a)) {
             delete e;
             e = 0;
         }
@@ -237,7 +239,7 @@ EngravingItem* Rest::drop(EditData& data)
     case ElementType::CHORD: {
         Chord* c = toChord(e);
         Note* n  = c->upNote();
-        Direction dir = c->stemDirection();
+        DirectionV dir = c->stemDirection();
         NoteVal nval;
         nval.pitch = n->pitch();
         nval.headGroup = n->headGroup();
@@ -257,7 +259,7 @@ EngravingItem* Rest::drop(EditData& data)
     case ElementType::MEASURE_REPEAT: {
         int numMeasures = toMeasureRepeat(e)->numMeasures();
         delete e;
-        if (durationType().type() == TDuration::DurationType::V_MEASURE) {
+        if (durationType().type() == DurationType::V_MEASURE) {
             score()->cmdAddMeasureRepeat(measure(), numMeasures, staffIdx());
         }
         break;
@@ -278,44 +280,44 @@ EngravingItem* Rest::drop(EditData& data)
 //   getSymbol
 //---------------------------------------------------------
 
-SymId Rest::getSymbol(TDuration::DurationType type, int line, int lines, int* yoffset)
+SymId Rest::getSymbol(DurationType type, int line, int lines, int* yoffset)
 {
     *yoffset = 2;
     switch (type) {
-    case TDuration::DurationType::V_LONG:
+    case DurationType::V_LONG:
         return SymId::restLonga;
-    case TDuration::DurationType::V_BREVE:
+    case DurationType::V_BREVE:
         return SymId::restDoubleWhole;
-    case TDuration::DurationType::V_MEASURE:
+    case DurationType::V_MEASURE:
         if (ticks() >= Fraction(2, 1)) {
             return SymId::restDoubleWhole;
         }
     // fall through
-    case TDuration::DurationType::V_WHOLE:
+    case DurationType::V_WHOLE:
         *yoffset = 1;
         return (line <= -2 || line >= (lines - 1)) ? SymId::restWholeLegerLine : SymId::restWhole;
-    case TDuration::DurationType::V_HALF:
+    case DurationType::V_HALF:
         return (line <= -3 || line >= (lines - 2)) ? SymId::restHalfLegerLine : SymId::restHalf;
-    case TDuration::DurationType::V_QUARTER:
+    case DurationType::V_QUARTER:
         return SymId::restQuarter;
-    case TDuration::DurationType::V_EIGHTH:
+    case DurationType::V_EIGHTH:
         return SymId::rest8th;
-    case TDuration::DurationType::V_16TH:
+    case DurationType::V_16TH:
         return SymId::rest16th;
-    case TDuration::DurationType::V_32ND:
+    case DurationType::V_32ND:
         return SymId::rest32nd;
-    case TDuration::DurationType::V_64TH:
+    case DurationType::V_64TH:
         return SymId::rest64th;
-    case TDuration::DurationType::V_128TH:
+    case DurationType::V_128TH:
         return SymId::rest128th;
-    case TDuration::DurationType::V_256TH:
+    case DurationType::V_256TH:
         return SymId::rest256th;
-    case TDuration::DurationType::V_512TH:
+    case DurationType::V_512TH:
         return SymId::rest512th;
-    case TDuration::DurationType::V_1024TH:
+    case DurationType::V_1024TH:
         return SymId::rest1024th;
     default:
-        qDebug("unknown rest type %d", int(type));
+        LOGD("unknown rest type %d", int(type));
         return SymId::restQuarter;
     }
 }
@@ -332,17 +334,17 @@ void Rest::layout()
     for (EngravingItem* e : el()) {
         e->layout();
     }
-    qreal _spatium = spatium();
+    double _spatium = spatium();
 
-    rxpos() = 0.0;
+    setPosX(0.0);
     const StaffType* stt = staffType();
     if (stt && stt->isTabStaff()) {
         // if rests are shown and note values are shown as duration symbols
         if (stt->showRests() && stt->genDurations()) {
-            TDuration::DurationType type = durationType().type();
+            DurationType type = durationType().type();
             int dots = durationType().dots();
             // if rest is whole measure, convert into actual type and dot values
-            if (type == TDuration::DurationType::V_MEASURE && measure()) {
+            if (type == DurationType::V_MEASURE && measure()) {
                 Fraction ticks = measure()->ticks();
                 TDuration dur  = TDuration(ticks).type();
                 type           = dur.type();
@@ -372,17 +374,17 @@ void Rest::layout()
 
     m_dotline = Rest::getDotline(durationType().type());
 
-    qreal yOff       = offset().y();
+    double yOff       = offset().y();
     const Staff* stf = staff();
     const StaffType* st = stf ? stf->staffTypeForElement(this) : 0;
-    qreal lineDist = st ? st->lineDistance().val() : 1.0;
+    double lineDist = st ? st->lineDistance().val() : 1.0;
     int userLine   = yOff == 0.0 ? 0 : lrint(yOff / (lineDist * _spatium));
     int lines      = st ? st->lines() : 5;
     int lineOffset = computeLineOffset(lines);
 
     int yo;
     m_sym = getSymbol(durationType().type(), lineOffset / 2 + userLine, lines, &yo);
-    rypos() = (qreal(yo) + qreal(lineOffset) * .5) * lineDist * _spatium;
+    setPosY((double(yo) + double(lineOffset) * .5) * lineDist * _spatium);
     if (!shouldNotBeDrawn()) {
         setbbox(symBbox(m_sym));
     }
@@ -396,9 +398,9 @@ void Rest::layout()
 void Rest::layoutDots()
 {
     checkDots();
-    qreal x = symWidth(m_sym) + score()->styleP(Sid::dotNoteDistance) * mag();
-    qreal dx = score()->styleP(Sid::dotDotDistance) * mag();
-    qreal y = m_dotline * spatium() * .5;
+    double x = symWidth(m_sym) + score()->styleMM(Sid::dotNoteDistance) * mag();
+    double dx = score()->styleMM(Sid::dotDotDistance) * mag();
+    double y = m_dotline * spatium() * .5;
     for (NoteDot* dot : m_dots) {
         dot->layout();
         dot->setPos(x, y);
@@ -440,18 +442,18 @@ NoteDot* Rest::dot(int n)
 //   getDotline
 //---------------------------------------------------------
 
-int Rest::getDotline(TDuration::DurationType durationType)
+int Rest::getDotline(DurationType durationType)
 {
     int dl = -1;
     switch (durationType) {
-    case TDuration::DurationType::V_64TH:
-    case TDuration::DurationType::V_32ND:
+    case DurationType::V_64TH:
+    case DurationType::V_32ND:
         dl = -3;
         break;
-    case TDuration::DurationType::V_1024TH:
-    case TDuration::DurationType::V_512TH:
-    case TDuration::DurationType::V_256TH:
-    case TDuration::DurationType::V_128TH:
+    case DurationType::V_1024TH:
+    case DurationType::V_512TH:
+    case DurationType::V_256TH:
+    case DurationType::V_128TH:
         dl = -5;
         break;
     default:
@@ -483,8 +485,8 @@ int Rest::computeLineOffset(int lines)
     if (offsetVoices && voice() < 2) {
         // in slash notation voices 1 and 2 are not offset outside the staff
         // if the staff contains slash notation then only offset rests in voices 3 and 4
-        int baseTrack = staffIdx() * VOICES;
-        for (int v = 0; v < VOICES; ++v) {
+        track_idx_t baseTrack = staffIdx() * VOICES;
+        for (voice_idx_t v = 0; v < VOICES; ++v) {
             EngravingItem* e = s->element(baseTrack + v);
             if (e && e->isChord() && toChord(e)->slash()) {
                 offsetVoices = false;
@@ -498,8 +500,8 @@ int Rest::computeLineOffset(int lines)
         // this is not always the right thing to do do, but is useful in choral music
         // and can be enabled via a staff property
         bool matchFound = false;
-        int baseTrack = staffIdx() * VOICES;
-        for (int v = 0; v < VOICES; ++v) {
+        track_idx_t baseTrack = staffIdx() * VOICES;
+        for (voice_idx_t v = 0; v < VOICES; ++v) {
             if (v == voice()) {
                 continue;
             }
@@ -539,13 +541,13 @@ int Rest::computeLineOffset(int lines)
         int line = up ? 10 : -10;
 
         // For compatibility reasons apply automatic collision avoidance only if y-offset is unchanged
-        if (qFuzzyIsNull(offset().y()) && autoplace()) {
-            int firstTrack = staffIdx() * 4;
+        if (RealIsNull(offset().y()) && autoplace()) {
+            track_idx_t firstTrack = staffIdx() * 4;
             int extraOffsetForFewLines = lines < 5 ? 2 : 0;
-            bool isMeasureRest = durationType().type() == TDuration::DurationType::V_MEASURE;
+            bool isMeasureRest = durationType().type() == DurationType::V_MEASURE;
             Segment* seg = isMeasureRest ? measure()->first() : s;
             while (seg) {
-                for (const int& track : { firstTrack + upOffset, firstTrack + 2 + upOffset }) {
+                for (const track_idx_t track : { firstTrack + upOffset, firstTrack + 2 + upOffset }) {
                     EngravingItem* e = seg->element(track);
                     if (e && e->isChord()) {
                         Chord* chord = toChord(e);
@@ -574,15 +576,15 @@ int Rest::computeLineOffset(int lines)
         }
 
         switch (durationType().type()) {
-        case TDuration::DurationType::V_LONG:
+        case DurationType::V_LONG:
             lineOffset = up ? -3 : 5;
             lineOffset += up ? (line < 5 ? line - 5 : 0) : (line > 5 ? line - 5 : 0);
             break;
-        case TDuration::DurationType::V_BREVE:
+        case DurationType::V_BREVE:
             lineOffset = up ? -3 : 5;
             lineOffset += up ? (line < 3 ? line - 3 : 0) : (line > 5 ? line - 5 : 0);
             break;
-        case TDuration::DurationType::V_MEASURE:
+        case DurationType::V_MEASURE:
             if (ticks() >= Fraction(2, 1)) {     // breve symbol
                 lineOffset = up ? -3 : 5;
                 lineOffset += up ? (line < 3 ? line - 3 : 0) : (line > 5 ? line - 4 : 0);
@@ -591,41 +593,41 @@ int Rest::computeLineOffset(int lines)
                 lineOffset += up ? (line < 3 ? line - 2 : 0) : (line > 6 ? line - 5 : 0);
             }
             break;
-        case TDuration::DurationType::V_WHOLE:
+        case DurationType::V_WHOLE:
             lineOffset = up ? -4 : 6;
             lineOffset += up ? (line < 3 ? line - 2 : 0) : (line > 6 ? line - 5 : 0);
             break;
-        case TDuration::DurationType::V_HALF:
+        case DurationType::V_HALF:
             lineOffset = up ? -4 : 4;
             lineOffset += up ? (line < 2 ? line - 3 : 0) : (line > 5 ? line - 4 : 0);
             break;
-        case TDuration::DurationType::V_QUARTER:
+        case DurationType::V_QUARTER:
             lineOffset = up ? -4 : 4;
             lineOffset += up ? (line < 5 ? line - 4 : 0) : (line > 3 ? line - 3 : 0);
             break;
-        case TDuration::DurationType::V_EIGHTH:
+        case DurationType::V_EIGHTH:
             lineOffset = up ? -4 : 4;
             lineOffset += up ? (line < 4 ? line - 4 : 0) : (line > 4 ? line - 4 : 0);
             break;
-        case TDuration::DurationType::V_16TH:
+        case DurationType::V_16TH:
             lineOffset = up ? -6 : 4;
             lineOffset += up ? (line < 4 ? line - 4 : 0) : (line > 4 ? line - 4 : 0);
             break;
-        case TDuration::DurationType::V_32ND:
+        case DurationType::V_32ND:
             lineOffset = up ? -6 : 6;
             lineOffset += up ? (line < 4 ? line - 4 : 0) : (line > 4 ? line - 4 : 0);
             break;
-        case TDuration::DurationType::V_64TH:
+        case DurationType::V_64TH:
             lineOffset = up ? -8 : 6;
             lineOffset += up ? (line < 4 ? line - 4 : 0) : (line > 4 ? line - 4 : 0);
             break;
-        case TDuration::DurationType::V_128TH:
+        case DurationType::V_128TH:
             lineOffset = up ? -8 : 8;
             lineOffset += up ? (line < 4 ? line - 4 : 0) : (line > 4 ? line - 4 : 0);
             break;
-        case TDuration::DurationType::V_1024TH:
-        case TDuration::DurationType::V_512TH:
-        case TDuration::DurationType::V_256TH:
+        case DurationType::V_1024TH:
+        case DurationType::V_512TH:
+        case DurationType::V_256TH:
             lineOffset = up ? -10 : 6;
             lineOffset += up ? (line < 4 ? line - 4 : 0) : (line > 4 ? line - 4 : 0);
             break;
@@ -656,17 +658,17 @@ int Rest::computeLineOffset(int lines)
         }
         lineOffset = centerDiff;
         switch (durationType().type()) {
-        case TDuration::DurationType::V_LONG:
-        case TDuration::DurationType::V_BREVE:
-        case TDuration::DurationType::V_MEASURE:
-        case TDuration::DurationType::V_WHOLE:
+        case DurationType::V_LONG:
+        case DurationType::V_BREVE:
+        case DurationType::V_MEASURE:
+        case DurationType::V_WHOLE:
             if (lineOffset & 1) {
                 lineOffset += 1;                // always round to nearest line
             } else if (lines <= 3) {
                 lineOffset += 2;                // special case - move down for 1-line or 3-line staff
             }
             break;
-        case TDuration::DurationType::V_HALF:
+        case DurationType::V_HALF:
             if (lineOffset & 1) {
                 lineOffset += 1;                // always round to nearest line
             }
@@ -686,7 +688,7 @@ int Rest::computeLineOffset(int lines)
 //   upPos
 //---------------------------------------------------------
 
-qreal Rest::upPos() const
+double Rest::upPos() const
 {
     return symBbox(m_sym).y();
 }
@@ -695,7 +697,7 @@ qreal Rest::upPos() const
 //   downPos
 //---------------------------------------------------------
 
-qreal Rest::downPos() const
+double Rest::downPos() const
 {
     return symBbox(m_sym).y() + symHeight(m_sym);
 }
@@ -706,7 +708,13 @@ qreal Rest::downPos() const
 
 void Rest::scanElements(void* data, void (* func)(void*, EngravingItem*), bool all)
 {
-    EngravingObject::scanElements(data, func, all);
+    ChordRest::scanElements(data, func, all);
+    for (EngravingItem* e : el()) {
+        e->scanElements(data, func, all);
+    }
+    for (NoteDot* dot : m_dots) {
+        dot->scanElements(data, func, all);
+    }
     if (!isGap()) {
         func(data, this);
     }
@@ -716,7 +724,7 @@ void Rest::scanElements(void* data, void (* func)(void*, EngravingItem*), bool a
 //   setTrack
 //---------------------------------------------------------
 
-void Rest::setTrack(int val)
+void Rest::setTrack(track_idx_t val)
 {
     ChordRest::setTrack(val);
     for (NoteDot* dot : m_dots) {
@@ -725,22 +733,12 @@ void Rest::setTrack(int val)
 }
 
 //---------------------------------------------------------
-//   reset
-//---------------------------------------------------------
-
-void Rest::reset()
-{
-    undoChangeProperty(Pid::BEAM_MODE, int(Beam::Mode::NONE));
-    ChordRest::reset();
-}
-
-//---------------------------------------------------------
 //   mag
 //---------------------------------------------------------
 
-qreal Rest::mag() const
+double Rest::mag() const
 {
-    qreal m = staff() ? staff()->staffMag(this) : 1.0;
+    double m = staff() ? staff()->staffMag(this) : 1.0;
     if (isSmall()) {
         m *= score()->styleD(Sid::smallNoteMag);
     }
@@ -753,7 +751,7 @@ qreal Rest::mag() const
 
 int Rest::upLine() const
 {
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     return lrint((pos().y() + bbox().top() + _spatium) * 2 / _spatium);
 }
 
@@ -763,7 +761,7 @@ int Rest::upLine() const
 
 int Rest::downLine() const
 {
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     return lrint((pos().y() + bbox().top() + _spatium) * 2 / _spatium);
 }
 
@@ -798,7 +796,7 @@ PointF Rest::stemPosBeam() const
 //   stemPosX
 //---------------------------------------------------------
 
-qreal Rest::stemPosX() const
+double Rest::stemPosX() const
 {
     if (_up) {
         return bbox().right();
@@ -811,7 +809,7 @@ qreal Rest::stemPosX() const
 //   rightEdge
 //---------------------------------------------------------
 
-qreal Rest::rightEdge() const
+double Rest::rightEdge() const
 {
     return x() + width();
 }
@@ -834,11 +832,11 @@ void Rest::setAccent(bool flag)
     undoChangeProperty(Pid::SMALL, flag);
     if (voice() % 2 == 0) {
         if (flag) {
-            qreal yOffset = -(bbox().bottom());
-            if (durationType() >= TDuration::DurationType::V_HALF) {
+            double yOffset = -(bbox().bottom());
+            if (durationType() >= DurationType::V_HALF) {
                 yOffset -= staff()->spatium(tick()) * 0.5;
             }
-            rypos() += yOffset;
+            movePosY(yOffset);
         }
     }
 }
@@ -847,22 +845,28 @@ void Rest::setAccent(bool flag)
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Rest::accessibleInfo() const
+String Rest::accessibleInfo() const
 {
-    QString voice = QObject::tr("Voice: %1").arg(QString::number(track() % VOICES + 1));
-    return QObject::tr("%1; Duration: %2; %3").arg(EngravingItem::accessibleInfo(), durationUserName(), voice);
+    String voice = mtrc("engraving", "Voice: %1").arg(track() % VOICES + 1);
+    return mtrc("engraving", "%1; Duration: %2; %3").arg(EngravingItem::accessibleInfo(), durationUserName(), voice);
 }
 
 //---------------------------------------------------------
 //   screenReaderInfo
 //---------------------------------------------------------
 
-QString Rest::screenReaderInfo() const
+String Rest::screenReaderInfo() const
 {
     Measure* m = measure();
     bool voices = m ? m->hasVoices(staffIdx()) : false;
-    QString voice = voices ? QObject::tr("Voice: %1").arg(QString::number(track() % VOICES + 1)) : "";
-    return QString("%1 %2 %3").arg(EngravingItem::accessibleInfo(), durationUserName(), voice);
+    String voice = voices ? (u"; " + mtrc("engraving", "Voice: %1").arg(track() % VOICES + 1)) : u"";
+    String crossStaff;
+    if (staffMove() < 0) {
+        crossStaff = u"; " + mtrc("engraving", "Cross-staff above");
+    } else if (staffMove() > 0) {
+        crossStaff = u"; " + mtrc("engraving", "Cross-staff below");
+    }
+    return String(u"%1 %2%3%4").arg(EngravingItem::accessibleInfo(), durationUserName(), crossStaff, voice);
 }
 
 //---------------------------------------------------------
@@ -871,7 +875,7 @@ QString Rest::screenReaderInfo() const
 
 void Rest::add(EngravingItem* e)
 {
-    if (e->parent() != this) {
+    if (e->explicitParent() != this) {
         e->setParent(this);
     }
     e->setTrack(track());
@@ -879,10 +883,12 @@ void Rest::add(EngravingItem* e)
     switch (e->type()) {
     case ElementType::NOTEDOT:
         m_dots.push_back(toNoteDot(e));
+        e->added();
         break;
     case ElementType::SYMBOL:
     case ElementType::IMAGE:
         el().push_back(e);
+        e->added();
         break;
     default:
         ChordRest::add(e);
@@ -899,11 +905,14 @@ void Rest::remove(EngravingItem* e)
     switch (e->type()) {
     case ElementType::NOTEDOT:
         m_dots.pop_back();
+        e->removed();
         break;
     case ElementType::SYMBOL:
     case ElementType::IMAGE:
         if (!el().remove(e)) {
-            qDebug("Rest::remove(): cannot find %s", e->name());
+            LOGD("Rest::remove(): cannot find %s", e->typeName());
+        } else {
+            e->removed();
         }
         break;
     default:
@@ -922,7 +931,7 @@ void Rest::write(XmlWriter& xml) const
         return;
     }
     writeBeam(xml);
-    xml.startObject(this);
+    xml.startElement(this);
     writeStyledProperties(xml);
     ChordRest::writeProperties(xml);
     el().write(xml);
@@ -939,7 +948,7 @@ void Rest::write(XmlWriter& xml) const
             dot->write(xml);
         }
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -949,7 +958,7 @@ void Rest::write(XmlWriter& xml) const
 void Rest::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "Symbol") {
             Symbol* s = new Symbol(this);
             s->setTrack(track());
@@ -980,7 +989,7 @@ void Rest::read(XmlReader& e)
 //   localSpatiumChanged
 //---------------------------------------------------------
 
-void Rest::localSpatiumChanged(qreal oldValue, qreal newValue)
+void Rest::localSpatiumChanged(double oldValue, double newValue)
 {
     ChordRest::localSpatiumChanged(oldValue, newValue);
     for (EngravingItem* e : m_dots) {
@@ -995,7 +1004,7 @@ void Rest::localSpatiumChanged(qreal oldValue, qreal newValue)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Rest::propertyDefault(Pid propertyId) const
+PropertyValue Rest::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::GAP:
@@ -1019,7 +1028,7 @@ void Rest::resetProperty(Pid id)
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Rest::getProperty(Pid propertyId) const
+PropertyValue Rest::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::GAP:
@@ -1033,7 +1042,7 @@ QVariant Rest::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Rest::setProperty(Pid propertyId, const QVariant& v)
+bool Rest::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::GAP:
@@ -1049,7 +1058,7 @@ bool Rest::setProperty(Pid propertyId, const QVariant& v)
         setOffset(v.value<PointF>());
         layout();
         score()->addRefresh(canvasBoundingRect());
-        if (measure() && durationType().type() == TDuration::DurationType::V_MEASURE) {
+        if (measure() && durationType().type() == DurationType::V_MEASURE) {
             measure()->triggerLayout();
         }
         triggerLayout();
@@ -1067,7 +1076,7 @@ bool Rest::setProperty(Pid propertyId, const QVariant& v)
 void Rest::undoChangeDotsVisible(bool v)
 {
     for (NoteDot* dot : m_dots) {
-        dot->undoChangeProperty(Pid::VISIBLE, QVariant(v));
+        dot->undoChangeProperty(Pid::VISIBLE, v);
     }
 }
 
@@ -1098,15 +1107,7 @@ Shape Rest::shape() const
     Shape shape;
     if (!m_gap) {
         shape.add(ChordRest::shape());
-#ifndef NDEBUG
-        {
-            shape.add(bbox(), name());
-        }
-#else
-        {
-            shape.add(bbox());
-        }
-#endif
+        shape.add(bbox(), this);
         for (NoteDot* dot : m_dots) {
             shape.add(symBbox(SymId::augmentationDot).translated(dot->pos()));
         }
@@ -1127,7 +1128,7 @@ void Rest::editDrag(EditData& editData)
 {
     Segment* seg = segment();
 
-    if (editData.modifiers & Qt::ShiftModifier) {
+    if (editData.modifiers & ShiftModifier) {
         const Spatium deltaSp = Spatium(editData.delta.x() / spatium());
         seg->undoChangeProperty(Pid::LEADING_SPACE, seg->extraLeadingSpace() + deltaSp);
     } else {

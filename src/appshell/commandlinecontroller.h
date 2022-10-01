@@ -31,9 +31,12 @@
 #include "importexport/imagesexport/iimagesexportconfiguration.h"
 #include "importexport/midi/imidiconfiguration.h"
 #include "importexport/audioexport/iaudioexportconfiguration.h"
+#include "importexport/videoexport/ivideoexportconfiguration.h"
 #include "iappshellconfiguration.h"
 #include "internal/istartupscenario.h"
 #include "notation/inotationconfiguration.h"
+#include "project/iprojectconfiguration.h"
+#include "importexport/guitarpro/iguitarproconfiguration.h"
 
 namespace mu::appshell {
 class CommandLineController
@@ -43,9 +46,12 @@ class CommandLineController
     INJECT(appshell, iex::imagesexport::IImagesExportConfiguration, imagesExportConfiguration)
     INJECT(appshell, iex::midi::IMidiImportExportConfiguration, midiImportExportConfiguration)
     INJECT(appshell, iex::audioexport::IAudioExportConfiguration, audioExportConfiguration)
+    INJECT(appshell, iex::videoexport::IVideoExportConfiguration, videoExportConfiguration)
     INJECT(appshell, IAppShellConfiguration, configuration)
     INJECT(appshell, IStartupScenario, startupScenario)
     INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
+    INJECT(appshell, project::IProjectConfiguration, projectConfiguration)
+    INJECT(appshell, iex::guitarpro::IGuitarProConfiguration, guitarProConfiguration);
 
 public:
     CommandLineController() = default;
@@ -59,7 +65,8 @@ public:
         ExportScoreParts,
         ExportScorePartsPdf,
         ExportScoreTranspose,
-        SourceUpdate
+        SourceUpdate,
+        ExportScoreVideo
     };
 
     enum class ParamKey {
@@ -67,7 +74,9 @@ public:
         StylePath,
         ScoreSource,
         ScoreTransposeOptions,
-        ForceMode
+        ForceMode,
+
+        // Video
     };
 
     struct ConverterTask {

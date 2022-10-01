@@ -27,25 +27,25 @@ import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Cloud 1.0
 
-Rectangle {
+Item {
     id: root
 
     property string currentPageName: ""
+    property bool iconsOnly: false
 
     signal selected(string name)
-
-    color: ui.theme.backgroundPrimaryColor
 
     NavigationSection {
         id: navSec
         name: "HomeMenuSection"
-        enabled: root.visible
+        enabled: root.enabled && root.visible
         order: 2
     }
 
     NavigationPanel {
         id: navPanel
         name: "HomeMenuPanel"
+        enabled: root.enabled && root.visible
         section: navSec
         order: 1
         direction: NavigationPanel.Vertical
@@ -56,17 +56,19 @@ Rectangle {
     ColumnLayout {
         anchors.fill: parent
 
-        spacing: 20
+        spacing: 0
 
         AccountInfoButton {
             Layout.fillWidth: true
             Layout.preferredHeight: 60
+            Layout.topMargin: 20
 
             navigation.name: "AccountInfo"
             navigation.panel: navPanel
             navigation.row: 1
 
             checked: root.currentPageName === "account"
+            iconOnly: root.iconsOnly
 
             onToggled: {
                 root.selected("account")
@@ -88,16 +90,15 @@ Rectangle {
 
             model: [
                 { "name": "scores", "title": qsTrc("appshell", "Scores"), "icon": IconCode.MUSIC_NOTES },
-                { "name": "add-ons", "title": qsTrc("appshell", "Add-ons"), "icon":  IconCode.PLUS },
-                { "name": "audio", "title": qsTrc("appshell", "Audio"), "icon":  IconCode.AUDIO },
-                { "name": "feautured", "title": qsTrc("appshell", "Featured"), "icon":  IconCode.STAR },
-                { "name": "learn", "title": qsTrc("appshell", "Learn"), "icon":  IconCode.MORTAR_BOARD },
-                { "name": "support", "title": qsTrc("appshell", "Support"), "icon": IconCode.FEEDBACK },
+                { "name": "plugins", "title": qsTrc("appshell", "Plugins"), "icon":  IconCode.PLUGIN },
+                // TODO: need to implement
+                // { "name": "audio", "title": qsTrc("appshell", "Audio"), "icon":  IconCode.AUDIO },
+                { "name": "learn", "title": qsTrc("appshell", "Learn"), "icon":  IconCode.MORTAR_BOARD }
             ]
 
             currentIndex: 0
 
-            delegate: GradientTabButton {
+            delegate: PageTabButton {
                 id: radioButtonDelegate
 
                 width: parent.width
@@ -114,6 +115,7 @@ Rectangle {
                 checked: modelData["name"] === root.currentPageName
 
                 title: modelData["title"]
+                iconOnly: root.iconsOnly
 
                 iconComponent: StyledIconLabel {
                     iconCode: modelData["icon"]

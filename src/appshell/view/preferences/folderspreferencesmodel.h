@@ -29,7 +29,9 @@
 #include "project/iprojectconfiguration.h"
 #include "notation/inotationconfiguration.h"
 #include "plugins/ipluginsconfiguration.h"
-#include "extensions/iextensionsconfiguration.h"
+#include "audio/iaudioconfiguration.h"
+#include "vst/ivstconfiguration.h"
+#include "iappshellconfiguration.h"
 
 namespace mu::appshell {
 class FoldersPreferencesModel : public QAbstractListModel, public async::Asyncable
@@ -39,7 +41,9 @@ class FoldersPreferencesModel : public QAbstractListModel, public async::Asyncab
     INJECT(appshell, project::IProjectConfiguration, projectConfiguration)
     INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
     INJECT(appshell, plugins::IPluginsConfiguration, pluginsConfiguration)
-    INJECT(appshell, extensions::IExtensionsConfiguration, extensionsConfiguration)
+    INJECT(appshell, audio::IAudioConfiguration, audioConfiguration)
+    INJECT(appshell, vst::IVstConfiguration, vstConfiguration)
+    INJECT(appshell, IAppShellConfiguration, configuration)
 
 public:
     explicit FoldersPreferencesModel(QObject* parent = nullptr);
@@ -56,7 +60,9 @@ private:
 
     enum Roles {
         TitleRole = Qt::UserRole + 1,
-        PathRole
+        PathRole,
+        DirRole,
+        IsMultiDirectoriesRole
     };
 
     enum class FolderType {
@@ -66,20 +72,29 @@ private:
         Templates,
         Plugins,
         SoundFonts,
-        Images,
-        Extensions
+        VST3
+    };
+
+    enum class FolderValueType {
+        Directory,
+        MultiDirectories
     };
 
     struct FolderInfo {
         FolderType type = FolderType::Undefined;
         QString title;
-        QString path;
+        QString value;
+        QString dir;
+        FolderValueType valueType = FolderValueType::Directory;
     };
 
-    void savePath(FolderType folderType, const QString& path);
+    void saveFolderPaths(FolderType folderType, const QString& paths);
 
-    void setPath(FolderType folderType, const QString& path);
+    void setFolderPaths(FolderType folderType, const QString& paths);
     QModelIndex folderIndex(FolderType folderType);
+
+    QString pathsToString(const io::paths_t& paths) const;
+    io::paths_t pathsFromString(const QString& pathsStr) const;
 
     QList<FolderInfo> m_folders;
 };

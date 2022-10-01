@@ -26,6 +26,9 @@
 
 #include "modularity/ioc.h"
 #include "iappshellconfiguration.h"
+#include "update/iupdateconfiguration.h"
+
+class QUrl;
 
 namespace mu::appshell {
 class AboutModel : public QObject
@@ -33,6 +36,7 @@ class AboutModel : public QObject
     Q_OBJECT
 
     INJECT(appshell, IAppShellConfiguration, configuration)
+    INJECT(appshell, update::IUpdateConfiguration, updateConfiguration)
 
 public:
     explicit AboutModel(QObject* parent = nullptr);
@@ -42,6 +46,7 @@ public:
     Q_INVOKABLE QVariantMap museScoreUrl() const;
     Q_INVOKABLE QVariantMap museScoreForumUrl() const;
     Q_INVOKABLE QVariantMap museScoreContributionUrl() const;
+    Q_INVOKABLE QVariantMap museScorePrivacyPolicyUrl() const;
 
     Q_INVOKABLE QVariantMap musicXMLLicenseUrl() const;
     Q_INVOKABLE QVariantMap musicXMLLicenseDeedUrl() const;
@@ -49,7 +54,7 @@ public:
     Q_INVOKABLE void copyRevisionToClipboard() const;
 
 private:
-    QVariantMap makeUrl(const QString& url, const QString& displayName) const;
+    QVariantMap makeUrl(const QUrl& url, bool showPath = true) const;
 };
 }
 

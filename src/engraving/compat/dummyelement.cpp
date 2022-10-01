@@ -30,69 +30,105 @@
 #include "libmscore/chord.h"
 #include "libmscore/note.h"
 
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+#include "accessibility/accessibleitem.h"
+#endif
+
 using namespace mu::engraving;
 using namespace mu::engraving::compat;
 
 DummyElement::DummyElement(EngravingObject* parent)
-    : Ms::EngravingItem(Ms::ElementType::INVALID, parent)
+    : EngravingItem(ElementType::DUMMY, parent)
 {
 }
 
 DummyElement::~DummyElement()
 {
+    delete m_note;
+    delete m_chord;
+    delete m_segment;
+    delete m_measure;
+    delete m_system;
+    delete m_page;
+    delete m_root;
 }
 
 void DummyElement::init()
 {
-    m_root = new RootItem(score());
-    m_page = Factory::createPage(m_root);
-    m_system = Factory::createSystem(m_page);
-    m_measure = Factory::createMeasure(m_system);
-    m_segment = Factory::createSegment(m_measure);
-    m_chord = Factory::createChord(m_segment);
-    m_note = Factory::createNote(m_chord);
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+    setupAccessible();
+#endif
 
-    setIsDummy(true);
-    m_root->setIsDummy(true);
-    m_page->setIsDummy(true);
-    m_system->setIsDummy(true);
-    m_measure->setIsDummy(true);
-    m_segment->setIsDummy(true);
-    m_chord->setIsDummy(true);
-    m_note->setIsDummy(true);
+    m_root = new RootItem(score());
+    m_root->setParent(explicitParent());
+
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+    m_root->setupAccessible();
+#endif
+
+    m_page = Factory::createPage(m_root);
+    m_page->setParent(explicitParent());
+
+    m_system = Factory::createSystem(m_page);
+    m_system->setParent(m_page);
+
+    m_measure = Factory::createMeasure(m_system);
+    m_measure->setParent(m_system);
+
+    m_segment = Factory::createSegment(m_measure);
+    m_segment->setParent(m_measure);
+
+    m_chord = Factory::createChord(m_segment);
+    m_chord->setParent(m_segment);
+
+    m_note = Factory::createNote(m_chord);
+    m_note->setParent(m_chord);
 }
 
-Ms::Page* DummyElement::page()
+RootItem* DummyElement::rootItem()
+{
+    return m_root;
+}
+
+Page* DummyElement::page()
 {
     return m_page;
 }
 
-Ms::System* DummyElement::system()
+System* DummyElement::system()
 {
     return m_system;
 }
 
-Ms::Measure* DummyElement::measure()
+Measure* DummyElement::measure()
 {
     return m_measure;
 }
 
-Ms::Segment* DummyElement::segment()
+Segment* DummyElement::segment()
 {
     return m_segment;
 }
 
-Ms::Chord* DummyElement::chord()
+Chord* DummyElement::chord()
 {
     return m_chord;
 }
 
-Ms::Note* DummyElement::note()
+Note* DummyElement::note()
 {
     return m_note;
 }
 
-Ms::EngravingItem* DummyElement::clone() const
+EngravingItem* DummyElement::clone() const
 {
     return nullptr;
 }
+
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+AccessibleItemPtr DummyElement::createAccessible()
+{
+    return std::make_shared<AccessibleItem>(this, accessibility::IAccessible::Panel);
+}
+
+#endif

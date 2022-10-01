@@ -28,10 +28,11 @@ namespace mu::iex::guitarpro {
 class GuitarProConfiguration : public IGuitarProConfiguration
 {
 public:
-    void init();
+    bool linkedTabStaffCreated() const override;
+    void setLinkedTabStaffCreated(bool created) override;
 
-    std::string importGuitarProCharset() const override;
-    void setImportGuitarProCharset(const std::string& charset) override;
+private:
+    bool m_linkedTabStaffCreated = false;
 };
 }
 

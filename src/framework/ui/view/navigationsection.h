@@ -29,15 +29,17 @@
 #include "navigationpanel.h"
 
 #include "modularity/ioc.h"
+#include "global/iapplication.h"
+
 #include "../inavigationcontroller.h"
-#include "async/asyncable.h"
 
 namespace mu::ui {
-class NavigationSection : public AbstractNavigation, public INavigationSection, public async::Asyncable
+class NavigationSection : public AbstractNavigation, public INavigationSection
 {
     Q_OBJECT
     Q_PROPERTY(QmlType type READ type_property WRITE setType NOTIFY typeChanged)
 
+    INJECT(ui, framework::IApplication, application)
     INJECT(ui, INavigationController, navigationController)
 
 public:
@@ -67,15 +69,21 @@ public:
 
     void onEvent(EventPtr e) override;
 
+    QWindow* window() const override;
+
     const std::set<INavigationPanel*>& panels() const override;
     async::Notification panelsListChanged() const override;
-
-    SectionPanelControlChannel activeRequested() const override;
 
     void componentComplete() override;
 
     void addPanel(NavigationPanel* panel);
     void removePanel(NavigationPanel* panel);
+
+    void setOnActiveRequested(const OnActiveRequested& func) override;
+
+    //! NOTE Can be called from QML without args
+    Q_INVOKABLE void requestActive(INavigationPanel* panel = nullptr, INavigationControl* control = nullptr, bool enableHighlight = false,
+                                   ActivationType activationType = ActivationType::None) override;
 
 public slots:
     void setType(QmlType type);
@@ -84,11 +92,10 @@ signals:
     void typeChanged(QmlType type);
 
 private:
-
     std::set<INavigationPanel*> m_panels;
     async::Notification m_panelsListChanged;
-    SectionPanelControlChannel m_forceActiveRequested;
     QmlType m_type = Regular;
+    OnActiveRequested m_onActiveRequested;
 };
 }
 

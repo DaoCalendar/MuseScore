@@ -26,7 +26,7 @@
 using namespace mu::inspector;
 
 HairpinPlaybackModel::HairpinPlaybackModel(QObject* parent, IElementRepositoryService* repository)
-    : AbstractInspectorModel(parent, repository, Ms::ElementType::HAIRPIN)
+    : AbstractInspectorModel(parent, repository, mu::engraving::ElementType::HAIRPIN)
 {
     setTitle(qtrc("inspector", "Hairpins, crescendos & diminuendos"));
     setModelType(InspectorModelType::TYPE_HAIRPIN);
@@ -44,11 +44,6 @@ PropertyItem* HairpinPlaybackModel::velocityChange() const
     return m_velocityChange;
 }
 
-PropertyItem* HairpinPlaybackModel::useSingleNoteDynamics() const
-{
-    return m_useSingleNoteDynamics;
-}
-
 PropertyItem* HairpinPlaybackModel::velocityChangeType() const
 {
     return m_velocityChangeType;
@@ -56,17 +51,15 @@ PropertyItem* HairpinPlaybackModel::velocityChangeType() const
 
 void HairpinPlaybackModel::createProperties()
 {
-    m_scopeType = buildPropertyItem(Ms::Pid::DYNAMIC_RANGE);
-    m_velocityChange = buildPropertyItem(Ms::Pid::VELO_CHANGE);
-    m_useSingleNoteDynamics = buildPropertyItem(Ms::Pid::SINGLE_NOTE_DYNAMICS);
-    m_velocityChangeType = buildPropertyItem(Ms::Pid::VELO_CHANGE_METHOD);
+    m_scopeType = buildPropertyItem(mu::engraving::Pid::DYNAMIC_RANGE);
+    m_velocityChange = buildPropertyItem(mu::engraving::Pid::VELO_CHANGE);
+    m_velocityChangeType = buildPropertyItem(mu::engraving::Pid::VELO_CHANGE_METHOD);
 }
 
 void HairpinPlaybackModel::loadProperties()
 {
     loadPropertyItem(m_scopeType);
     loadPropertyItem(m_velocityChange);
-    loadPropertyItem(m_useSingleNoteDynamics);
     loadPropertyItem(m_velocityChangeType);
 }
 
@@ -74,6 +67,5 @@ void HairpinPlaybackModel::resetProperties()
 {
     m_scopeType->resetToDefault();
     m_velocityChange->resetToDefault();
-    m_useSingleNoteDynamics->resetToDefault();
     m_velocityChangeType->resetToDefault();
 }

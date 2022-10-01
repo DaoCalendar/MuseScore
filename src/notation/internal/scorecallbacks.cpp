@@ -21,6 +21,13 @@
  */
 #include "scorecallbacks.h"
 
+#include "libmscore/engravingitem.h"
+#include "libmscore/lyrics.h"
+#include "libmscore/system.h"
+
+#include "inotationinteraction.h"
+#include "igetscore.h"
+
 #include "log.h"
 
 using namespace mu::notation;
@@ -44,4 +51,55 @@ const mu::Rect ScoreCallbacks::geometry() const
 {
     NOT_IMPLEMENTED;
     return mu::Rect();
+}
+
+qreal ScoreCallbacks::selectionProximity() const
+{
+    return m_selectionProximity;
+}
+
+void ScoreCallbacks::setSelectionProximity(qreal proximity)
+{
+    m_selectionProximity = proximity;
+}
+
+void ScoreCallbacks::setDropTarget(const mu::engraving::EngravingItem* dropTarget)
+{
+    IF_ASSERT_FAILED(m_interaction) {
+        return;
+    }
+
+    m_interaction->setDropTarget(dropTarget, false);
+}
+
+void ScoreCallbacks::setDropRectangle(const RectF& rect)
+{
+    IF_ASSERT_FAILED(m_interaction) {
+        return;
+    }
+
+    m_interaction->setDropRect(rect);
+}
+
+void ScoreCallbacks::changeEditElement(mu::engraving::EngravingItem* newElement)
+{
+    IF_ASSERT_FAILED(m_interaction) {
+        return;
+    }
+
+    m_interaction->changeEditElement(newElement);
+}
+
+void ScoreCallbacks::adjustCanvasPosition(const mu::engraving::EngravingItem* el, int staffIndex)
+{
+    IF_ASSERT_FAILED(m_interaction) {
+        return;
+    }
+
+    m_interaction->showItem(el, staffIndex);
+}
+
+void ScoreCallbacks::setNotationInteraction(INotationInteraction* interaction)
+{
+    m_interaction = interaction;
 }

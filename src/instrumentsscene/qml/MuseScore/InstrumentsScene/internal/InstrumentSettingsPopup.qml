@@ -28,10 +28,14 @@ import MuseScore.InstrumentsScene 1.0
 StyledPopupView {
     id: root
 
+    property bool needActiveFirstItem: false
+
     contentHeight: contentColumn.childrenRect.height
 
     onOpened: {
-        instrNameField.navigation.requestActive()
+        if (root.needActiveFirstItem) {
+            instrNameField.navigation.requestActive()
+        }
     }
 
     function load(instrument) {
@@ -56,6 +60,7 @@ StyledPopupView {
         spacing: 12
 
         StyledTextLabel {
+            id: nameLabel
             text: settingsModel.isMainScore ? qsTrc("instruments", "Name on main score") :
                                               qsTrc("instruments", "Name on part score")
         }
@@ -67,15 +72,17 @@ StyledPopupView {
 
             navigation.panel: root.navigationPanel
             navigation.row: 1
+            navigation.accessible.name: nameLabel.text + " " + currentText
 
             currentText: settingsModel.instrumentName
 
-            onCurrentTextEdited: {
+            onCurrentTextEdited: function(newTextValue) {
                 settingsModel.instrumentName = newTextValue
             }
         }
 
         StyledTextLabel {
+            id: abbreviatureLabel
             text: qsTrc("instruments", "Abbreviated name")
         }
 
@@ -84,15 +91,17 @@ StyledPopupView {
 
             navigation.panel: root.navigationPanel
             navigation.row: 2
+            navigation.accessible.name: abbreviatureLabel.text + " " + currentText
 
             currentText: settingsModel.abbreviature
 
-            onCurrentTextEdited: {
+            onCurrentTextEdited: function(newTextValue) {
                 settingsModel.abbreviature = newTextValue
             }
         }
 
         StyledTextLabel {
+            id: partNameLabel
             text: qsTrc("instruments", "Part name")
         }
 
@@ -101,10 +110,11 @@ StyledPopupView {
 
             navigation.panel: root.navigationPanel
             navigation.row: 3
+            navigation.accessible.name: partNameLabel.text + " " + currentText
 
             currentText: settingsModel.partName
 
-            onCurrentTextEdited: {
+            onCurrentTextEdited: function(newTextValue) {
                 settingsModel.partName = newTextValue
             }
         }

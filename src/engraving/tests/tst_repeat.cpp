@@ -135,6 +135,8 @@ private slots:
 
     void repeat65() { repeat("repeat65.mscx", "1;2;3;4; 2;3;4; 1;2; 5"); } // Jump at volta end with end repeat
     void repeat66() { repeat("repeat66.mscx", "1;2;3;4; 2;3;4; 1;2; 5; 1;2;3;4; 2;3;4; 2; 5"); } // final repeat and new section
+
+    void repeat67() { repeat("repeat67.mscx", "1;2; 1"); } // Jump at skipped open volta end with end repeat at end of score: #327681
 };
 
 //---------------------------------------------------------
@@ -169,7 +171,7 @@ void TestRepeat::repeat(const char* f1, const QString& ref)
     QString s = sl.join(";");
     QString ref1 = ref;
     ref1.replace(" ", "");
-    qDebug("File <%s> sequence %s", f1, qPrintable(s));
+    qDebug("File <%s> sequence %s", f1, muPrintable(s));
     QCOMPARE(s, ref1);
     delete score;
 }

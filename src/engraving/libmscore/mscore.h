@@ -23,11 +23,11 @@
 #ifndef __MSCORE_H__
 #define __MSCORE_H__
 
-#include "config.h"
+#include "global/containers.h"
 
-#include "infrastructure/draw/color.h"
+#include "engraving/types/types.h"
 
-namespace Ms {
+namespace mu::engraving {
 #define MSC_VERSION     "4.00"
 static constexpr int MSCVERSION = 400;
 
@@ -78,30 +78,26 @@ static constexpr int MSCVERSION = 400;
 //       - The style is stored in a separate file (inside mscz)
 //       - The ChordList is stored in a separate file (inside mscz)
 
-enum class HairpinType : signed char;
+static constexpr size_t VOICES = 4;
 
-static constexpr int VOICES = 4;
-
-static constexpr int INVALID_INDEX = -1;
-
-inline constexpr int staff2track(int staffIdx, int voiceIdx = 0)
+inline constexpr track_idx_t staff2track(staff_idx_t staffIdx, voice_idx_t voiceIdx = 0)
 {
-    return staffIdx >= 0 ? staffIdx * VOICES + voiceIdx : INVALID_INDEX;
+    return staffIdx != mu::nidx ? staffIdx * VOICES + voiceIdx : mu::nidx;
 }
 
-inline constexpr int track2staff(int track)
+inline constexpr staff_idx_t track2staff(track_idx_t track)
 {
-    return track >= 0 ? track / VOICES : INVALID_INDEX;
+    return track != mu::nidx ? track / VOICES : mu::nidx;
 }
 
-inline constexpr int track2voice(int track)
+inline constexpr voice_idx_t track2voice(track_idx_t track)
 {
-    return track >= 0 ? track % VOICES : INVALID_INDEX;
+    return track != mu::nidx ? track % VOICES : mu::nidx;
 }
 
-inline constexpr int trackZeroVoice(int track)
+inline constexpr track_idx_t trackZeroVoice(track_idx_t track)
 {
-    return track >= 0 ? (track / VOICES) * VOICES : INVALID_INDEX;
+    return track != mu::nidx ? (track / VOICES) * VOICES : mu::nidx;
 }
 
 static constexpr int MAX_TAGS = 32;
@@ -109,16 +105,14 @@ static constexpr int MAX_TAGS = 32;
 static constexpr int MAX_HEADERS = 3;
 static constexpr int MAX_FOOTERS = 3;
 
-static constexpr qreal INCH      = 25.4;
-static constexpr qreal PPI       = 72.0; // printer points per inch
-static constexpr qreal DPI_F     = 5;
-static constexpr qreal DPI       = 72.0 * DPI_F;
-static constexpr qreal SPATIUM20 = 5.0 * (DPI / 72.0);
-static constexpr qreal DPMM      = DPI / INCH;
+static constexpr double INCH      = 25.4;
+static constexpr double PPI       = 72.0; // printer points per inch
+static constexpr double DPI_F     = 5;
+static constexpr double DPI       = 72.0 * DPI_F;
+static constexpr double SPATIUM20 = 5.0 * (DPI / 72.0);
+static constexpr double DPMM      = DPI / INCH;
 
 static constexpr int MAX_STAVES = 4;
-
-static constexpr int SHADOW_NOTE_LIGHT = 135;
 
 static constexpr char mimeSymbolFormat[]     = "application/musescore/symbol";
 static constexpr char mimeSymbolListFormat[] = "application/musescore/symbollist";
@@ -127,21 +121,7 @@ static constexpr char mimeStaffListFormat[]  = "application/musescore/stafflist"
 static constexpr int INVALID_STRING_INDEX = -1; // no ordinal for a physical string (0 = topmost in instrument)
 static constexpr int INVALID_FRET_INDEX   = -1; // no ordinal for a fret
 
-// no ordinal for the visual repres. of string
-// (topmost in TAB varies according to visual order and presence of bass strings)
-static constexpr int VISUAL_INVALID_STRING_INDEX = -100;
-
-using ID = uint64_t;
 static constexpr ID INVALID_ID = 0;
-
-//---------------------------------------------------------
-//   BracketType
-//    System Brackets
-//---------------------------------------------------------
-
-enum class BracketType : signed char {
-    NORMAL, BRACE, SQUARE, LINE, NO_BRACKET = -1
-};
 
 //---------------------------------------------------------
 //   TransposeDirection
@@ -164,23 +144,7 @@ enum class TransposeMode : char {
 //---------------------------------------------------------
 
 enum class SelectType : char {
-    SINGLE, RANGE, ADD
-};
-
-//---------------------------------------------------------
-//    AccidentalVal
-//---------------------------------------------------------
-
-enum class AccidentalVal : signed char {
-    SHARP3  = 3,
-    SHARP2  = 2,
-    SHARP   = 1,
-    NATURAL = 0,
-    FLAT    = -1,
-    FLAT2   = -2,
-    FLAT3   = -3,
-    MIN     = FLAT3,
-    MAX     = SHARP3
+    SINGLE, RANGE, ADD, REPLACE
 };
 
 //---------------------------------------------------------
@@ -202,50 +166,6 @@ enum class UpDownMode : char {
 };
 
 //---------------------------------------------------------
-//   StaffGroup
-//---------------------------------------------------------
-
-enum class StaffGroup : char {
-    STANDARD, PERCUSSION, TAB
-};
-constexpr int STAFF_GROUP_MAX = int(StaffGroup::TAB) + 1; // out of enum to avoid compiler complains about not handled switch cases
-
-//---------------------------------------------------------
-//   BarLineType
-//---------------------------------------------------------
-
-enum class BarLineType {
-    NORMAL           = 1,
-    SINGLE           = BarLineType::NORMAL,
-    DOUBLE           = 2,
-    START_REPEAT     = 4,
-    LEFT_REPEAT      = BarLineType::START_REPEAT,
-    END_REPEAT       = 8,
-    RIGHT_REPEAT     = BarLineType::END_REPEAT,
-    BROKEN           = 0x10,
-    DASHED           = BarLineType::BROKEN,
-    END              = 0x20,
-    FINAL            = BarLineType::END,
-    END_START_REPEAT = 0x40,
-    LEFT_RIGHT_REPEAT= BarLineType::END_START_REPEAT,
-    DOTTED           = 0x80,
-    REVERSE_END      = 0x100,
-    REVERSE_FINALE   = BarLineType::REVERSE_END,
-    HEAVY            = 0x200,
-    DOUBLE_HEAVY     = 0x400,
-};
-
-constexpr BarLineType operator|(BarLineType t1, BarLineType t2)
-{
-    return static_cast<BarLineType>(static_cast<int>(t1) | static_cast<int>(t2));
-}
-
-constexpr bool operator&(BarLineType t1, BarLineType t2)
-{
-    return static_cast<int>(t1) & static_cast<int>(t2);
-}
-
-//---------------------------------------------------------
 //   MScoreError
 //---------------------------------------------------------
 
@@ -264,6 +184,7 @@ enum class MsError {
     CANNOT_SPLIT_MEASURE_TUPLET,
     INSUFFICIENT_MEASURES,
     CANNOT_SPLIT_MEASURE_REPEAT,
+    CANNOT_SPLIT_MEASURE_TOO_SHORT,
     CANNOT_REMOVE_TIME_TUPLET,
     CANNOT_REMOVE_TIME_MEASURE_REPEAT,
     NO_DEST,
@@ -291,36 +212,23 @@ struct MScoreError {
 
 class MScore
 {
-    Q_GADGET
-
-    static QString _globalShare;
     static int _hRaster, _vRaster;
     static bool _verticalOrientation;
 
 public:
-    enum class DirectionH : char {   /**.\{*/
-        AUTO, LEFT, RIGHT                                       /**\}*/
-    };
-    enum class OrnamentStyle : char {   /**.\{*/
-        DEFAULT, BAROQUE                                          /**\}*/
-    };
-    Q_ENUM(DirectionH)
-    Q_ENUM(OrnamentStyle)
 
     static MsError _error;
-    static std::vector<MScoreError> errorList;
 
     static void init();
     static void registerUiTypes();
 
-    static const QString& globalShare() { return _globalShare; }
-    static qreal hRaster() { return _hRaster; }
-    static qreal vRaster() { return _vRaster; }
+    static double hRaster() { return _hRaster; }
+    static double vRaster() { return _vRaster; }
     static void setHRaster(int val) { _hRaster = val; }
     static void setVRaster(int val) { _vRaster = val; }
-    static void setNudgeStep(qreal val) { nudgeStep = val; }
-    static void setNudgeStep10(qreal val) { nudgeStep10 = val; }
-    static void setNudgeStep50(qreal val) { nudgeStep50 = val; }
+    static void setNudgeStep(double val) { nudgeStep = val; }
+    static void setNudgeStep10(double val) { nudgeStep10 = val; }
+    static void setNudgeStep50(double val) { nudgeStep50 = val; }
 
     static bool verticalOrientation() { return _verticalOrientation; }
     static void setVerticalOrientation(bool val) { _verticalOrientation = val; }
@@ -328,31 +236,22 @@ public:
     static bool warnPitchRange;
     static int pedalEventsMinTicks;
 
-    static bool harmonyPlayDisableCompatibility;
-    static bool harmonyPlayDisableNew;
     static bool playRepeats;
     static int playbackSpeedIncrement;
-    static qreal nudgeStep;
-    static qreal nudgeStep10;
-    static qreal nudgeStep50;
+    static double nudgeStep;
+    static double nudgeStep10;
+    static double nudgeStep50;
     static int defaultPlayDuration;
-    static QString lastError;
 
 // #ifndef NDEBUG
     static bool noHorizontalStretch;
     static bool noVerticalStretch;
-    static bool showSegmentShapes;
-    static bool showSkylines;
-    static bool showMeasureShapes;
-    static bool showBoundingRect;
-    static bool showSystemBoundingRect;
-    static bool showCorruptedMeasures;
     static bool useFallbackFont;
 // #endif
     static bool debugMode;
     static bool testMode;
+    static bool testWriteStyleToScore;
 
-    static int division;
     static int sampleRate;
     static int mtcType;
 
@@ -366,40 +265,12 @@ public:
     static bool svgPrinting;
     static double pixelRatio;
 
-    static qreal verticalPageGap;
-    static qreal horizontalPageGapEven;
-    static qreal horizontalPageGapOdd;
+    static double verticalPageGap;
+    static double horizontalPageGapEven;
+    static double horizontalPageGapOdd;
 
     static void setError(MsError e) { _error = e; }
-    static const char* errorMessage();
-    static const char* errorGroup();
 };
-
-//---------------------------------------------------------
-//   center
-//---------------------------------------------------------
-
-static constexpr qreal center(qreal x1, qreal x2)
-{
-    return x1 + (x2 - x1) * .5;
-}
-
-//---------------------------------------------------------
-//   limit
-//---------------------------------------------------------
-
-static constexpr int limit(int val, int min, int max)
-{
-    if (val > max) {
-        return max;
-    }
-    if (val < min) {
-        return min;
-    }
-    return val;
-}
-} // namespace Ms
-
-Q_DECLARE_METATYPE(Ms::BarLineType);
+} // namespace mu::engraving
 
 #endif

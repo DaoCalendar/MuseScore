@@ -22,17 +22,17 @@
 
 #include "ledgerline.h"
 
-#include "io/xml.h"
+#include "rw/xml.h"
 
 #include "chord.h"
 #include "measure.h"
+#include "score.h"
 #include "staff.h"
 #include "system.h"
-#include "score.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   LedgerLine
 //---------------------------------------------------------
@@ -57,7 +57,7 @@ LedgerLine::~LedgerLine()
 PointF LedgerLine::pagePos() const
 {
     System* system = chord()->measure()->system();
-    qreal yp = y() + system->staff(staffIdx())->y() + system->y();
+    double yp = y() + system->staff(staffIdx())->y() + system->y();
     return PointF(pageX(), yp);
 }
 
@@ -65,9 +65,9 @@ PointF LedgerLine::pagePos() const
 //   measureXPos
 //---------------------------------------------------------
 
-qreal LedgerLine::measureXPos() const
+double LedgerLine::measureXPos() const
 {
-    qreal xp = x();                     // chord relative
+    double xp = x();                     // chord relative
     xp += chord()->x();                  // segment relative
     xp += chord()->segment()->x();       // measure relative
     return xp;
@@ -79,15 +79,15 @@ qreal LedgerLine::measureXPos() const
 
 void LedgerLine::layout()
 {
-    setLineWidth(score()->styleP(Sid::ledgerLineWidth) * chord()->mag());
+    setLineWidth(score()->styleMM(Sid::ledgerLineWidth) * chord()->mag());
     if (staff()) {
         setColor(staff()->staffType(tick())->color());
     }
-    qreal w2 = _width * .5;
+    double w2 = _width * .5;
 
     //Adjust Y position to staffType offset
     if (staffType()) {
-        rypos() += staffType()->yoffset().val() * spatium();
+        movePosY(staffType()->yoffset().val() * spatium());
     }
 
     if (vertical) {
@@ -120,7 +120,7 @@ void LedgerLine::draw(mu::draw::Painter* painter) const
 //   spatiumChanged
 //---------------------------------------------------------
 
-void LedgerLine::spatiumChanged(qreal oldValue, qreal newValue)
+void LedgerLine::spatiumChanged(double oldValue, double newValue)
 {
     _width = (_width / oldValue) * newValue;
     _len   = (_len / oldValue) * newValue;
@@ -146,7 +146,7 @@ void LedgerLine::writeProperties(XmlWriter& xml) const
 
 bool LedgerLine::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (tag == "lineWidth") {
         _width = e.readDouble() * spatium();
@@ -158,18 +158,5 @@ bool LedgerLine::readProperties(XmlReader& e)
         return false;
     }
     return true;
-}
-
-//---------------------------------------------------------
-//   scanElements
-//---------------------------------------------------------
-
-void LedgerLine::scanElements(void* data, void (* func)(void*, EngravingItem*), bool all)
-{
-    Staff* st = chord()->staff();
-    if (st && !st->showLedgerLines(tick())) {
-        return;
-    }
-    EngravingItem::scanElements(data, func, all);
 }
 }

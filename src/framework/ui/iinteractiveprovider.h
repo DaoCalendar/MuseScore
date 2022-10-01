@@ -23,10 +23,12 @@
 #define MU_UI_IINTERACTIVEPROVIDER_H
 
 #include "modularity/imoduleexport.h"
-#include "uri.h"
-#include "retval.h"
+#include "types/uri.h"
+#include "types/retval.h"
 
 #include "iinteractive.h"
+
+class QWindow;
 
 namespace mu::ui {
 class IInteractiveProvider : MODULE_EXPORT_INTERFACE
@@ -41,25 +43,36 @@ public:
                                  int defBtn = int(framework::IInteractive::Button::NoButton),
                                  const framework::IInteractive::Options& options = {}) = 0;
 
-    virtual RetVal<Val> info(const std::string& title, const std::string& text, const framework::IInteractive::ButtonDatas& buttons,
+    virtual RetVal<Val> info(const std::string& title, const framework::IInteractive::Text& text,
+                             const framework::IInteractive::ButtonDatas& buttons,
                              int defBtn = int(framework::IInteractive::Button::NoButton),
                              const framework::IInteractive::Options& options = {}) = 0;
 
-    virtual RetVal<Val> warning(const std::string& title, const std::string& text, const framework::IInteractive::ButtonDatas& buttons,
+    virtual RetVal<Val> warning(const std::string& title, const framework::IInteractive::Text& text,
+                                const framework::IInteractive::ButtonDatas& buttons,
                                 int defBtn = int(framework::IInteractive::Button::NoButton),
                                 const framework::IInteractive::Options& options = {}) = 0;
 
-    virtual RetVal<Val> error(const std::string& title, const std::string& text, const framework::IInteractive::ButtonDatas& buttons,
+    virtual RetVal<Val> error(const std::string& title, const framework::IInteractive::Text& text,
+                              const framework::IInteractive::ButtonDatas& buttons,
                               int defBtn = int(framework::IInteractive::Button::NoButton),
                               const framework::IInteractive::Options& options = {}) = 0;
 
     virtual RetVal<Val> open(const UriQuery& uri) = 0;
     virtual RetVal<bool> isOpened(const Uri& uri) const = 0;
+    virtual RetVal<bool> isOpened(const UriQuery& uri) const = 0;
+    virtual async::Channel<Uri> opened() const = 0;
+
+    virtual void raise(const UriQuery& uri) = 0;
 
     virtual void close(const Uri& uri) = 0;
+    virtual void close(const UriQuery& uri) = 0;
 
     virtual ValCh<Uri> currentUri() const = 0;
     virtual std::vector<Uri> stack() const = 0;
+
+    virtual QWindow* topWindow() const = 0;
+    virtual bool topWindowIsWidget() const = 0;
 };
 }
 

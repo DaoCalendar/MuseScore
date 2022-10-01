@@ -53,10 +53,9 @@ public:
     void setStaffVisible(const ID& staffId, bool visible) override;
     void setPartName(const ID& partId, const QString& name) override;
     void setPartSharpFlat(const ID& partId, const SharpFlat& sharpFlat) override;
-    void setPartTransposition(const ID& partId, const Interval& transpose) override;
     void setInstrumentName(const InstrumentKey& instrumentKey, const QString& name) override;
     void setInstrumentAbbreviature(const InstrumentKey& instrumentKey, const QString& abbreviature) override;
-    void setStaffType(const ID& staffId, StaffType type) override;
+    void setStaffType(const ID& staffId, StaffTypeId type) override;
     void setStaffConfig(const ID& staffId, const StaffConfig& config) override;
 
     void removeParts(const IDList& partsIds) override;
@@ -65,8 +64,8 @@ public:
     void moveParts(const IDList& sourcePartsIds, const ID& destinationPartId, InsertMode mode = InsertMode::Before) override;
     void moveStaves(const IDList& sourceStavesIds, const ID& destinationStaffId, InsertMode mode = InsertMode::Before) override;
 
-    void appendStaff(Staff* staff, const ID& destinationPartId) override;
-    void appendLinkedStaff(Staff* staff, const ID& sourceStaffId, const ID& destinationPartId) override;
+    bool appendStaff(Staff* staff, const ID& destinationPartId) override;
+    bool appendLinkedStaff(Staff* staff, const ID& sourceStaffId, const ID& destinationPartId) override;
 
     void insertPart(Part* part, size_t index) override;
 
@@ -78,21 +77,21 @@ public:
     async::Notification scoreOrderChanged() const override;
 
 protected:
-    Ms::Score* score() const;
+    mu::engraving::Score* score() const;
     INotationUndoStackPtr undoStack() const;
 
     void startEdit();
     void apply();
+    void rollback();
 
 private:
     void updatePartTitles();
 
     void doSetScoreOrder(const ScoreOrder& order);
-    void doMoveStaves(const std::vector<Staff*>& staves, int destinationStaffIndex, Part* destinationPart = nullptr);
     void doRemoveParts(const std::vector<Part*>& parts);
     void doAppendStaff(Staff* staff, Part* destinationPart);
     void doSetStaffConfig(Staff* staff, const StaffConfig& config);
-    void doInsertPart(Part* part, int index);
+    void doInsertPart(Part* part, size_t index);
 
     Part* partModifiable(const ID& partId) const;
     Staff* staffModifiable(const ID& staffId) const;
@@ -100,22 +99,22 @@ private:
     std::vector<Staff*> staves(const IDList& stavesIds) const;
     std::vector<Part*> parts(const IDList& partsIds) const;
 
-    void appendStaves(Part* part, const InstrumentTemplate& templ);
-    void insertStaff(Staff* staff, int destinationStaffIndex);
-    void initStaff(Staff* staff, const InstrumentTemplate& templ, const Ms::StaffType* staffType, int cleffIndex);
+    mu::engraving::InstrumentChange* findInstrumentChange(const Part* part, const Fraction& tick) const;
 
-    void removeMissingParts(const PartInstrumentList& parts);
+    void appendStaves(Part* part, const InstrumentTemplate& templ, const mu::engraving::KeyList& keyList);
+    void insertStaff(Staff* staff, engraving::staff_idx_t destinationStaffIndex);
+    void initStaff(Staff* staff, const InstrumentTemplate& templ, const mu::engraving::StaffType* staffType, size_t cleffIndex);
+
+    void removeMissingParts(const PartInstrumentList& newParts);
     void appendNewParts(const PartInstrumentList& parts);
     void updateSoloist(const PartInstrumentList& parts);
-    void sortParts(const PartInstrumentList& parts, const QList<Ms::Staff*>& originalStaves);
-
-    void updateTracks();
+    void sortParts(const PartInstrumentList& parts, const std::vector<mu::engraving::Staff*>& originalStaves);
 
     int resolveNewInstrumentNumber(const InstrumentTemplate& instrument, const PartInstrumentList& allNewInstruments) const;
 
     void setBracketsAndBarlines();
 
-    void deselectAll();
+    void endInteractionWithScore();
 
     void notifyAboutPartChanged(const Part* part) const;
     void notifyAboutPartAdded(const Part* part) const;

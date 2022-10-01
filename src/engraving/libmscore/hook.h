@@ -25,32 +25,34 @@
 
 #include "symbol.h"
 
-#include "symid.h"
+#include "global/allocator.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Chord;
 
 class Hook final : public Symbol
 {
-    int _hookType { 0 };
-
+    OBJECT_ALLOCATOR(engraving, Hook)
 public:
     Hook(Chord* parent = 0);
 
     Hook* clone() const override { return new Hook(*this); }
-    qreal mag() const override { return parentItem()->mag(); }
+    double mag() const override { return parentItem()->mag(); }
     EngravingItem* elementBase() const override;
 
     void setHookType(int v);
     int hookType() const { return _hookType; }
     void layout() override;
     void draw(mu::draw::Painter*) const override;
-    Chord* chord() const { return toChord(parent()); }
+    Chord* chord() const { return toChord(explicitParent()); }
     mu::PointF smuflAnchor() const;
 
     //! @p index: the number of flags (positive: upwards, negative: downwards)
     //! @p straight: whether to use straight flags
     static SymId symIdForHookIndex(int index, bool straight);
+
+private:
+    int _hookType { 0 };
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

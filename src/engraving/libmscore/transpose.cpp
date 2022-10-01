@@ -20,28 +20,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "utils.h"
-#include "factory.h"
-#include "score.h"
-#include "pitchspelling.h"
-#include "key.h"
-#include "staff.h"
-#include "note.h"
-#include "harmony.h"
-#include "segment.h"
-#include "undo.h"
-#include "keysig.h"
-#include "stafftype.h"
 #include "chord.h"
-#include "measure.h"
-#include "fret.h"
-#include "part.h"
+#include "factory.h"
+#include "harmony.h"
+#include "key.h"
+#include "keysig.h"
 #include "linkedobjects.h"
+#include "measure.h"
+#include "note.h"
+#include "part.h"
+#include "pitchspelling.h"
+#include "score.h"
+#include "segment.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "undo.h"
+#include "utils.h"
+
+#include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   keydiff2Interval
 //    keysig -   -7(Cb) - +7(C#)
@@ -150,7 +151,7 @@ int transposeTpc(int tpc, Interval interval, bool useDoubleSharpsFlats)
     int steps     = interval.diatonic;
     int semitones = interval.chromatic;
 
-// qDebug("transposeTpc tpc %d steps %d semitones %d", tpc, steps, semitones);
+// LOGD("transposeTpc tpc %d steps %d semitones %d", tpc, steps, semitones);
     if (semitones == 0 && steps == 0) {
         return tpc;
     }
@@ -188,9 +189,9 @@ int transposeTpc(int tpc, Interval interval, bool useDoubleSharpsFlats)
         } else {
             break;
         }
-//            qDebug("  again alter %d steps %d, step %d", alter, steps, step);
+//            LOGD("  again alter %d steps %d, step %d", alter, steps, step);
     }
-//      qDebug("  = step %d alter %d  tpc %d", step, alter, step2tpc(step, alter));
+//      LOGD("  = step %d alter %d  tpc %d", step, alter, step2tpc(step, alter));
     return step2tpc(step, AccidentalVal(alter));
 }
 
@@ -274,8 +275,8 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
                       int transposeInterval, bool trKeys, bool transposeChordNames, bool useDoubleSharpsFlats)
 {
     bool rangeSelection = selection().isRange();
-    int startStaffIdx   = 0;
-    int endStaffIdx     = 0;
+    staff_idx_t startStaffIdx   = 0;
+    staff_idx_t endStaffIdx     = 0;
     Fraction startTick  = Fraction(0, 1);
     if (rangeSelection) {
         startStaffIdx = selection().staffStart();
@@ -291,7 +292,7 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
             // calculate interval from "transpose to key"
             // find the key of the first pitched staff
             Key key = Key::C;
-            for (int i = startStaffIdx; i < endStaffIdx; ++i) {
+            for (staff_idx_t i = startStaffIdx; i < endStaffIdx; ++i) {
                 Staff* s = staff(i);
                 if (s->isPitchedStaff(startTick)) {
                     key = s->key(startTick);
@@ -339,7 +340,7 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
     }
 
     if (_selection.isList()) {
-        foreach (EngravingItem* e, _selection.uniqueElements()) {
+        for (EngravingItem* e : _selection.uniqueElements()) {
             if (!e->staff() || e->staff()->staffType(e->tick())->group() == StaffGroup::PERCUSSION) {
                 continue;
             }
@@ -357,10 +358,10 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
                 int rootTpc, baseTpc;
                 if (mode == TransposeMode::DIATONICALLY) {
                     Fraction tick = Fraction(0, 1);
-                    if (h->parent()->isSegment()) {
-                        tick = toSegment(h->parent())->tick();
-                    } else if (h->parent()->isFretDiagram() && h->parent()->parent()->isSegment()) {
-                        tick = toSegment(h->parent()->parent())->tick();
+                    if (h->explicitParent()->isSegment()) {
+                        tick = toSegment(h->explicitParent())->tick();
+                    } else if (h->explicitParent()->isFretDiagram() && h->explicitParent()->explicitParent()->isSegment()) {
+                        tick = toSegment(h->explicitParent()->explicitParent())->tick();
                     }
                     Key key = !h->staff() ? Key::C : h->staff()->key(tick);
                     rootTpc = transposeTpcDiatonicByKey(h->rootTpc(),
@@ -377,7 +378,7 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
                 // if we enabled it, then it will need work
                 // probably the code should look more like the range selection code
                 KeySig* ks     = toKeySig(e);
-                if (!ks->isCustom() && !ks->isAtonal()) {
+                if (!ks->isAtonal()) {
                     Key key        = st->key(ks->tick());
                     KeySigEvent ke = ks->keySigEvent();
                     ke.setKey(key);
@@ -392,13 +393,13 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
     // process range selection
     //--------------------------
 
-    QList<Staff*> sl;
-    for (int staffIdx = _selection.staffStart(); staffIdx < _selection.staffEnd(); ++staffIdx) {
+    std::list<Staff*> sl;
+    for (staff_idx_t staffIdx = _selection.staffStart(); staffIdx < _selection.staffEnd(); ++staffIdx) {
         Staff* s = staff(staffIdx);
         if (s->staffType(Fraction(0, 1))->group() == StaffGroup::PERCUSSION) {        // ignore percussion staff
             continue;
         }
-        if (sl.contains(s)) {
+        if (mu::contains(sl, s)) {
             continue;
         }
         bool alreadyThere = false;
@@ -409,14 +410,14 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
             }
         }
         if (!alreadyThere) {
-            sl.append(s);
+            sl.push_back(s);
         }
     }
-    QList<int> tracks;
+    std::list<track_idx_t> tracks;
     for (Staff* s : sl) {
-        int idx = s->idx() * VOICES;
-        for (int i = 0; i < VOICES; ++i) {
-            tracks.append(idx + i);
+        track_idx_t idx = s->idx() * VOICES;
+        for (voice_idx_t i = 0; i < VOICES; ++i) {
+            tracks.push_back(idx + i);
         }
     }
 
@@ -436,7 +437,7 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
         if (!segment->enabled()) {
             continue;
         }
-        for (int track : tracks) {
+        for (track_idx_t track : tracks) {
             if (staff(track / VOICES)->staffType(s1->tick())->group() == StaffGroup::PERCUSSION) {
                 continue;
             }
@@ -473,7 +474,7 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
                 Fraction tick = segment->tick();
                 bool startKey = tick == s1->tick();
                 bool addKey = ks->isChange();
-                if ((startKey || addKey) && !ks->isCustom() && !ks->isAtonal()) {
+                if ((startKey || addKey) && !ks->isAtonal()) {
                     Staff* staff = ks->staff();
                     Key oKey = ks->key();
                     if (!styleB(Sid::concertPitch)) {
@@ -496,8 +497,8 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
             }
         }
         if (transposeChordNames) {
-            foreach (EngravingItem* e, segment->annotations()) {
-                if ((e->type() != ElementType::HARMONY) || (!tracks.contains(e->track()))) {
+            for (EngravingItem* e : segment->annotations()) {
+                if ((e->type() != ElementType::HARMONY) || (!mu::contains(tracks, e->track()))) {
                     continue;
                 }
                 Harmony* hh  = toHarmony(e);
@@ -527,7 +528,7 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
     // create missing key signatures
     //
     if (trKeys && (mode != TransposeMode::DIATONICALLY) && (s1->tick() == Fraction(0, 1))) {
-        for (int track : tracks) {
+        for (track_idx_t track : tracks) {
             if (track % VOICES) {
                 continue;
             }
@@ -551,7 +552,8 @@ bool Score::transpose(TransposeMode mode, TransposeDirection direction, Key trKe
 //    key -   -7(Cb) - +7(C#)
 //---------------------------------------------------------
 
-void Score::transposeKeys(int staffStart, int staffEnd, const Fraction& ts, const Fraction& tickEnd, const Interval& interval,
+void Score::transposeKeys(staff_idx_t staffStart, staff_idx_t staffEnd, const Fraction& ts, const Fraction& tickEnd,
+                          const Interval& interval,
                           bool useInstrument, bool flip)
 {
     Fraction tickStart(ts);
@@ -560,7 +562,7 @@ void Score::transposeKeys(int staffStart, int staffEnd, const Fraction& ts, cons
     if (tickStart < Fraction(0, 1)) {            // -1 and 0 are valid values to indicate start of score
         tickStart = Fraction(0, 1);
     }
-    for (int staffIdx = staffStart; staffIdx < staffEnd; ++staffIdx) {
+    for (staff_idx_t staffIdx = staffStart; staffIdx < staffEnd; ++staffIdx) {
         Staff* st = staff(staffIdx);
         if (st->staffType(tickStart)->group() == StaffGroup::PERCUSSION) {
             continue;
@@ -587,7 +589,7 @@ void Score::transposeKeys(int staffStart, int staffEnd, const Fraction& ts, cons
             if (s->tick().isZero()) {
                 createKey = false;
             }
-            if (!ks->isCustom() && !ks->isAtonal()) {
+            if (!ks->isAtonal()) {
                 KeySigEvent ke = st->keySigEvent(s->tick());
                 PreferSharpFlat pref = ks->part()->preferSharpFlat();
                 // TODO: if we are transposing to concert pitch,
@@ -610,7 +612,7 @@ void Score::transposeKeys(int staffStart, int staffEnd, const Fraction& ts, cons
                 //      }
                 Key nKey = transposeKey(ke.key(), segmentInterval, pref);
                 // remove initial C major key signatures
-                if (nKey == Key::C && s->tick().isZero()) {
+                if (nKey == Key::C && s->tick().isZero() && !ks->isCustom()) {
                     undo(new RemoveElement(ks));
                     if (s->empty()) {
                         undo(new RemoveElement(s));
@@ -678,7 +680,7 @@ void Score::transposeSemitone(int step)
     const int interval = intervalListArray[keyType][step > 0 ? 0 : 1];
 
     if (!transpose(TransposeMode::BY_INTERVAL, dir, Key::C, interval, true, true, false)) {
-        qDebug("Score::transposeSemitone: failed");
+        LOGD("Score::transposeSemitone: failed");
         // TODO: set error message
     } else {
         setSelectionChanged(true);
@@ -714,10 +716,10 @@ void Note::transposeDiatonic(int interval, bool keepAlterations, bool useDoubleA
     if (concertPitch()) {
         v.flip();
         newTpc1 = newTpc;
-        newTpc2 = Ms::transposeTpc(newTpc, v, true);
+        newTpc2 = mu::engraving::transposeTpc(newTpc, v, true);
     } else {
         newPitch += v.chromatic;
-        newTpc1 = Ms::transposeTpc(newTpc, v, true);
+        newTpc1 = mu::engraving::transposeTpc(newTpc, v, true);
         newTpc2 = newTpc;
     }
 
@@ -790,15 +792,15 @@ void Score::transpositionChanged(Part* part, Interval oldV, Fraction tickStart, 
     Interval diffV(oldV.chromatic + v.chromatic);
 
     // transpose keys first
-    QList<Score*> scores;
+    std::set<Score*> scores;
     for (Staff* ls : part->staff(0)->staffList()) {
         // TODO: special handling for linked staves within a score
         // could be useful for capo
         Score* score = ls->score();
-        if (scores.contains(score)) {
+        if (mu::contains(scores, score)) {
             continue;
         }
-        scores.append(score);
+        scores.insert(score);
         Part* lp = ls->part();
         if (!score->styleB(Sid::concertPitch)) {
             score->transposeKeys(lp->startTrack() / VOICES, lp->endTrack() / VOICES, tickStart, tickEnd, diffV);
@@ -813,13 +815,13 @@ void Score::transpositionChanged(Part* part, Interval oldV, Fraction tickStart, 
         if (tickEnd != Fraction(-1, 1) && s->tick() >= tickEnd) {
             break;
         }
-        for (Staff* st : *part->staves()) {
+        for (Staff* st : part->staves()) {
             if (st->staffType(tickStart)->group() == StaffGroup::PERCUSSION) {
                 continue;
             }
-            int t1 = st->idx() * VOICES;
-            int t2 = t1 + VOICES;
-            for (int track = t1; track < t2; ++track) {
+            track_idx_t t1 = st->idx() * VOICES;
+            track_idx_t t2 = t1 + VOICES;
+            for (track_idx_t track = t1; track < t2; ++track) {
                 EngravingItem* e = s->element(track);
                 if (e && e->isChord()) {
                     Chord* c = toChord(e);

@@ -22,7 +22,11 @@
 
 #include "pluginsmodel.h"
 
+#include "containers.h"
+#include "translation.h"
 #include "log.h"
+
+#include "shortcuts/shortcutstypes.h"
 
 using namespace mu::plugins;
 using namespace mu::framework;
@@ -37,9 +41,10 @@ PluginsModel::PluginsModel(QObject* parent)
     m_roles.insert(rName, "name");
     m_roles.insert(rDescription, "description");
     m_roles.insert(rThumbnailUrl, "thumbnailUrl");
-    m_roles.insert(rInstalled, "installed");
+    m_roles.insert(rEnabled, "enabled");
     m_roles.insert(rCategory, "category");
-    m_roles.insert(rHasUpdate, "hasUpdate");
+    m_roles.insert(rVersion, "version");
+    m_roles.insert(rShortcuts, "shortcuts");
 }
 
 void PluginsModel::load()
@@ -47,35 +52,18 @@ void PluginsModel::load()
     beginResetModel();
     m_plugins.clear();
 
-    // TODO: this is temporary solution and will be changed in future
-    QList<QString> thumbnailUrlExamples {
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder1.jpeg",
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder2.jpeg",
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder3.jpeg",
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder4.jpeg",
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder5.jpeg",
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder6.jpeg",
-        "qrc:/qml/MuseScore/Plugins/internal/placeholders/placeholder7.jpeg"
-    };
-
-    QList<QString> categoriesExamples {
-        "Simplified notation",
-        "Other",
-        "Accidentals",
-        "Notes & Rests",
-        "Chord symbols"
-    };
-
-    RetVal<PluginInfoList> plugins = service()->plugins();
+    RetVal<PluginInfoMap> plugins = service()->plugins();
     if (!plugins.ret) {
         LOGE() << plugins.ret.toString();
     }
 
-    for (int i = 0; i < plugins.val.size(); ++i) {
-        plugins.val[i].thumbnailUrl = thumbnailUrlExamples[i % thumbnailUrlExamples.size()];
-        plugins.val[i].category = categoriesExamples[i % categoriesExamples.size()];
-        m_plugins << plugins.val[i];
+    for (const PluginInfo& plugin : values(plugins.val)) {
+        m_plugins << plugin;
     }
+
+    std::sort(m_plugins.begin(), m_plugins.end(), [](const PluginInfo& l, const PluginInfo& r) {
+        return l.name < r.name;
+    });
 
     Channel<PluginInfo> pluginChanged = service()->pluginChanged();
     pluginChanged.onReceive(this, [this](const PluginInfo& plugin) {
@@ -101,13 +89,24 @@ QVariant PluginsModel::data(const QModelIndex& index, int role) const
     case rDescription:
         return plugin.description;
     case rThumbnailUrl:
+        if (plugin.thumbnailUrl.isEmpty()) {
+            return "qrc:/qml/MuseScore/Plugins/internal/resources/placeholder.png";
+        }
+
         return plugin.thumbnailUrl;
-    case rInstalled:
-        return plugin.installed;
+    case rEnabled:
+        return plugin.enabled;
     case rCategory:
-        return plugin.category;
-    case rHasUpdate:
-        return plugin.hasUpdate;
+        return plugin.categoryCode;
+    case rVersion:
+        return plugin.version.toString();
+    case rShortcuts:
+        if (!plugin.shortcuts.empty()) {
+            return shortcuts::sequencesToNativeText(shortcuts::Shortcut::sequencesFromString(plugin.shortcuts));
+        }
+
+        //: No keyboard shortcut is assigned to this plugin.
+        return qtrc("plugins", "Not defined");
     }
 
     return QVariant();
@@ -123,63 +122,55 @@ QHash<int, QByteArray> PluginsModel::roleNames() const
     return m_roles;
 }
 
-void PluginsModel::install(QString codeKey)
+void PluginsModel::setEnable(const QString& codeKey, bool enable)
 {
-    service()->install(codeKey);
+    Ret ret = service()->setEnable(codeKey, enable);
     emit finished();
-}
-
-void PluginsModel::uninstall(QString codeKey)
-{
-    Ret ret = service()->uninstall(codeKey);
-
-    if (!ret) {
-        LOGE() << ret.toString();
-        return;
-    }
-
-    emit finished();
-}
-
-void PluginsModel::update(QString codeKey)
-{
-    NOT_IMPLEMENTED;
-    Q_UNUSED(codeKey)
-}
-
-void PluginsModel::restart(QString codeKey)
-{
-    Ret ret = service()->run(codeKey);
 
     if (!ret) {
         LOGE() << ret.toString();
     }
 }
 
-void PluginsModel::openFullDescription(QString codeKey)
+void PluginsModel::editShortcut(QString codeKey)
 {
     int index = itemIndexByCodeKey(codeKey);
     if (index == INVALID_INDEX) {
         return;
     }
 
-    std::string url = m_plugins[index].detailsUrl.toString().toStdString();
-    Ret ret = interactive()->openUrl(url);
+    UriQuery uri("musescore://preferences");
+    uri.addParam("currentPageId", Val("shortcuts"));
 
-    if (!ret) {
-        LOGE() << ret.toString();
+    QVariantMap params;
+    params["shortcutCodeKey"] = codeKey;
+    uri.addParam("params", Val::fromQVariant(params));
+
+    RetVal<Val> retVal = interactive()->open(uri);
+
+    if (!retVal.ret) {
+        LOGE() << retVal.ret.toString();
     }
 }
 
-QStringList PluginsModel::categories() const
+void PluginsModel::reloadPlugins()
 {
-    QSet<QString> result;
+    service()->reloadPlugins();
+}
 
-    for (const PluginInfo& plugin: m_plugins) {
-        result << plugin.category;
+QVariantList PluginsModel::categories() const
+{
+    QVariantList result;
+
+    for (const auto& category: service()->categories()) {
+        QVariantMap obj;
+        obj["code"] = QString::fromStdString(category.first);
+        obj["title"] = category.second.qTranslated();
+
+        result << obj;
     }
 
-    return result.values();
+    return result;
 }
 
 void PluginsModel::updatePlugin(const PluginInfo& plugin)
@@ -189,7 +180,7 @@ void PluginsModel::updatePlugin(const PluginInfo& plugin)
             PluginInfo tmp = m_plugins[i];
             m_plugins[i] = plugin;
             m_plugins[i].thumbnailUrl = tmp.thumbnailUrl;
-            m_plugins[i].category = tmp.category;
+            m_plugins[i].categoryCode = tmp.categoryCode;
             QModelIndex index = createIndex(i, 0);
             emit dataChanged(index, index);
             return;

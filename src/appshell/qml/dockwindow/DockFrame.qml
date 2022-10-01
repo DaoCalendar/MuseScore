@@ -35,9 +35,9 @@ Rectangle {
     property QtObject frameCpp
     readonly property QtObject titleBarCpp: Boolean(frameCpp) ? frameCpp.actualTitleBar : null
     readonly property int nonContentsHeight: titleBar.visible ? titleBar.heightWhenVisible + tabsPanel.height : 0
+    //! ---
 
     anchors.fill: parent
-
     color: ui.theme.backgroundPrimaryColor
 
     onFrameCppChanged: {
@@ -65,10 +65,11 @@ Rectangle {
     NavigationPanel {
         id: navPanel
         name: root.objectName+"PanelTabs"
+        enabled: root.enabled && root.visible
         section: frameModel.navigationSection
         order: 1
 
-        onNavigationEvent: {
+        onNavigationEvent: function(event) {
             if (event.type === NavigationEvent.AboutActive) {
                 event.setData("controlName", tabs.currentItem.navigation.name)
             }
@@ -84,8 +85,9 @@ Rectangle {
 
         contextMenuModel: frameModel.currentDockContextMenuModel
         visible: frameModel.titleBarVisible
+        isHorizontalPanel: frameModel.isHorizontalPanel
 
-        onHandleContextMenuItemRequested: {
+        onHandleContextMenuItemRequested: function(itemId) {
             frameModel.handleMenuItem(itemId)
         }
     }
@@ -109,10 +111,11 @@ Rectangle {
 
         anchors.top: titleBar.visible ? titleBar.bottom : parent.top
 
-        height: 36
+        height: visible ? 35 : 0
         width: parent.width
 
         visible: tabs.count > 1
+        clip: true
 
         color: ui.theme.backgroundSecondaryColor
 
@@ -121,7 +124,7 @@ Rectangle {
 
         onTabBarCppChanged: {
             if (Boolean(tabBarCpp)) {
-                tabBarCpp.redirectMouseEvents(dragMouseArea)
+                tabBarCpp.setDraggableMouseArea(dragMouseArea)
                 tabBarCpp.tabBarQmlItem = this
             }
         }
@@ -139,20 +142,41 @@ Rectangle {
             anchors.bottom: parent.bottom
             anchors.left: parent.left
 
-            width: contentWidth
+            width: Math.min(contentWidth, availableWidth)
 
             orientation: Qt.Horizontal
             interactive: false
-            clip: true
             spacing: 0
 
             currentIndex: tabsPanel.currentIndex
             model: frameModel.tabs
 
+            readonly property real availableWidth: tabsPanel.width + 1  // + 1, because we don't need to see the rightmost separator
+            readonly property real implicitWidthOfActiveTab: currentItem ? currentItem.implicitWidth : 0
+            readonly property real implicitWidthOfAllTabsTogether: {
+                let result = 0
+                let items = tabs.contentItem.children
+
+                for (let i in items) {
+                    let item = items[i]
+                    if (item && item.implicitWidth) {
+                        result += item.implicitWidth
+                    }
+                }
+
+                return result
+            }
+
             delegate: DockPanelTab {
                 text: modelData.title
                 isCurrent: tabsPanel && (tabsPanel.currentIndex === model.index)
                 contextMenuModel: modelData.contextMenuModel
+
+                width: isCurrent || (tabs.implicitWidthOfAllTabsTogether <= tabs.availableWidth)
+                       ? implicitWidth
+                       : (tabs.availableWidth - tabs.implicitWidthOfActiveTab)
+                         / (tabs.implicitWidthOfAllTabsTogether - tabs.implicitWidthOfActiveTab)
+                         * implicitWidth
 
                 navigation.name: text
                 navigation.panel: navPanel
@@ -166,7 +190,7 @@ Rectangle {
                     tabsPanel.currentIndex = model.index
                 }
 
-                onHandleContextMenuItemRequested: {
+                onHandleContextMenuItemRequested: function(itemId) {
                     frameModel.handleMenuItem(itemId)
                 }
             }
@@ -202,6 +226,27 @@ Rectangle {
             }
 
             return 0
+        }
+    }
+
+    Rectangle {
+        visible: frameModel.highlightingVisible
+
+        x: frameModel.highlightingRect.x
+        y: frameModel.highlightingRect.y
+        width: frameModel.highlightingRect.width
+        height: frameModel.highlightingRect.height
+
+        color: "transparent"
+
+        border.width: 1
+        border.color: ui.theme.accentColor
+
+        Rectangle {
+            anchors.fill: parent
+
+            color: ui.theme.accentColor
+            opacity: 0.3
         }
     }
 }

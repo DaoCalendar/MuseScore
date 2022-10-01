@@ -22,27 +22,29 @@
 
 #include <gtest/gtest.h>
 
-#include "libmscore/factory.h"
 #include "libmscore/barline.h"
-#include "libmscore/measure.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/system.h"
-#include "libmscore/undo.h"
 #include "libmscore/bracket.h"
+#include "libmscore/factory.h"
+#include "libmscore/layoutbreak.h"
+#include "libmscore/masterscore.h"
+#include "libmscore/measure.h"
+#include "libmscore/system.h"
+#include "libmscore/timesig.h"
+#include "libmscore/undo.h"
 
 #include "utils/scorerw.h"
 #include "utils/scorecomp.h"
 
-static const QString BARLINE_DATA_DIR("barline_data/");
-
-using namespace Ms;
+using namespace mu;
 using namespace mu::engraving;
+
+static const String BARLINE_DATA_DIR(u"barline_data/");
 
 //---------------------------------------------------------
 //   BarlineTests
 //---------------------------------------------------------
 
-class BarlineTests : public ::testing::Test
+class Engraving_BarlineTests : public ::testing::Test
 {
 public:
 };
@@ -62,29 +64,23 @@ public:
 //---------------------------------------------------------
 
 // actual 3-staff bracket should be high 28.6 SP ca.: allow for some layout margin
-static const qreal BRACKET0_HEIGHT_MIN     = 27;
-static const qreal BRACKET0_HEIGHT_MAX     = 30;
+static const double BRACKET0_HEIGHT_MIN     = 27;
+static const double BRACKET0_HEIGHT_MAX     = 30;
 // actual 2-staff bracket should be high 18.1 SP ca.
-static const qreal BRACKET_HEIGHT_MIN      = 17;
-static const qreal BRACKET_HEIGHT_MAX      = 20;
-// actual 3-staff bar line should be high 25 SP
-static const qreal BARLINE0_HEIGHT_MIN     = 24;
-static const qreal BARLINE0_HEIGHT_MAX     = 26;
-// actual 2-staff bar line should be high 14.5 SP
-static const qreal BARLINE_HEIGHT_MIN      = 14;
-static const qreal BARLINE_HEIGHT_MAX      = 15;
+static const double BRACKET_HEIGHT_MIN      = 17;
+static const double BRACKET_HEIGHT_MAX      = 20;
 
-TEST_F(BarlineTests, barline01)
+TEST_F(Engraving_BarlineTests, barline01)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline01.mscx");
     EXPECT_TRUE(score);
 
-    qreal height, heightMin, heightMax;
-    qreal spatium = score->spatium();
+    double height, heightMin, heightMax;
+    double spatium = score->spatium();
     int sysNo = 0;
     for (System* sys : score->systems()) {
         // check number of the brackets of each system
-        EXPECT_EQ(sys->brackets().count(), 1);
+        EXPECT_EQ(sys->brackets().size(), 1);
 
         // check height of the bracket of each system
         // (bracket height is different between first system (3 staves) and other systems (2 staves) )
@@ -118,7 +114,7 @@ TEST_F(BarlineTests, barline01)
 //
 //    NO REFERENCE SCORE IS USED.
 //---------------------------------------------------------
-TEST_F(BarlineTests, barline02)
+TEST_F(Engraving_BarlineTests, barline02)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline02.mscx");
     EXPECT_TRUE(score);
@@ -155,7 +151,7 @@ TEST_F(BarlineTests, barline02)
 //
 //   NO REFERENCE SCORE IS USED.
 //---------------------------------------------------------
-TEST_F(BarlineTests, barline03)
+TEST_F(Engraving_BarlineTests, barline03)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline03.mscx");
     EXPECT_TRUE(score);
@@ -184,11 +180,11 @@ TEST_F(BarlineTests, barline03)
 //---------------------------------------------------------
 //   barline04
 //   Sets custom span parameters to a system-initial start-repeat bar line and
-//   check that it is properly applied to it and to the start-reapeat bar lines of staves below.
+//   check that it is properly applied to it and to the start-repeat bar lines of staves below.
 //
 //   NO REFERENCE SCORE IS USED.
 //---------------------------------------------------------
-TEST_F(BarlineTests, barline04)
+TEST_F(Engraving_BarlineTests, barline04)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline04.mscx");
     EXPECT_TRUE(score);
@@ -230,7 +226,7 @@ TEST_F(BarlineTests, barline04)
 //
 //   NO REFERENCE SCORE IS USED.
 //---------------------------------------------------------
-TEST_F(BarlineTests, barline05)
+TEST_F(Engraving_BarlineTests, barline05)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline05.mscx");
     EXPECT_TRUE(score);
@@ -244,8 +240,8 @@ TEST_F(BarlineTests, barline05)
     }
     // create and add a LineBreak element
     LayoutBreak* lb = Factory::createLayoutBreak(msr);
-    lb->setLayoutBreakType(LayoutBreak::Type::LINE);
-    lb->setTrack(-1);               // system-level element
+    lb->setLayoutBreakType(LayoutBreakType::LINE);
+    lb->setTrack(mu::nidx);               // system-level element
     lb->setParent(msr);
     score->undoAddElement(lb);
     score->doLayout();
@@ -281,7 +277,7 @@ TEST_F(BarlineTests, barline05)
 //
 //   NO REFERENCE SCORE IS USED.
 //---------------------------------------------------------
-TEST_F(BarlineTests, barline06)
+TEST_F(Engraving_BarlineTests, barline06)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline06.mscx");
     EXPECT_TRUE(score);
@@ -341,7 +337,7 @@ void dropNormalBarline(EngravingItem* e)
 //
 //    NO REFERENCE SCORE IS USED.
 //---------------------------------------------------------
-TEST_F(BarlineTests, barline179726)
+TEST_F(Engraving_BarlineTests, barline179726)
 {
     Score* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barline179726.mscx");
     EXPECT_TRUE(score);
@@ -419,7 +415,7 @@ TEST_F(BarlineTests, barline179726)
 //---------------------------------------------------------
 //   deleteSkipBarlines
 //---------------------------------------------------------
-TEST_F(BarlineTests, deleteSkipBarlines)
+TEST_F(Engraving_BarlineTests, deleteSkipBarlines)
 {
     MasterScore* score = ScoreRW::readScore(BARLINE_DATA_DIR + "barlinedelete.mscx");
     EXPECT_TRUE(score);
@@ -434,7 +430,7 @@ TEST_F(BarlineTests, deleteSkipBarlines)
 
     score->doLayout();
 
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, QString("barlinedelete.mscx"), BARLINE_DATA_DIR + QString("barlinedelete-ref.mscx")));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, String("barlinedelete.mscx"), BARLINE_DATA_DIR + String("barlinedelete-ref.mscx")));
 
     delete score;
 }

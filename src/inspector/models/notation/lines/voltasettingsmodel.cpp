@@ -31,14 +31,15 @@ using namespace mu::inspector;
 using IconCode = mu::ui::IconCode::Code;
 
 VoltaSettingsModel::VoltaSettingsModel(QObject* parent, IElementRepositoryService* repository)
-    : LineSettingsModel(parent, repository, Ms::ElementType::VOLTA)
+    : TextLineSettingsModel(parent, repository, mu::engraving::ElementType::VOLTA)
 {
     setModelType(InspectorModelType::TYPE_VOLTA);
     setTitle(qtrc("inspector", "Volta"));
+    setIcon(ui::IconCode::Code::VOLTA);
 
     static const QList<HookTypeInfo> hookTypes {
-        { Ms::HookType::NONE, IconCode::LINE_WITH_INVERTED_START_HOOK, qtrc("inspector", "Normal") },
-        { Ms::HookType::HOOK_90, IconCode::LINE_WITH_TWO_INVERTED_HOOKS, qtrc("inspector", "Hooked 90") }
+        { mu::engraving::HookType::NONE, IconCode::LINE_WITH_INVERTED_START_HOOK, qtrc("inspector", "Normal") },
+        { mu::engraving::HookType::HOOK_90, IconCode::LINE_WITH_TWO_INVERTED_HOOKS, qtrc("inspector", "Hooked 90°") }
     };
 
     setPossibleEndHookTypes(hookTypes);
@@ -53,25 +54,25 @@ PropertyItem* VoltaSettingsModel::repeatCount() const
 
 void VoltaSettingsModel::createProperties()
 {
-    LineSettingsModel::createProperties();
+    TextLineSettingsModel::createProperties();
 
-    m_repeatCount = buildPropertyItem(Ms::Pid::VOLTA_ENDING);
+    m_repeatCount = buildPropertyItem(mu::engraving::Pid::VOLTA_ENDING);
 
+    isLineVisible()->setIsVisible(true);
+    allowDiagonal()->setIsVisible(true);
     placement()->setIsVisible(false);
-    beginingTextHorizontalOffset()->setIsVisible(false);
-    continiousTextHorizontalOffset()->setIsVisible(false);
 }
 
 void VoltaSettingsModel::loadProperties()
 {
-    LineSettingsModel::loadProperties();
+    TextLineSettingsModel::loadProperties();
 
     loadPropertyItem(m_repeatCount);
 }
 
 void VoltaSettingsModel::resetProperties()
 {
-    LineSettingsModel::resetProperties();
+    TextLineSettingsModel::resetProperties();
 
     m_repeatCount->resetToDefault();
 }

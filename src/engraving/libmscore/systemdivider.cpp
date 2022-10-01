@@ -21,15 +21,16 @@
  */
 
 #include "systemdivider.h"
-#include "io/xml.h"
+#include "rw/xml.h"
+#include "types/symnames.h"
+
 #include "score.h"
-#include "measure.h"
-#include "symnames.h"
 #include "system.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   SystemDivider
 //---------------------------------------------------------
@@ -59,7 +60,7 @@ SystemDivider::SystemDivider(const SystemDivider& sd)
 void SystemDivider::layout()
 {
     SymId sid;
-    ScoreFont* sf = score()->scoreFont();
+    SymbolFont* sf = score()->symbolFont();
 
     if (_dividerType == SystemDivider::Type::LEFT) {
         sid = SymNames::symIdByName(score()->styleSt(Sid::dividerLeftSym));
@@ -100,13 +101,9 @@ mu::RectF SystemDivider::drag(EditData& ed)
 
 void SystemDivider::write(XmlWriter& xml) const
 {
-    if (dividerType() == SystemDivider::Type::LEFT) {
-        xml.startObject(this, "type=\"left\"");
-    } else {
-        xml.startObject(this, "type=\"right\"");
-    }
+    xml.startElement(this, { { "type", (dividerType() == SystemDivider::Type::LEFT ? "left" : "right") } });
     writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -115,7 +112,7 @@ void SystemDivider::write(XmlWriter& xml) const
 
 void SystemDivider::read(XmlReader& e)
 {
-    ScoreFont* sf = score()->scoreFont();
+    SymbolFont* sf = score()->symbolFont();
     if (e.attribute("type") == "left") {
         _dividerType = SystemDivider::Type::LEFT;
         SymId sym = SymNames::symIdByName(score()->styleSt(Sid::dividerLeftSym));
@@ -129,4 +126,4 @@ void SystemDivider::read(XmlReader& e)
     }
     Symbol::read(e);
 }
-}  // namespace Ms
+} // namespace mu::engraving

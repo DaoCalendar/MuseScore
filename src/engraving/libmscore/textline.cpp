@@ -21,17 +21,15 @@
  */
 #include "textline.h"
 
-#include "io/xml.h"
+#include "rw/xml.h"
 
 #include "score.h"
-#include "staff.h"
 #include "system.h"
 #include "undo.h"
-#include "musescoreCore.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   textLineSegmentStyle
 //---------------------------------------------------------
@@ -145,9 +143,9 @@ TextLine::TextLine(EngravingItem* parent, bool system)
 
     initStyle();
 
-    setBeginText("");
-    setContinueText("");
-    setEndText("");
+    setBeginText(u"");
+    setContinueText(u"");
+    setEndText(u"");
     setBeginTextOffset(PointF(0, 0));
     setContinueTextOffset(PointF(0, 0));
     setEndTextOffset(PointF(0, 0));
@@ -189,19 +187,19 @@ void TextLine::initStyle()
 
 void TextLine::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
     if (systemFlag()) {
-        xml.startObject(QString("TextLine"), this, QString("system=\"1\""));
+        xml.startElement(this, { { "system", "1" } });
     } else {
-        xml.startObject(this);
+        xml.startElement(this);
     }
     // other styled properties are included in TextLineBase pids list
     writeProperty(xml, Pid::PLACEMENT);
     writeProperty(xml, Pid::OFFSET);
     TextLineBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -292,7 +290,7 @@ Sid TextLine::getPropertyStyle(Pid pid) const
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant TextLine::propertyDefault(Pid propertyId) const
+engraving::PropertyValue TextLine::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::PLACEMENT:
@@ -313,11 +311,11 @@ QVariant TextLine::propertyDefault(Pid propertyId) const
         return PointF(0, 0);
     case Pid::BEGIN_HOOK_TYPE:
     case Pid::END_HOOK_TYPE:
-        return int(HookType::NONE);
+        return HookType::NONE;
     case Pid::BEGIN_TEXT_PLACE:
     case Pid::CONTINUE_TEXT_PLACE:
     case Pid::END_TEXT_PLACE:
-        return int(PlaceText::LEFT);
+        return TextPlace::LEFT;
     case Pid::BEGIN_HOOK_HEIGHT:
     case Pid::END_HOOK_HEIGHT:
         return Spatium(1.5);
@@ -330,11 +328,11 @@ QVariant TextLine::propertyDefault(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool TextLine::setProperty(Pid id, const QVariant& v)
+bool TextLine::setProperty(Pid id, const engraving::PropertyValue& v)
 {
     switch (id) {
     case Pid::PLACEMENT:
-        setPlacement(Placement(v.toInt()));
+        setPlacement(v.value<PlacementV>());
         break;
     default:
         return TextLineBase::setProperty(id, v);
@@ -347,7 +345,7 @@ bool TextLine::setProperty(Pid id, const QVariant& v)
 //   undoChangeProperty
 //---------------------------------------------------------
 
-void TextLine::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
+void TextLine::undoChangeProperty(Pid id, const engraving::PropertyValue& v, PropertyFlags ps)
 {
     if (id == Pid::SYSTEM_FLAG) {
         score()->undo(new ChangeTextLineProperty(this, v));
@@ -367,17 +365,9 @@ void TextLine::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
 
 SpannerSegment* TextLine::layoutSystem(System* system)
 {
-    TextLineSegment* tls = toTextLineSegment(TextLineBase::layoutSystem(system));
+    SpannerSegment* segment = TextLineBase::layoutSystem(system);
+    moveToSystemTopIfNeed(segment);
 
-    if (tls->spanner()) {
-        for (SpannerSegment* ss : tls->spanner()->spannerSegments()) {
-            ss->setFlag(ElementFlag::SYSTEM, systemFlag());
-            ss->setTrack(systemFlag() ? 0 : track());
-        }
-        tls->spanner()->setFlag(ElementFlag::SYSTEM, systemFlag());
-        tls->spanner()->setTrack(systemFlag() ? 0 : track());
-    }
-
-    return tls;
+    return segment;
 }
-}     // namespace Ms
+} // namespace mu::engraving

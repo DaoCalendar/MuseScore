@@ -24,24 +24,46 @@
 #define MU_PALETTE_PALETTEWIDGET_H
 
 #include <QScrollArea>
+#include <QAccessibleWidget>
 
-#include "internal/palette.h"
+#include "../../internal/palette.h"
 
 #include "engraving/libmscore/engravingitem.h"
 
 #include "modularity/ioc.h"
-#include "ipaletteconfiguration.h"
+#include "../../ipaletteconfiguration.h"
 #include "ui/iuiactionsregister.h"
+#include "ui/iuiconfiguration.h"
 #include "context/iglobalcontext.h"
 #include "iinteractive.h"
 
-namespace Ms {
+namespace mu::engraving {
 enum class ActionIconType;
 class XmlWriter;
 class XmlReader;
 }
 
 namespace mu::palette {
+class PaletteWidget;
+class AccessiblePaletteWidget : public QObject, public QAccessibleWidget
+{
+    Q_OBJECT
+
+public:
+    AccessiblePaletteWidget(PaletteWidget* palette);
+
+    QObject* object() const override;
+    QAccessibleInterface* child(int index) const override;
+    int childCount() const override;
+    int indexOfChild(const QAccessibleInterface* child) const override;
+    QAccessible::Role role() const override;
+    QAccessible::State state() const override;
+    QAccessibleInterface* focusChild() const override;
+
+private:
+    PaletteWidget* m_palette = nullptr;
+};
+
 class PaletteWidget : public QWidget
 {
     Q_OBJECT
@@ -50,10 +72,14 @@ class PaletteWidget : public QWidget
     INJECT_STATIC(palette, ui::IUiActionsRegister, actionsRegister)
     INJECT_STATIC(palette, context::IGlobalContext, globalContext)
     INJECT(palette, framework::IInteractive, interactive)
+    INJECT(palette, ui::IUiConfiguration, uiConfiguration)
 
 public:
     PaletteWidget(QWidget* parent = nullptr);
-    PaletteWidget(PalettePtr palette, QWidget* parent = nullptr);
+
+    void setPalette(PalettePtr palette);
+
+    static QAccessibleInterface* accessibleInterface(QObject* object);
 
     QString name() const;
     void setName(const QString& name);
@@ -61,11 +87,13 @@ public:
     // Elements & Cells
     int actualCellCount() const;
     PaletteCellPtr cellAt(size_t index) const;
-    Ms::ElementPtr elementForCellAt(int idx) const;
+    mu::engraving::ElementPtr elementForCellAt(int idx) const;
 
-    PaletteCellPtr insertElement(int idx, Ms::ElementPtr element, const QString& name, qreal mag = 1.0);
-    PaletteCellPtr appendElement(Ms::ElementPtr element, const QString& name, qreal mag = 1.0);
-    PaletteCellPtr appendActionIcon(Ms::ActionIconType type, actions::ActionCode code);
+    PaletteCellPtr insertElement(int idx, mu::engraving::ElementPtr element, const QString& name, qreal mag = 1.0,
+                                 const QPointF offset = QPointF(), const QString& tag = "");
+    PaletteCellPtr appendElement(mu::engraving::ElementPtr element, const QString& name, qreal mag = 1.0,
+                                 const QPointF offset = QPointF(), const QString& tag = "");
+    PaletteCellPtr appendActionIcon(mu::engraving::ActionIconType type, actions::ActionCode code);
 
     void clear();
 
@@ -124,17 +152,29 @@ public:
     QSize sizeHint() const override;
 
     // Read/write
-    void read(Ms::XmlReader&);
-    void write(Ms::XmlWriter&) const;
+    void read(mu::engraving::XmlReader&);
+    void write(mu::engraving::XmlWriter&) const;
     bool readFromFile(const QString& path);
     void writeToFile(const QString& path) const;
 
     // events
     bool handleEvent(QEvent* event);
 
+    struct PaintOptions {
+        mu::draw::Color backgroundColor;
+        mu::draw::Color selectionColor;
+        mu::draw::Color linesColor;
+        bool useElementColors = false;
+        bool colorsInverionsEnabled = false;
+    };
+
+    const PaintOptions& paintOptions() const;
+    void setPaintOptions(const PaintOptions& options);
+
 signals:
     void changed();
     void boxClicked(int index);
+    void selectedChanged(int index, int previous);
 
 private:
     bool event(QEvent*) override;
@@ -169,7 +209,7 @@ private:
     void applyElementAtPosition(QPoint pos, Qt::KeyboardModifiers modifiers);
     void applyElementAtIndex(int index, Qt::KeyboardModifiers modifiers = {});
 
-    PalettePtr m_palette;
+    PalettePtr m_palette = nullptr;
 
     std::vector<PaletteCellPtr> m_filteredCells; // used for filter & backup
 
@@ -185,6 +225,8 @@ private:
     int m_dragIdx = -1;
     int m_selectedIdx = -1;
     QPoint m_dragStartPosition;
+
+    PaintOptions m_paintOptions;
 };
 
 class PaletteScrollArea : public QScrollArea

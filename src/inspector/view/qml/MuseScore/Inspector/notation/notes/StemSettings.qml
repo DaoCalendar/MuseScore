@@ -52,14 +52,14 @@ FocusableItem {
         spacing: 12
 
         CheckBox {
+            width: parent.width
             isIndeterminate: root.stemModel && root.beamModel ? root.stemModel.isStemHidden.isUndefined || root.beamModel.isBeamHidden.isUndefined : false
             checked: root.stemModel && !isIndeterminate && root.beamModel ? root.stemModel.isStemHidden.value && root.beamModel.isBeamHidden.value : false
             text: qsTrc("inspector", "Hide stem (also hides beam)")
 
-            navigation.name: "HideStemCheckBox"
+            navigation.name: "HideStem"
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 1
-            navigation.enabled: root.enabled
 
             onClicked: {
                 var isHidden = !checked
@@ -68,7 +68,7 @@ FocusableItem {
             }
         }
 
-        FlatRadioButtonGroupPropertyView {
+        DirectionSection {
             id: stemDirectionGroup
 
             titleText: qsTrc("inspector", "Stem direction")
@@ -76,13 +76,6 @@ FocusableItem {
 
             navigationPanel: root.navigationPanel
             navigationRowStart: root.navigationRowStart + 2
-            navigationEnabled: root.enabled
-
-            model: [
-                { text: qsTrc("inspector", "Auto"), value: DirectionTypes.VERTICAL_AUTO, title: qsTrc("inspector", "Auto") },
-                { iconCode: IconCode.ARROW_DOWN, value: DirectionTypes.VERTICAL_DOWN, title: qsTrc("inspector", "Down") },
-                { iconCode: IconCode.ARROW_UP, value: DirectionTypes.VERTICAL_UP, title: qsTrc("inspector", "Up") }
-            ]
         }
 
         Column {
@@ -103,8 +96,8 @@ FocusableItem {
                 width: parent.width
                 height: 70
 
-                property int navigationRowStart: stemDirectionGroup.navigationRowEnd + 1
-                property int navigationRowEnd: navigationRowStart + count
+                readonly property int navigationRowStart: stemDirectionGroup.navigationRowEnd + 1
+                readonly property int navigationRowEnd: navigationRowStart + count
 
                 model: [
                     { iconCode: IconCode.NOTEFLAGS_TRADITIONAL, text: qsTrc("inspector", "Traditional", "Note flags"), value: false },
@@ -114,10 +107,9 @@ FocusableItem {
                 delegate: FlatRadioButton {
                     height: 70
 
-                    navigation.name: "FlagStyleGroup"
+                    navigation.name: "FlagStyle" + modelData.text
                     navigation.panel: root.navigationPanel
                     navigation.row: flagStyleGroup.navigationRowStart + index
-                    navigation.enabled: root.enabled
                     navigation.accessible.name: flagStyleLabel.text + " " + modelData.text
 
                     Column {
@@ -181,9 +173,9 @@ FocusableItem {
                         minValue: 0.01
                         step: 0.01
 
+                        navigationName: "Thickness"
                         navigationPanel: root.navigationPanel
                         navigationRowStart: showItem.navigation.row + 1
-                        navigationEnabled: visible && showItem.isExpanded
                     }
 
                     SpinBoxPropertyView {
@@ -198,9 +190,9 @@ FocusableItem {
                         maxValue: 10
                         minValue: -10
 
+                        navigationName: "Length"
                         navigationPanel: root.navigationPanel
                         navigationRowStart: thicknessView.navigationRowEnd + 1
-                        navigationEnabled: visible && showItem.isExpanded
                     }
                 }
 
@@ -210,9 +202,9 @@ FocusableItem {
                     horizontalOffset: root.stemModel ? root.stemModel.horizontalOffset : null
                     verticalOffset: root.stemModel ? root.stemModel.verticalOffset : null
 
+                    navigationName: "StemOffset"
                     navigationPanel: root.navigationPanel
                     navigationRowStart: lengthView.navigationRowEnd + 1
-                    navigationEnabled: visible && showItem.isExpanded
                 }
 
                 OffsetSection {
@@ -220,9 +212,9 @@ FocusableItem {
                     horizontalOffset: root.hookModel ? root.hookModel.horizontalOffset : null
                     verticalOffset: root.hookModel ? root.hookModel.verticalOffset : null
 
+                    navigationName: "FlagOffset"
                     navigationPanel: root.navigationPanel
                     navigationRowStart: stemOffsetSection.navigationRowEnd + 1
-                    navigationEnabled: visible && showItem.isExpanded
                 }
             }
         }

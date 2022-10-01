@@ -29,7 +29,7 @@ using namespace mu::learn;
 using namespace mu::network;
 
 static const QString API_KEY(YOUTUBE_API_KEY);
-static const QString GET_STARTED_PLAYLIST_ID("PLTYuWi2LmaPEZX1IDtL6Lx1Uyq7WGdGCL");
+static const QString GET_STARTED_PLAYLIST_ID("PLTYuWi2LmaPEhcwZJwFZqoyQ2xXx_maPa");
 static const QString ADVANCED_PLAYLIST_ID("PL24C760637A625BB6");
 static const int MAX_NUMBER_OF_RESULT_ITEMS(100);
 
@@ -50,14 +50,14 @@ QUrl LearnConfiguration::advancedPlaylistUrl() const
     return QUrl(apiRootUrl() + "/playlistItems?" + playlistItemsParams(ADVANCED_PLAYLIST_ID));
 }
 
-QUrl LearnConfiguration::videosInfoUrl(const std::vector<std::string>& videosIds) const
+QUrl LearnConfiguration::videosInfoUrl(const QStringList& videosIds) const
 {
     return QUrl(apiRootUrl() + "/videos?" + videosParams(videosIds));
 }
 
-QUrl LearnConfiguration::videoOpenUrl(const std::string& videoId) const
+QUrl LearnConfiguration::videoOpenUrl(const QString& videoId) const
 {
-    return QUrl("https://www.youtube.com/watch?v=" + QString::fromStdString(videoId));
+    return QUrl("https://www.youtube.com/watch?v=" + videoId);
 }
 
 QString LearnConfiguration::apiRootUrl() const
@@ -77,7 +77,7 @@ QString LearnConfiguration::playlistItemsParams(const QString& playlistId) const
     return params.join('&');
 }
 
-QString LearnConfiguration::videosParams(const std::vector<std::string>& videosIds) const
+QString LearnConfiguration::videosParams(const QStringList& videosIds) const
 {
     QStringList params {
         "part=snippet,contentDetails",
@@ -85,8 +85,10 @@ QString LearnConfiguration::videosParams(const std::vector<std::string>& videosI
         "maxResults=" + QString::number(MAX_NUMBER_OF_RESULT_ITEMS)
     };
 
-    for (const std::string& videoId : videosIds) {
-        params << "id=" + QString::fromStdString(videoId);
+    params.reserve(params.size() + videosIds.size());
+
+    for (const QString& videoId : videosIds) {
+        params << "id=" + videoId;
     }
 
     return params.join('&');

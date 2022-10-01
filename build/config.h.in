@@ -23,13 +23,7 @@
 #ifndef MUSESCORE_CONFIG_H
 #define MUSESCORE_CONFIG_H
 
-#cmakedefine FOR_WINSTORE
-
 #cmakedefine MSCORE_UNSTABLE
-
-#cmakedefine HAS_MIDI
-#cmakedefine SCRIPT_INTERFACE
-#cmakedefine HAS_AUDIOFILE
 
 #define CRASH_REPORT_URL       "${CRASH_REPORT_URL}"
 #define MUSESCORE_NAME_VERSION "${MUSESCORE_NAME_VERSION}"
@@ -41,21 +35,16 @@
 #define BUILD_NUMBER           "${CMAKE_BUILD_NUMBER}"
 #define SPARKLE_APPCAST_URL    "${SPARKLE_APPCAST_URL}"
 
-#cmakedefine BUILD_TELEMETRY_MODULE
-#define TELEMETRY_TRACK_ID "${TELEMETRY_TRACK_ID}"
-
 #define YOUTUBE_API_KEY "${YOUTUBE_API_KEY}"
 
 #cmakedefine LOGGER_DEBUGLEVEL_ENABLED
 
 #cmakedefine BUILD_SHORTCUTS_MODULE
-#cmakedefine BUILD_SYSTEM_MODULE
 #cmakedefine BUILD_NETWORK_MODULE
 #cmakedefine BUILD_AUDIO_MODULE
 #cmakedefine BUILD_LEARN_MODULE
 #cmakedefine BUILD_WORKSPACE_MODULE
 #cmakedefine BUILD_CLOUD_MODULE
-#cmakedefine BUILD_EXTENSIONS_MODULE
 #cmakedefine BUILD_LANGUAGES_MODULE
 #cmakedefine BUILD_PLUGINS_MODULE
 #cmakedefine BUILD_PLAYBACK_MODULE
@@ -64,33 +53,31 @@
 #cmakedefine BUILD_INSPECTOR_MODULE
 #cmakedefine BUILD_AUTOBOT_MODULE
 #cmakedefine BUILD_MULTIINSTANCES_MODULE
+#cmakedefine BUILD_MUSESAMPLER_MODULE
+#cmakedefine BUILD_UPDATE_MODULE
+#cmakedefine BUILD_VIDEOEXPORT_MODULE
 #cmakedefine BUILD_VST
 #cmakedefine BUILD_DIAGNOSTICS
 
-#cmakedefine ENGRAVING_BUILD_ACCESSIBLE_TREE
 #cmakedefine ENGRAVING_PAINT_DEBUGGER_ENABLED
 #cmakedefine ENGRAVING_COMPAT_WRITESTYLE_302
 #cmakedefine ENGRAVING_COMPAT_WRITEEXCERPTS_302
+
+#cmakedefine ENABLE_AUDIO_EXPORT
 
 #cmakedefine UI_DISABLE_MODALITY
 
 #cmakedefine ACCESSIBILITY_LOGGING_ENABLED
 
-#cmakedefine SPARKLE_ENABLED
-#cmakedefine OPENGL
-#cmakedefine SOUNDFONT3
-#cmakedefine WIN_PORTABLE
-
 #cmakedefine QML_LOAD_FROM_SOURCE
 #cmakedefine TRACE_DRAW_OBJ_ENABLED
 
-#cmakedefine Q_WS_UIKIT
+#cmakedefine SCRIPT_INTERFACE
 
 #cmakedefine APP_UPDATABLE
-
-#define USE_BSP     true
-
-// does not work on windows/mac:
-//#define USE_GLYPHS  true
+#cmakedefine SPARKLE_ENABLED
+#cmakedefine SOUNDFONT3
+#cmakedefine WIN_PORTABLE
+#cmakedefine FOR_WINSTORE
 
 #endif /* MUSESCORE_CONFIG_H */

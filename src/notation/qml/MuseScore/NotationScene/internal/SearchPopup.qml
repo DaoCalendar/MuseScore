@@ -81,13 +81,9 @@ Rectangle {
         TextInputField {
             id: textInputField
 
-            Component.onCompleted: {
-                forceActiveFocus()
-            }
-
             width: 500
 
-            onCurrentTextEdited: {
+            onCurrentTextEdited: function(newTextValue) {
                 model.search(newTextValue)
             }
         }

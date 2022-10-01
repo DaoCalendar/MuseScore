@@ -29,62 +29,14 @@
 */
 
 #include "engravingitem.h"
-#include "mscore.h"
 
 namespace mu::engraving {
 class Factory;
-}
-
-namespace Ms {
-class XmlWriter;
-class MuseScoreView;
 class Segment;
+class XmlReader;
+class XmlWriter;
 
 static const int NO_CLEF = -1000;
-
-//---------------------------------------------------------
-//   ClefType
-//---------------------------------------------------------
-
-enum class ClefType : signed char {
-    INVALID = -1,
-    G = 0,
-    G15_MB,
-    G8_VB,
-    G8_VA,
-    G15_MA,
-    G8_VB_O,
-    G8_VB_P,
-    G_1,
-    C1,
-    C2,
-    C3,
-    C4,
-    C5,
-    C_19C,
-    C1_F18C,
-    C3_F18C,
-    C4_F18C,
-    C3_F20C,
-    C1_F20C,
-    C4_F20C,
-    F,
-    F15_MB,
-    F8_VB,
-    F_8VA,
-    F_15MA,
-    F_B,
-    F_C,
-    F_F18C,
-    F_19C,
-    PERC,
-    PERC2,
-    TAB,
-    TAB4,
-    TAB_SERIF,
-    TAB4_SERIF,
-    MAX
-};
 
 //---------------------------------------------------------
 //   ClefTypeList
@@ -113,27 +65,19 @@ class ClefInfo
 public:
     static const ClefInfo clefTable[];
 
-    const char* _tag;          ///< comprehensive name for instruments.xml
-    const char* _sign;         ///< Name for musicXml.
-    int _line;                 ///< Line for musicXml and for positioning on the staff
-    int _octChng;              ///< Octave change for musicXml.
+    ClefType type;
+    int _line;                 ///< Line positioning on the staff
     int _pitchOffset;          ///< Pitch offset for line 0.
     signed char _lines[14];
     SymId _symId;
-    const char* _name;
     StaffGroup _staffGroup;
 
 public:
-    static const char* tag(ClefType t) { return clefTable[int(t)]._tag; }
-    static const char* sign(ClefType t) { return clefTable[int(t)]._sign; }
     static int line(ClefType t) { return clefTable[int(t)]._line; }
-    static int octChng(ClefType t) { return clefTable[int(t)]._octChng; }
     static int pitchOffset(ClefType t) { return clefTable[int(t)]._pitchOffset; }
     static SymId symId(ClefType t) { return clefTable[int(t)]._symId; }
     static const signed char* lines(ClefType t) { return clefTable[int(t)]._lines; }
-    static const char* name(ClefType t) { return clefTable[int(t)]._name; }
     static StaffGroup staffGroup(ClefType t) { return clefTable[int(t)]._staffGroup; }
-    static ClefType tag2type(const QString&);
 };
 
 //---------------------------------------------------------
@@ -146,6 +90,8 @@ public:
 
 class Clef final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, Clef)
+
     SymId symId;
     bool _showCourtesy = true;
     bool m_isSmall = false;
@@ -153,16 +99,18 @@ class Clef final : public EngravingItem
 
     ClefTypeList _clefTypes { ClefType::INVALID };
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
     Clef(Segment* parent);
+
+    bool neverKernable() const override { return true; }
 
 public:
 
     Clef* clone() const override { return new Clef(*this); }
-    qreal mag() const override;
+    double mag() const override;
 
-    Segment* segment() const { return (Segment*)parent(); }
-    Measure* measure() const { return (Measure*)parent()->parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
+    Measure* measure() const { return (Measure*)explicitParent()->explicitParent(); }
 
     bool acceptDrop(EditData&) const override;
     EngravingItem* drop(EditData&) override;
@@ -181,12 +129,8 @@ public:
     void undoSetShowCourtesy(bool v);
     Clef* otherClef();
 
-    static ClefType clefType(const QString& s);
-    const char* clefTypeName();
-
     ClefType clefType() const;
     void setClefType(ClefType i);
-    void setClefType(const QString& s);
 
     void setForInstrumentChange(bool forInstrumentChange) { _forInstrumentChange = forInstrumentChange; }
     bool forInstrumentChange() const { return _forInstrumentChange; }
@@ -197,16 +141,16 @@ public:
     void setConcertClef(ClefType val);
     void setTransposingClef(ClefType val);
     void setClefType(const ClefTypeList& ctl) { _clefTypes = ctl; }
-    void spatiumChanged(qreal oldValue, qreal newValue) override;
+    void spatiumChanged(double oldValue, double newValue) override;
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
     EngravingItem* nextSegmentElement() override;
     EngravingItem* prevSegmentElement() override;
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
     void clear();
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

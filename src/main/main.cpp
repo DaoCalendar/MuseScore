@@ -29,6 +29,7 @@
 #include "appshell/appshell.h"
 
 #include "framework/global/globalmodule.h"
+#include "framework/draw/drawmodule.h"
 #include "framework/ui/uimodule.h"
 #include "framework/uicomponents/uicomponentsmodule.h"
 #include "framework/fonts/fontsmodule.h"
@@ -40,11 +41,6 @@
 #include "stubs/framework/shortcuts/shortcutsstubmodule.h"
 #endif
 
-#ifdef BUILD_SYSTEM_MODULE
-#include "framework/system/systemmodule.h"
-#else
-#include "stubs/framework/system/systemstubmodule.h"
-#endif
 #ifdef BUILD_NETWORK_MODULE
 #include "framework/network/networkmodule.h"
 #else
@@ -57,6 +53,11 @@
 #include "stubs/framework/audio/audiostubmodule.h"
 #endif
 #include "framework/midi/midimodule.h"
+#include "framework/mpe/mpemodule.h"
+
+#ifdef BUILD_MUSESAMPLER_MODULE
+#include "framework/musesampler/musesamplermodule.h"
+#endif
 
 #include "appshell/appshellmodule.h"
 #include "context/contextmodule.h"
@@ -70,16 +71,23 @@
 #include "engraving/engravingmodule.h"
 #include "notation/notationmodule.h"
 #include "project/projectmodule.h"
+#include "print/printmodule.h"
 
 #include "importexport/musicxml/musicxmlmodule.h"
 #include "importexport/bb/bbmodule.h"
+#include "importexport/braille/braillemodule.h"
 #include "importexport/bww/bwwmodule.h"
 #include "importexport/capella/capellamodule.h"
 #include "importexport/guitarpro/guitarpromodule.h"
 #include "importexport/midi/midimodule.h"
+#include "importexport/musedata/musedatamodule.h"
 #include "importexport/ove/ovemodule.h"
 #include "importexport/audioexport/audioexportmodule.h"
 #include "importexport/imagesexport/imagesexportmodule.h"
+
+#ifdef BUILD_VIDEOEXPORT_MODULE
+#include "importexport/videoexport/videoexportmodule.h"
+#endif
 
 #include "commonscene/commonscenemodule.h"
 #ifdef BUILD_PALETTE_MODULE
@@ -102,9 +110,8 @@
 
 #ifdef BUILD_VST
 #include "framework/vst/vstmodule.h"
-#endif
-#ifdef BUILD_TELEMETRY_MODULE
-#include "framework/telemetry/telemetrymodule.h"
+#else
+#include "stubs/framework/vst/vststubmodule.h"
 #endif
 
 #ifndef Q_OS_WASM
@@ -125,12 +132,6 @@
 #include "stubs/cloud/cloudstubmodule.h"
 #endif
 
-#ifdef BUILD_EXTENSIONS_MODULE
-#include "extensions/extensionsmodule.h"
-#else
-#include "stubs/extensions/extensionsstubmodule.h"
-#endif
-
 #ifdef BUILD_LANGUAGES_MODULE
 #include "languages/languagesmodule.h"
 #else
@@ -141,6 +142,12 @@
 #include "multiinstances/multiinstancesmodule.h"
 #else
 #include "stubs/multiinstances/multiinstancesstubmodule.h"
+#endif
+
+#ifdef BUILD_UPDATE_MODULE
+#include "update/updatemodule.h"
+#else
+#include "stubs/update/updatestubmodule.h"
 #endif
 
 #include "diagnostics/diagnosticsmodule.h"
@@ -170,19 +177,13 @@ int main(int argc, char** argv)
 
     mu::appshell::AppShell app;
 
-    //! NOTE `telemetry` must be first, because it install crash handler.
-    //! others modules order not important (must be)
-#ifdef BUILD_TELEMETRY_MODULE
-    app.addModule(new mu::telemetry::TelemetryModule());
-#endif
+    //! NOTE `diagnostics` must be first, because it installs the crash handler.
+    //! For other modules, the order is (an should be) unimportant.
+    app.addModule(new mu::diagnostics::DiagnosticsModule());
+    app.addModule(new mu::draw::DrawModule());
     app.addModule(new mu::fonts::FontsModule());
     app.addModule(new mu::ui::UiModule());
     app.addModule(new mu::uicomponents::UiComponentsModule());
-#ifdef BUILD_SYSTEM_MODULE
-    app.addModule(new mu::system::SystemModule());
-#else
-    app.addModule(new mu::system::SystemStubModule());
-#endif
 
 #ifdef BUILD_NETWORK_MODULE
     app.addModule(new mu::network::NetworkModule());
@@ -207,12 +208,18 @@ int main(int argc, char** argv)
     app.addModule(new mu::audio::AudioStubModule());
 #endif
     app.addModule(new mu::midi::MidiModule());
+    app.addModule(new mu::mpe::MpeModule());
+
+#ifdef BUILD_MUSESAMPLER_MODULE
+    app.addModule(new mu::musesampler::MuseSamplerModule());
+#endif
 
     app.addModule(new mu::learn::LearnModule());
 
     app.addModule(new mu::engraving::EngravingModule());
     app.addModule(new mu::notation::NotationModule());
     app.addModule(new mu::project::ProjectModule());
+    app.addModule(new mu::print::PrintModule());
     app.addModule(new mu::commonscene::CommonSceneModule());
 #ifdef BUILD_PLAYBACK_MODULE
     app.addModule(new mu::playback::PlaybackModule());
@@ -228,6 +235,8 @@ int main(int argc, char** argv)
 
 #ifdef BUILD_VST
     app.addModule(new mu::vst::VSTModule());
+#else
+    app.addModule(new mu::vst::VstStubModule());
 #endif
 
     app.addModule(new mu::inspector::InspectorModule());
@@ -240,14 +249,20 @@ int main(int argc, char** argv)
 
 #ifndef Q_OS_WASM
     app.addModule(new mu::iex::bb::BBModule());
+    app.addModule(new mu::iex::braille::BrailleModule());
     app.addModule(new mu::iex::bww::BwwModule());
     app.addModule(new mu::iex::musicxml::MusicXmlModule());
     app.addModule(new mu::iex::capella::CapellaModule());
     app.addModule(new mu::iex::guitarpro::GuitarProModule());
     app.addModule(new mu::iex::midi::MidiModule());
+    app.addModule(new mu::iex::musedata::MuseDataModule());
     app.addModule(new mu::iex::ove::OveModule());
     app.addModule(new mu::iex::audioexport::AudioExportModule());
     app.addModule(new mu::iex::imagesexport::ImagesExportModule());
+
+#ifdef BUILD_VIDEOEXPORT_MODULE
+    app.addModule(new mu::iex::videoexport::VideoExportModule());
+#endif
 
 #ifdef BUILD_WORKSPACE_MODULE
     app.addModule(new mu::workspace::WorkspaceModule());
@@ -264,11 +279,6 @@ int main(int argc, char** argv)
 #else
     app.addModule(new mu::cloud::CloudStubModule());
 #endif
-#ifdef BUILD_EXTENSIONS_MODULE
-    app.addModule(new mu::extensions::ExtensionsModule());
-#else
-    app.addModule(new mu::extensions::ExtensionsStubModule());
-#endif
 #ifdef BUILD_LANGUAGES_MODULE
     app.addModule(new mu::languages::LanguagesModule());
 #else
@@ -276,7 +286,12 @@ int main(int argc, char** argv)
 #endif
 
     app.addModule(new mu::mi::MultiInstancesModule());
-    app.addModule(new mu::diagnostics::DiagnosticsModule());
+
+#ifdef BUILD_UPDATE_MODULE
+    app.addModule(new mu::update::UpdateModule());
+#else
+    app.addModule(new mu::update::UpdateStubModule());
+#endif
 
 #ifdef BUILD_AUTOBOT_MODULE
     app.addModule(new mu::autobot::AutobotModule());

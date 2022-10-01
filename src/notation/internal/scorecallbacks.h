@@ -24,9 +24,16 @@
 
 #include "libmscore/mscoreview.h"
 
+#include "notation/inotationconfiguration.h"
+#include "modularity/ioc.h"
+
 namespace mu::notation {
-class ScoreCallbacks : public Ms::MuseScoreView
+class INotationInteraction;
+class IGetScore;
+class ScoreCallbacks : public mu::engraving::MuseScoreView
 {
+    INJECT(notation, INotationConfiguration, configuration)
+
 public:
     ScoreCallbacks() = default;
 
@@ -34,6 +41,19 @@ public:
     void updateAll() override;
     void drawBackground(mu::draw::Painter*, const RectF&) const override;
     const mu::Rect geometry() const override;
+    qreal selectionProximity() const override;
+    void setDropTarget(const mu::engraving::EngravingItem* dropTarget) override;
+    void setDropRectangle(const RectF& rect) override;
+    void changeEditElement(mu::engraving::EngravingItem* newElement) override;
+    void adjustCanvasPosition(const mu::engraving::EngravingItem*, int staffIdx = -1) override;
+
+    void setSelectionProximity(qreal proximity);
+    void setNotationInteraction(INotationInteraction* interaction);
+
+private:
+    qreal m_selectionProximity = 0.0f;
+
+    INotationInteraction* m_interaction = nullptr;
 };
 }
 

@@ -32,9 +32,10 @@ Rectangle {
 
     property NavigationPanel navigation: NavigationPanel {
         name: "PreferencesButtonsPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
 
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
@@ -61,7 +62,7 @@ Rectangle {
             navigation.panel: root.navigation
             navigation.order: 2
 
-            text: qsTrc("appshell", "Reset preferences")
+            text: qsTrc("appshell/preferences", "Reset preferences")
 
             onClicked: {
                 root.revertFactorySettingsRequested()

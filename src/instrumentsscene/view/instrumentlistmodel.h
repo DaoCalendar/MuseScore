@@ -41,11 +41,11 @@ class InstrumentListModel : public QAbstractListModel, public async::Asyncable
     Q_PROPERTY(QStringList genres READ genres NOTIFY genresChanged)
     Q_PROPERTY(QStringList groups READ groups NOTIFY groupsChanged)
 
-    Q_PROPERTY(int currentGenreIndex READ currentGenreIndex WRITE setCurrentGenreIndex NOTIFY currentGenreChanged)
-    Q_PROPERTY(int currentGroupIndex READ currentGroupIndex WRITE setCurrentGroupIndex NOTIFY currentGroupChanged)
+    Q_PROPERTY(int currentGenreIndex READ currentGenreIndex WRITE setCurrentGenreIndex NOTIFY currentGenreIndexChanged)
+    Q_PROPERTY(int currentGroupIndex READ currentGroupIndex WRITE setCurrentGroupIndex NOTIFY currentGroupIndexChanged)
 
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
-    Q_PROPERTY(QString selectedInstrumentDescription READ selectedInstrumentDescription NOTIFY selectionChanged)
+    Q_PROPERTY(QVariant selectedInstrument READ selectedInstrument NOTIFY selectionChanged)
 
 public:
     InstrumentListModel(QObject* parent = nullptr);
@@ -62,14 +62,15 @@ public:
     int currentGroupIndex() const;
 
     bool hasSelection() const;
-    QString selectedInstrumentDescription() const;
+    QVariant selectedInstrument() const;
 
     Q_INVOKABLE void load(bool canSelectMultipleInstruments, const QString& currentInstrumentId);
 
+    Q_INVOKABLE void saveCurrentGroup();
     Q_INVOKABLE void setSearchText(const QString& text);
 
     Q_INVOKABLE void selectInstrument(int instrumentIndex);
-    Q_INVOKABLE QVariantList selectedInstruments() const;
+    Q_INVOKABLE QStringList selectedInstrumentIdList() const;
 
 public slots:
     void setCurrentGenreIndex(int index);
@@ -79,8 +80,8 @@ signals:
     void genresChanged();
     void groupsChanged();
 
-    void currentGenreChanged();
-    void currentGroupChanged();
+    void currentGenreIndexChanged();
+    void currentGroupIndexChanged();
 
     void selectionChanged();
 
@@ -99,23 +100,29 @@ private:
         QString name;
         notation::InstrumentTemplateList templates;
         int currentTemplateIndex = 0;
+
+        bool operator==(const CombinedInstrument& instrument) const
+        {
+            return name == instrument.name && templates == instrument.templates;
+        }
     };
 
     using Instruments = QList<CombinedInstrument>;
 
     void init(const QString& genreId, const QString& groupId);
 
-    QString resolveInstrumentGroupId(const QString& instrumentId) const;
-    void focusOnInstrument(const QString& instrumentId);
+    QString resolveInstrumentGroupId(const String& instrumentId) const;
+    void focusOnInstrument(const String& instrumentId);
 
+    void loadGenres();
+    void loadGroups();
     void loadInstruments();
     void sortInstruments(Instruments& instruments) const;
 
-    notation::InstrumentGenreList availableGenres() const;
-    notation::InstrumentGroupList availableGroups() const;
-
     bool isSearching() const;
-    void updateGenreStateBySearch();
+
+    void updateStateBySearch();
+
     bool isInstrumentAccepted(const notation::InstrumentTemplate& instrument, bool compareWithCurrentGroup = true) const;
     bool isInstrumentIndexValid(int index) const;
 
@@ -131,7 +138,11 @@ private:
     Instruments m_instruments;
     uicomponents::ItemMultiSelectionModel* m_selection = nullptr;
 
+    notation::InstrumentGenreList m_genres;
+    notation::InstrumentGroupList m_groups;
+
     bool m_instrumentsLoadingAllowed = false;
+    bool m_saveCurrentGroup = false;
 };
 }
 

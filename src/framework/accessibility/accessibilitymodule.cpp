@@ -28,11 +28,12 @@
 
 #include "internal/accessibilitycontroller.h"
 #include "internal/accessibilityconfiguration.h"
+#include "internal/qaccessibleinterfaceregister.h"
 
 using namespace mu::accessibility;
 using namespace mu::modularity;
 
-static std::shared_ptr<AccessibilityController> s_accessibilityController = std::make_shared<AccessibilityController>();
+static std::shared_ptr<AccessibilityConfiguration> s_configuration = std::make_shared<AccessibilityConfiguration>();
 
 std::string AccessibilityModule::moduleName() const
 {
@@ -41,15 +42,23 @@ std::string AccessibilityModule::moduleName() const
 
 void AccessibilityModule::registerExports()
 {
-    ioc()->registerExport<IAccessibilityConfiguration>(moduleName(), new AccessibilityConfiguration());
-    ioc()->registerExport<IAccessibilityController>(moduleName(), s_accessibilityController);
+    ioc()->registerExport<IAccessibilityConfiguration>(moduleName(), s_configuration);
+    ioc()->registerExport<IAccessibilityController>(moduleName(), std::make_shared<AccessibilityController>());
+    ioc()->registerExport<IQAccessibleInterfaceRegister>(moduleName(), new QAccessibleInterfaceRegister());
 }
 
-void AccessibilityModule::onInit(const framework::IApplication::RunMode& mode)
+void AccessibilityModule::resolveImports()
 {
-    if (mode != framework::IApplication::RunMode::Editor) {
-        return;
+    auto accr = ioc()->resolve<IQAccessibleInterfaceRegister>(moduleName());
+    if (accr) {
+#ifdef Q_OS_MAC
+        accr->registerInterfaceGetter("QQuickWindow", AccessibilityController::accessibleInterface);
+#endif
+        accr->registerInterfaceGetter("mu::accessibility::AccessibleObject", AccessibleObject::accessibleInterface);
     }
+}
 
-    s_accessibilityController->init();
+void AccessibilityModule::onInit(const framework::IApplication::RunMode&)
+{
+    s_configuration->init();
 }

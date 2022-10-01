@@ -70,9 +70,9 @@ Item {
 
                 visible: root.model ? root.model.areSettingsAvailable : false
 
-                text: qsTrc("inspector", "Reset")
+                text: qsTrc("global", "Clear")
 
-                navigation.name: "Reset"
+                navigation.name: "Clear"
                 navigation.panel: root.navigationPanel
                 navigation.row: 10000
 
@@ -93,7 +93,6 @@ Item {
 
                 width: parent.width
             }
-
         }
     }
 
@@ -101,7 +100,7 @@ Item {
         anchors.fill: parent
 
         wrapMode: Text.Wrap
-        text: qsTrc("inspector", "You have multiple fretboard diagrams selected. Select a single diagram to edit its settings")
+        text: qsTrc("inspector", "You have multiple fretboard diagrams selected. Select a single diagram to edit its settings.")
         visible: root.model ? !root.model.areSettingsAvailable : false
     }
 }

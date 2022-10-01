@@ -31,6 +31,8 @@ FocusScope {
     property int maxValue: 999
     property int value: 0
 
+    property bool live: true
+
     property bool addLeadingZeros: true
     property int displayedNumberLength: maxValue.toString().length
 
@@ -59,7 +61,7 @@ FocusScope {
     }
 
     QtObject {
-        id: privateProperties
+        id: prv
 
         function pad(value) {
             var str = value.toString()
@@ -81,7 +83,7 @@ FocusScope {
     }
 
     onValueChanged: {
-        textField.text = privateProperties.pad(value)
+        textField.text = prv.pad(root.value)
     }
 
     NavigationControl {
@@ -107,14 +109,18 @@ FocusScope {
         padding: 0
 
         readOnly: root.maxValue === 0
-        text: privateProperties.pad(root.value)
+        text: prv.pad(root.value)
+
+        function textAsInt() {
+            return textField.text.length > 0 ? parseInt(textField.text) : 0
+        }
 
         onTextEdited: {
-            var currentValue = text.length > 0 ? parseInt(text) : 0
+            var currentValue = textField.textAsInt()
             var str = currentValue.toString()
             var newValue = 0
 
-            if (str.length > privateProperties.displayedNumberLength || currentValue > root.maxValue) {
+            if (str.length > root.displayedNumberLength || currentValue > root.maxValue) {
                 var lastDigit = str.charAt(str.length - 1)
                 newValue = parseInt(lastDigit)
             } else {
@@ -122,9 +128,22 @@ FocusScope {
             }
 
             newValue = Math.min(newValue, root.maxValue)
-            text = privateProperties.pad(newValue)
+            textField.text = prv.pad(newValue)
 
-            root.valueEdited(newValue)
+            if (root.live) {
+                newValue = Math.max(newValue, root.minValue)
+                root.valueEdited(newValue)
+            }
+        }
+
+        onActiveFocusChanged: {
+            if (!activeFocus && !root.live) {
+                //! NOTE do not adjust the value immediately to minValue,
+                // let the user enter the whole number
+                var newValue = Math.max(textField.textAsInt(), root.minValue)
+                textField.text = prv.pad(newValue)
+                root.valueEdited(newValue)
+            }
         }
 
         background: Rectangle {
@@ -136,17 +155,17 @@ FocusScope {
         selectByMouse: false
 
         color: ui.theme.fontPrimaryColor
-        font: ui.theme.tabFont
+        font: ui.theme.largeBodyFont
 
         validator: IntValidator {
             bottom: root.minValue
         }
 
-        Keys.onShortcutOverride: {
+        Keys.onShortcutOverride: function(event) {
             event.accepted = true
         }
 
-        Keys.onPressed: {
+        Keys.onPressed: function(event) {
             if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return
                     || event.key === Qt.Key_Escape) {
                 textField.focus = false
@@ -164,6 +183,8 @@ FocusScope {
         enabled: !textField.readOnly
 
         onPressed: {
+            navigation.requestActiveByInteraction()
+
             root.ensureActiveFocus()
             textField.cursorPosition = textField.text.length
         }

@@ -32,7 +32,7 @@ ListItemBlank {
     property string title: ""
     property int currentPartIndex: -1
 
-    property bool isCreated: false
+    property bool isCustom: false
 
     property int sideMargin: 0
 
@@ -59,6 +59,10 @@ ListItemBlank {
         }
     }
 
+    onCurrentPartIndexChanged: {
+        root.endEditTitle()
+    }
+
     height: 42
 
     onClicked: {
@@ -67,7 +71,9 @@ ListItemBlank {
     }
 
     onDoubleClicked: {
-        root.startEditTitle()
+        if (root.isCustom) {
+            root.startEditTitle()
+        }
     }
 
     onIsSelectedChanged: {
@@ -96,14 +102,6 @@ ListItemBlank {
 
             sourceComponent: partTitle
 
-            Connections {
-                target: root
-
-                function onCurrentPartIndexChanged(currentPartIndex) {
-                    root.endEditTitle()
-                }
-            }
-
             Component {
                 id: partTitle
 
@@ -130,7 +128,7 @@ ListItemBlank {
 
                     currentText: root.title
 
-                    onCurrentTextEdited: {
+                    onCurrentTextEdited: function(newTextValue) {
                         root.titleEdited(newTextValue)
                     }
 
@@ -142,28 +140,33 @@ ListItemBlank {
         }
 
         MenuButton {
-            menuModel: [
-                { "id": "duplicate", "title": qsTrc("notation", "Duplicate"), "enabled": root.isCreated },
-                { "id": "delete", "title": qsTrc("notation", "Delete"), "enabled": root.isCreated },
-                { "id": "rename", "title": qsTrc("notation", "Rename") },
-            ]
+            Component.onCompleted: {
+                var operations = [ { "id": "duplicate", "title": qsTrc("notation", "Duplicate") }]
+
+                if (root.isCustom) {
+                    operations.push({ "id": "rename", "title": qsTrc("notation", "Rename") })
+                    operations.push({ "id": "delete", "title": qsTrc("notation", "Delete") })
+                }
+
+                menuModel = operations
+            }
 
             navigation.name: title
             navigation.panel: root.navigation.panel
             navigation.row: root.navigation.row
             navigation.column: 2
 
-            onHandleMenuItem: {
+            onHandleMenuItem: function(itemId) {
                 switch(itemId) {
                 case "duplicate":
                     root.copyPartRequested()
                     break
+                case "rename":
+                    root.startEditTitle()
+                    break
                 case "delete":
                     root.removePartRequested()
                     break
-                case "rename":
-                    root.startEditTitle()
-                    break;
                 }
             }
         }

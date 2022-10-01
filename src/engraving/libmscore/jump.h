@@ -23,9 +23,11 @@
 #ifndef __JUMP_H__
 #define __JUMP_H__
 
-#include "text.h"
+#include "textbase.h"
 
-namespace Ms {
+#include "types/types.h"
+
+namespace mu::engraving {
 //---------------------------------------------------------
 //   @@ Jump
 ///    Jump label
@@ -39,77 +41,62 @@ namespace Ms {
 
 class Jump final : public TextBase
 {
-    QString _jumpTo;
-    QString _playUntil;
-    QString _continueAt;
+    OBJECT_ALLOCATOR(engraving, Jump)
+
+    String _jumpTo;
+    String _playUntil;
+    String _continueAt;
     bool _playRepeats;
 
 public:
-    enum class Type : char {
-        DC,
-        DC_AL_FINE,
-        DC_AL_CODA,
-        DS_AL_CODA,
-        DS_AL_FINE,
-        DS,
-        USER
-    };
 
     Jump(Measure* parent);
 
-    void setJumpType(Type t);
-    Type jumpType() const;
-    QString jumpTypeUserName() const;
+    void setJumpType(JumpType t);
+    JumpType jumpType() const;
+    String jumpTypeUserName() const;
 
     Jump* clone() const override { return new Jump(*this); }
 
     int subtype() const override { return int(jumpType()); }
 
-    Measure* measure() const { return toMeasure(parent()); }
+    Measure* measure() const { return toMeasure(explicitParent()); }
 
     void read(XmlReader&) override;
     void write(XmlWriter& xml) const override;
 
     void layout() override;
 
-    QString jumpTo() const { return _jumpTo; }
-    QString playUntil() const { return _playUntil; }
-    QString continueAt() const { return _continueAt; }
-    void setJumpTo(const QString& s) { _jumpTo = s; }
-    void setPlayUntil(const QString& s) { _playUntil = s; }
-    void setContinueAt(const QString& s) { _continueAt = s; }
-    void undoSetJumpTo(const QString& s);
-    void undoSetPlayUntil(const QString& s);
-    void undoSetContinueAt(const QString& s);
+    String jumpTo() const { return _jumpTo; }
+    String playUntil() const { return _playUntil; }
+    String continueAt() const { return _continueAt; }
+    void setJumpTo(const String& s) { _jumpTo = s; }
+    void setPlayUntil(const String& s) { _playUntil = s; }
+    void setContinueAt(const String& s) { _continueAt = s; }
+    void undoSetJumpTo(const String& s);
+    void undoSetPlayUntil(const String& s);
+    void undoSetContinueAt(const String& s);
     bool playRepeats() const { return _playRepeats; }
     void setPlayRepeats(bool val) { _playRepeats = val; }
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
     EngravingItem* nextSegmentElement() override;
     EngravingItem* prevSegmentElement() override;
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 };
 
-//---------------------------------------------------------
-//   JumpTypeTable
-//---------------------------------------------------------
-
-struct JumpTypeTable {
-    Jump::Type type;
-    const char* text;
-    const char* jumpTo;
-    const char* playUntil;
-    const char* continueAt;
-    QString userText;
+struct JumpTypeTableItem {
+    JumpType type;
+    AsciiStringView text;
+    AsciiStringView jumpTo;
+    AsciiStringView playUntil;
+    AsciiStringView continueAt;
 };
 
-extern const JumpTypeTable jumpTypeTable[];
-int jumpTypeTableSize();
-}     // namespace Ms
-
-Q_DECLARE_METATYPE(Ms::Jump::Type);
+extern const std::vector<JumpTypeTableItem> jumpTypeTable;
+} // namespace mu::engraving
 
 #endif

@@ -23,16 +23,14 @@
 #ifndef __PAGE_H__
 #define __PAGE_H__
 
-#include "config.h"
+#include <vector>
+
 #include "engravingitem.h"
 #include "bsp.h"
 
 namespace mu::engraving {
 class RootItem;
 class Factory;
-}
-
-namespace Ms {
 class System;
 class Text;
 class Measure;
@@ -47,33 +45,31 @@ class MeasureBase;
 
 class Page final : public EngravingItem
 {
-    QList<System*> _systems;
-    int _no;                        // page number
-#ifdef USE_BSP
+    OBJECT_ALLOCATOR(engraving, Page)
+
+    std::vector<System*> _systems;
+    page_idx_t _no;                        // page number
+
     BspTree bspTree;
-    void doRebuildBspTree();
-#endif
     bool bspTreeValid;
 
-    friend class mu::engraving::Factory;
-    Page(mu::engraving::RootItem* parent);
+    void doRebuildBspTree();
 
-    QString replaceTextMacros(const QString&) const;
-    void drawHeaderFooter(mu::draw::Painter*, int area, const QString&) const;
-    Text* layoutHeaderFooter(int area, const QString& ss) const;
+    friend class Factory;
+    Page(RootItem* parent);
+
+    String replaceTextMacros(const String&) const;
+    void drawHeaderFooter(mu::draw::Painter*, int area, const String&) const;
+    Text* layoutHeaderFooter(int area, const String& ss) const;
 
 public:
-
-    ~Page();
-
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
 
     Page* clone() const override { return new Page(*this); }
-    const QList<System*>& systems() const { return _systems; }
-    QList<System*>& systems() { return _systems; }
+    const std::vector<System*>& systems() const { return _systems; }
+    std::vector<System*>& systems() { return _systems; }
     System* system(int idx) { return _systems[idx]; }
 
     void write(XmlWriter&) const override;
@@ -81,26 +77,30 @@ public:
 
     void appendSystem(System* s);
 
-    int no() const { return _no; }
-    void setNo(int n) { _no = n; }
+    page_idx_t no() const { return _no; }
+    void setNo(page_idx_t n) { _no = n; }
     bool isOdd() const;
-    qreal tm() const;              // margins in pixel
-    qreal bm() const;
-    qreal lm() const;
-    qreal rm() const;
-    qreal headerExtension() const;
-    qreal footerExtension() const;
+    double tm() const;              // margins in pixel
+    double bm() const;
+    double lm() const;
+    double rm() const;
+    double headerExtension() const;
+    double footerExtension() const;
 
     void draw(mu::draw::Painter*) const override;
     void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
 
-    QList<EngravingItem*> items(const mu::RectF& r);
-    QList<EngravingItem*> items(const mu::PointF& p);
+    std::vector<EngravingItem*> items(const mu::RectF& r);
+    std::vector<EngravingItem*> items(const mu::PointF& p);
     void invalidateBspTree() { bspTreeValid = false; }
     mu::PointF pagePos() const override { return mu::PointF(); }       ///< position in page coordinates
-    QList<EngravingItem*> elements() const;           ///< list of visible elements
+    std::vector<EngravingItem*> elements() const;              ///< list of visible elements
     mu::RectF tbbox();                             // tight bounding box, excluding white space
     Fraction endTick() const;
+
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+    AccessibleItemPtr createAccessible() override;
+#endif
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

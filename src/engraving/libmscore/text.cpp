@@ -21,12 +21,14 @@
  */
 
 #include "text.h"
-#include "io/xml.h"
+#include "rw/xml.h"
+#include "types/typesconv.h"
 #include "score.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   defaultStyle
 //---------------------------------------------------------
@@ -39,7 +41,7 @@ static const ElementStyle defaultStyle {
 //   Text
 //---------------------------------------------------------
 
-Text::Text(EngravingItem* parent, Tid tid)
+Text::Text(EngravingItem* parent, TextStyleType tid)
     : TextBase(ElementType::TEXT, parent, tid)
 {
     initElementStyle(&defaultStyle);
@@ -52,14 +54,13 @@ Text::Text(EngravingItem* parent, Tid tid)
 void Text::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "style") {
-            QString sn = e.readElementText();
-            if (sn == "Tuplet") {              // ugly hack for compatibility
+            TextStyleType s = TConv::fromXml(e.readAsciiText(), TextStyleType::DEFAULT);
+            if (TextStyleType::TUPLET == s) {  // ugly hack for compatibility
                 continue;
             }
-            Tid s = textStyleFromName(sn);
-            initTid(s);
+            initTextStyleType(s);
         } else if (!readProperties(e)) {
             e.unknown();
         }
@@ -70,17 +71,17 @@ void Text::read(XmlReader& e)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Text::propertyDefault(Pid id) const
+engraving::PropertyValue Text::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::DEFAULT);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::DEFAULT;
     default:
         return TextBase::propertyDefault(id);
     }
 }
 
-QString Text::readXmlText(XmlReader& r, Score* score)
+String Text::readXmlText(XmlReader& r, Score* score)
 {
     Text t(score->dummy());
     t.read(r);

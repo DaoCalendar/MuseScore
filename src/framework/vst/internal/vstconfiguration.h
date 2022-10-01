@@ -20,17 +20,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef VSTCONFIGURATION_H
-#define VSTCONFIGURATION_H
+#ifndef MU_VST_VSTCONFIGURATION_H
+#define MU_VST_VSTCONFIGURATION_H
+
+#include "modularity/ioc.h"
+#include "iglobalconfiguration.h"
 
 #include "ivstconfiguration.h"
 
 namespace mu::vst {
 class VstConfiguration : public IVstConfiguration
 {
+    INJECT(vst, framework::IGlobalConfiguration, globalConfig)
 public:
-    io::path customSearchPath() const override;
+    void init();
+
+    io::paths_t userVstDirectories() const override;
+    void setUserVstDirectories(const io::paths_t& paths) override;
+    async::Channel<io::paths_t> userVstDirectoriesChanged() const override;
+    io::path_t knownPluginsDir() const override;
+
+private:
+    async::Channel<io::paths_t> m_userVstDirsChanged;
 };
 }
 
-#endif // VSTCONFIGURATION_H
+#endif // MU_VST_VSTCONFIGURATION_H

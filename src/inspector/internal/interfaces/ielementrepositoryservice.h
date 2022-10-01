@@ -22,7 +22,7 @@
 #ifndef MU_INSPECTOR_IELEMENTREPOSITORYSERVICE_H
 #define MU_INSPECTOR_IELEMENTREPOSITORYSERVICE_H
 
-#include "libmscore/engravingitem.h"
+#include "notation/notationtypes.h"
 
 #include <QList>
 #include <QObject>
@@ -36,14 +36,19 @@ public:
 
     virtual QObject* getQObject() = 0;
 
-    virtual void updateElementList(const QList<Ms::EngravingItem*>& newRawElementList) = 0;
-    virtual QList<Ms::EngravingItem*> findElementsByType(const Ms::ElementType elementType) const = 0;
-    virtual QList<Ms::EngravingItem*> findElementsByType(const Ms::ElementType elementType,
-                                                         std::function<bool(const Ms::EngravingItem*)> filterFunc) const = 0;
-    virtual QList<Ms::EngravingItem*> takeAllElements() const = 0;
+    virtual bool needUpdateElementList(const QList<mu::engraving::EngravingItem*>& newRawElementList,
+                                       notation::SelectionState selectionState) const = 0;
+    virtual void updateElementList(const QList<mu::engraving::EngravingItem*>& newRawElementList,
+                                   notation::SelectionState selectionState) = 0;
+
+    virtual QList<mu::engraving::EngravingItem*> findElementsByType(const mu::engraving::ElementType elementType) const = 0;
+    virtual QList<mu::engraving::EngravingItem*> findElementsByType(const mu::engraving::ElementType elementType,
+                                                                    std::function<bool(const mu::engraving::EngravingItem*)> filterFunc)
+    const = 0;
+    virtual QList<mu::engraving::EngravingItem*> takeAllElements() const = 0;
 
 signals:
-    virtual void elementsUpdated() = 0;
+    virtual void elementsUpdated(const QList<mu::engraving::EngravingItem*>& newRawElementList) = 0;
 };
 }
 

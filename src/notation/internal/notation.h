@@ -30,8 +30,7 @@
 #include "igetscore.h"
 #include "../inotationconfiguration.h"
 
-namespace Ms {
-class MScore;
+namespace mu::engraving {
 class Score;
 }
 
@@ -44,52 +43,61 @@ class Notation : virtual public INotation, public IGetScore, public async::Async
     INJECT(notation, engraving::IEngravingConfiguration, engravingConfiguration)
 
 public:
-    explicit Notation(Ms::Score* score = nullptr);
+    explicit Notation(engraving::Score* score = nullptr);
     ~Notation() override;
 
     static void init();
 
-    QString title() const override;
+    QString name() const override;
+    QString projectName() const override;
+    QString projectNameAndPartName() const override;
 
-    void setViewMode(const ViewMode& viewMode) override;
+    QString workTitle() const override;
+    QString projectWorkTitle() const override;
+    QString projectWorkTitleAndPartName() const override;
+
+    bool isOpen() const override;
+    void setIsOpen(bool open) override;
+    async::Notification openChanged() const override;
+
     ViewMode viewMode() const override;
-    void paint(draw::Painter* painter, const RectF& frameRect) override;
+    void setViewMode(const ViewMode& viewMode) override;
 
-    ValCh<bool> opened() const override;
-    void setOpened(bool opened) override;
-
+    INotationPaintingPtr painting() const override;
+    INotationViewStatePtr viewState() const override;
     INotationInteractionPtr interaction() const override;
     INotationMidiInputPtr midiInput() const override;
     INotationUndoStackPtr undoStack() const override;
     INotationElementsPtr elements() const override;
     INotationStylePtr style() const override;
-    INotationPlaybackPtr playback() const override;
     INotationAccessibilityPtr accessibility() const override;
     INotationPartsPtr parts() const override;
 
     async::Notification notationChanged() const override;
 
 protected:
-    Ms::Score* score() const override;
-    void setScore(Ms::Score* score);
+    mu::engraving::Score* score() const override;
+    void setScore(mu::engraving::Score* score);
+    async::Notification scoreInited() const override;
+
     void notifyAboutNotationChanged();
 
     INotationPartsPtr m_parts = nullptr;
+    INotationUndoStackPtr m_undoStack = nullptr;
     async::Notification m_notationChanged;
 
 private:
     friend class NotationInteraction;
+    friend class NotationPainting;
 
-    void paintPages(mu::draw::Painter* painter, const RectF& frameRect, const QList<Ms::Page*>& pages, bool paintBorders) const;
-    void paintPageBorder(mu::draw::Painter* painter, const Ms::Page* page) const;
-    void paintForeground(mu::draw::Painter* painter, const RectF& pageRect) const;
+    engraving::Score* m_score = nullptr;
+    async::Notification m_scoreInited;
 
-    Ms::Score* m_score = nullptr;
-    ValCh<bool> m_opened;
+    async::Notification m_openChanged;
 
+    INotationPaintingPtr m_painting = nullptr;
+    INotationViewStatePtr m_viewState = nullptr;
     INotationInteractionPtr m_interaction = nullptr;
-    INotationPlaybackPtr m_playback = nullptr;
-    INotationUndoStackPtr m_undoStack = nullptr;
     INotationStylePtr m_style = nullptr;
     INotationMidiInputPtr m_midiInput = nullptr;
     INotationAccessibilityPtr m_accessibility = nullptr;

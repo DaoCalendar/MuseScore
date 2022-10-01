@@ -25,7 +25,7 @@
 #include "modularity/imoduleexport.h"
 
 #include "iworkspace.h"
-#include "retval.h"
+#include "types/retval.h"
 #include "async/notification.h"
 
 namespace mu::workspace {
@@ -41,6 +41,7 @@ public:
 
     //! NOTE Current selected by a user, writable, optionally managed
     virtual IWorkspacePtr currentWorkspace() const = 0;
+    virtual async::Notification currentWorkspaceAboutToBeChanged() const = 0;
     virtual async::Notification currentWorkspaceChanged() const = 0;
 
     virtual IWorkspacePtrList workspaces() const = 0;

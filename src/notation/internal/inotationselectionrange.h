@@ -23,7 +23,7 @@
 #define MU_NOTATION_INOTATIONSELECTIONRANGE_H
 
 #include <vector>
-#include <QRectF>
+
 #include "../notationtypes.h"
 
 namespace mu::notation {
@@ -32,14 +32,20 @@ class INotationSelectionRange
 public:
     virtual ~INotationSelectionRange() = default;
 
-    virtual int startStaffIndex() const = 0;
+    virtual engraving::staff_idx_t startStaffIndex() const = 0;
     virtual Fraction startTick() const = 0;
 
-    virtual int endStaffIndex() const = 0;
+    virtual engraving::staff_idx_t endStaffIndex() const = 0;
     virtual Fraction endTick() const = 0;
 
-    virtual int startMeasureIndex() const = 0;
-    virtual int endMeasureIndex() const = 0;
+    struct MeasureRange {
+        Measure* startMeasure = nullptr;
+        Measure* endMeasure = nullptr;
+    };
+
+    virtual MeasureRange measureRange() const = 0;
+
+    virtual std::vector<const Part*> selectedParts() const = 0;
 
     virtual std::vector<RectF> boundingArea() const = 0;
     virtual bool containsPoint(const PointF& point) const = 0;

@@ -22,8 +22,8 @@
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
-import MuseScore.UiComponents 1.0
 import MuseScore.Ui 1.0
+import MuseScore.UiComponents 1.0
 
 RowLayout {
     id: root
@@ -49,10 +49,13 @@ RowLayout {
         icon: IconCode.ZOOM_IN
         iconFont: ui.theme.toolbarIconsFont
 
+        width: height
+        height: 28
         transparent: true
 
         navigation.panel: root.navigationPanel
         navigation.order: root.navigationOrderMin
+        accessible.name: qsTrc("notation", "Zoom in")
 
         onClicked: {
             root.zoomInRequested()
@@ -66,10 +69,13 @@ RowLayout {
         icon: IconCode.ZOOM_OUT
         iconFont: ui.theme.toolbarIconsFont
 
+        width: height
+        height: 28
         transparent: true
 
         navigation.panel: root.navigationPanel
         navigation.order: zoomInButton.navigation.order + 1
+        accessible.name: qsTrc("notation", "Zoom out")
 
         onClicked: {
             root.zoomOutRequested()
@@ -87,13 +93,15 @@ RowLayout {
 
             anchors.verticalCenter: parent.verticalCenter
 
+            live: false
+
             addLeadingZeros: false
             font: ui.theme.bodyFont
 
             navigation.panel: root.navigationPanel
             navigation.order: zoomOutButton.navigation.order + 1
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 root.changeZoomPercentageRequested(newValue)
             }
         }
@@ -109,15 +117,17 @@ RowLayout {
         id: menuButton
         Layout.leftMargin: 4
         Layout.preferredWidth: 20
+        height: 28
 
         icon: IconCode.SMALL_ARROW_DOWN
 
         navigation.panel: root.navigationPanel
         navigation.order: zoomInputField.navigation.order + 1
+        accessible.name: qsTrc("notation", "Zoom menu")
 
         menuModel: root.availableZoomList
         menuAnchorItem: ui.rootItem
-        onHandleMenuItem: {
+        onHandleMenuItem: function(itemId) {
             root.changeZoomRequested(itemId)
         }
     }

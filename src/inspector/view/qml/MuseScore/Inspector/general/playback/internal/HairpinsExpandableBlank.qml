@@ -20,8 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
+
 import MuseScore.UiComponents 1.0
 import MuseScore.Inspector 1.0
+
 import "../../../common"
 
 ExpandableBlank {
@@ -50,9 +52,9 @@ ExpandableBlank {
             titleText: qsTrc("inspector", "Applies to")
             propertyItem: root.model ? root.model.scopeType : null
 
+            navigationName: "Hairpin Applies to"
             navigationPanel: root.navigation.panel
             navigationRowStart: root.navigation.row + 1
-            navigationEnabled: root.navigation.enabled && root.enabled
 
             model: [
                 { text: qsTrc("inspector", "Staff"), value: Dynamic.SCOPE_STAFF },
@@ -64,9 +66,9 @@ ExpandableBlank {
         SpinBoxPropertyView {
             id: velocityChangeSection
 
+            navigationName: "Velocity change"
             navigationPanel: root.navigation.panel
             navigationRowStart: appliesToSection.navigationRowEnd + 1
-            navigationEnabled: root.navigation.enabled && root.enabled
 
             titleText: qsTrc("inspector", "Velocity change")
             propertyItem: root.model ? root.model.velocityChange : null
@@ -77,30 +79,12 @@ ExpandableBlank {
             minValue: 0
         }
 
-        CheckBox {
-            id: singleNoteCheckBox
-
-            navigation.name: "Use single note dynamics"
-            navigation.panel: root.navigation.panel
-            navigation.column: root.navigation.column
-            navigation.row: velocityChangeSection.navigationRowEnd + 1
-            navigation.enabled: root.navigation.enabled && root.enabled
-
-            text: qsTrc("inspector", "Use single note dynamics")
-
-            checked: root.model && root.model.useSingleNoteDynamics.value
-
-            onClicked: {
-                root.model.useSingleNoteDynamics.value = !checked
-            }
-        }
-
         DropdownPropertyView {
             id: velocityChangeTypeSection
 
+            navigationName: "Changes in dynamics range"
             navigationPanel: root.navigation.panel
-            navigationRowStart: singleNoteCheckBox.navigation.row + 1
-            navigationEnabled: root.navigation.enabled && root.enabled
+            navigationRowStart: velocityChangeSection.navigationRowEnd + 1
 
             titleText: qsTrc("inspector", "Changes in dynamics range")
             propertyItem: root.model ? root.model.velocityChangeType : null
@@ -108,9 +92,9 @@ ExpandableBlank {
             model: [
                 { text: qsTrc("inspector", "Linear (default)"), value: Hairpin.VELOCITY_EASING_LINEAR },
                 { text: qsTrc("inspector", "Exponential"), value: Hairpin.VELOCITY_EASING_EXPONENTIAL },
-                { text: qsTrc("inspector", "Ease-in"), value: Hairpin.VELOCITY_EASING_IN },
-                { text: qsTrc("inspector", "Ease-out"), value: Hairpin.VELOCITY_EASING_OUT },
-                { text: qsTrc("inspector", "Ease-in and out"), value: Hairpin.VELOCITY_EASING_IN_OUT }
+                { text: qsTrc("inspector", "Ease in"), value: Hairpin.VELOCITY_EASING_IN },
+                { text: qsTrc("inspector", "Ease out"), value: Hairpin.VELOCITY_EASING_OUT },
+                { text: qsTrc("inspector", "Ease in and out"), value: Hairpin.VELOCITY_EASING_IN_OUT }
             ]
         }
     }

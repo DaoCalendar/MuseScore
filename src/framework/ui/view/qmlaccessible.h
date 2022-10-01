@@ -58,6 +58,7 @@ public:
         ComboBox,
         ListItem,
         MenuItem,
+        Range,
         Information
     };
     Q_ENUM(Role)
@@ -71,6 +72,18 @@ class AccessibleItem : public QObject, public QQmlParserStatus, public accessibi
     Q_PROPERTY(mu::ui::MUAccessible::Role role READ role WRITE setRole NOTIFY roleChanged)
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY nameChanged)
     Q_PROPERTY(QString description READ description WRITE setDescription NOTIFY descriptionChanged)
+
+    Q_PROPERTY(QVariant value READ value WRITE setValue NOTIFY valueChanged)
+    Q_PROPERTY(QVariant maximumValue READ maximumValue WRITE setMaximumValue NOTIFY maximumValueChanged)
+    Q_PROPERTY(QVariant minimumValue READ minimumValue WRITE setMinimumValue NOTIFY minimumValueChanged)
+    Q_PROPERTY(QVariant stepSize READ stepSize WRITE setStepSize NOTIFY stepSizeChanged)
+
+    Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged)
+    Q_PROPERTY(QString selectedText READ selectedText WRITE setSelectedText NOTIFY selectedTextChanged)
+    Q_PROPERTY(int selectionStart READ selectionStart WRITE setSelectionStart NOTIFY selectionStartChanged)
+    Q_PROPERTY(int selectionEnd READ selectionEnd WRITE setSelectionEnd NOTIFY selectionEndChanged)
+    Q_PROPERTY(int cursorPosition READ cursorPosition WRITE setCursorPosition NOTIFY cursorPositionChanged)
+
     Q_PROPERTY(bool ignored READ ignored WRITE setIgnored NOTIFY ignoredChanged)
     Q_PROPERTY(QQuickItem * visualItem READ visualItem WRITE setVisualItem NOTIFY visualItemChanged)
 
@@ -80,6 +93,7 @@ class AccessibleItem : public QObject, public QQmlParserStatus, public accessibi
 
 public:
 
+    STATE_PROPERTY(enabled, State::Enabled)
     STATE_PROPERTY(selected, State::Selected)
     STATE_PROPERTY(focused, State::Focused)
     STATE_PROPERTY(checked, State::Checked)
@@ -90,11 +104,23 @@ public:
     MUAccessible::Role role() const;
     QString name() const;
     QString description() const;
+
+    QVariant value() const;
+    QVariant maximumValue() const;
+    QVariant minimumValue() const;
+    QVariant stepSize() const;
+
+    QString text() const;
+    QString selectedText() const;
+    int selectionStart() const;
+    int selectionEnd() const;
+    int cursorPosition() const;
+
     bool ignored() const;
     QQuickItem* visualItem() const;
 
     const IAccessible* accessibleRoot() const;
-    void setState(State st, bool arg);
+    void setState(State st, bool arg) override;
 
     AccessibleItem* accessibleParent_property() const;
     void setAccessibleParent(AccessibleItem* p);
@@ -105,14 +131,34 @@ public:
     const IAccessible* accessibleParent() const override;
     size_t accessibleChildCount() const override;
     const IAccessible* accessibleChild(size_t i) const override;
+    QWindow* accessibleWindow() const override;
 
     IAccessible::Role accessibleRole() const override;
     QString accessibleName() const override;
     QString accessibleDescription() const override;
     bool accessibleState(State st) const override;
     QRect accessibleRect() const override;
+    bool accessibleIgnored() const override;
 
-    async::Channel<Property> accessiblePropertyChanged() const override;
+    // Value Interface
+    QVariant accessibleValue() const override;
+    QVariant accessibleMaximumValue() const override;
+    QVariant accessibleMinimumValue() const override;
+    QVariant accessibleValueStepSize() const override;
+
+    // Text Interface
+    void accessibleSelection(int selectionIndex, int* startOffset, int* endOffset) const override;
+    int accessibleSelectionCount() const override;
+
+    int accessibleCursorPosition() const override;
+
+    QString accessibleText(int startOffset, int endOffset) const override;
+    QString accessibleTextBeforeOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    QString accessibleTextAfterOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    QString accessibleTextAtOffset(int offset, TextBoundaryType boundaryType, int* startOffset, int* endOffset) const override;
+    int accessibleCharacterCount() const override;
+
+    async::Channel<Property, Val> accessiblePropertyChanged() const override;
     async::Channel<State, bool> accessibleStateChanged() const override;
     // -----
 
@@ -124,6 +170,15 @@ public slots:
     void setRole(MUAccessible::Role role);
     void setName(QString name);
     void setDescription(QString description);
+    void setValue(QVariant value);
+    void setMaximumValue(QVariant maximumValue);
+    void setMinimumValue(QVariant minimumValue);
+    void setStepSize(QVariant stepSize);
+    void setText(const QString& text);
+    void setSelectedText(const QString& selectedText);
+    void setSelectionStart(int selectionStart);
+    void setSelectionEnd(int selectionEnd);
+    void setCursorPosition(int cursorPosition);
     void setIgnored(bool ignored);
     void setVisualItem(QQuickItem* item);
 
@@ -132,12 +187,20 @@ signals:
     void roleChanged(MUAccessible::Role role);
     void nameChanged(QString name);
     void descriptionChanged(QString description);
+    void valueChanged(QVariant value);
+    void maximumValueChanged(QVariant maximumValue);
+    void minimumValueChanged(QVariant minimumValue);
+    void stepSizeChanged(QVariant stepSize);
+    void textChanged();
+    void selectedTextChanged();
+    void selectionStartChanged();
+    void selectionEndChanged();
+    void cursorPositionChanged();
     void ignoredChanged(bool ignored);
     void visualItemChanged(QQuickItem* item);
     void stateChanged();
 
 private:
-
     QQuickItem* resolveVisualItem() const;
 
     bool m_registred = false;
@@ -146,10 +209,19 @@ private:
     MUAccessible::Role m_role = MUAccessible::NoRole;
     QString m_name;
     QString m_description;
+    QVariant m_value;
+    QVariant m_maximumValue;
+    QVariant m_minimumValue;
+    QVariant m_stepSize;
+    QString m_text;
+    QString m_selectedText;
+    int m_selectionStart = 0;
+    int m_selectionEnd = 0;
+    int m_cursorPosition = 0;
     bool m_ignored = false;
     QQuickItem* m_visualItem = nullptr;
     QMap<State, bool> m_state;
-    async::Channel<Property> m_accessiblePropertyChanged;
+    async::Channel<Property, Val> m_accessiblePropertyChanged;
     async::Channel<State, bool> m_accessibleStateChanged;
 };
 }

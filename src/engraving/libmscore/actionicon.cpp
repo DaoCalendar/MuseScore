@@ -21,15 +21,23 @@
  */
 
 #include "actionicon.h"
-#include "io/xml.h"
+
+#include "draw/fontmetrics.h"
+#include "rw/xml.h"
+
 #include "property.h"
 
-using namespace mu;
+#include "log.h"
 
-namespace Ms {
+using namespace mu;
+using namespace mu::draw;
+
+namespace mu::engraving {
 ActionIcon::ActionIcon(EngravingItem* score)
     : EngravingItem(ElementType::ACTION_ICON, score)
 {
+    m_iconFont = Font(engravingConfiguration()->iconsFontFamily());
+    m_iconFont.setPointSizeF(DEFAULT_FONT_SIZE);
 }
 
 ActionIcon* ActionIcon::clone() const
@@ -58,32 +66,32 @@ void ActionIcon::setAction(const std::string& actionCode, char16_t icon)
     m_icon = icon;
 }
 
-qreal ActionIcon::extent() const
+double ActionIcon::fontSize() const
 {
-    return m_extent;
+    return m_iconFont.pointSizeF();
 }
 
-void ActionIcon::setExtent(qreal extent)
+void ActionIcon::setFontSize(double size)
 {
-    m_extent = extent;
+    m_iconFont.setPointSizeF(size);
 }
 
 void ActionIcon::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     xml.tag("subtype", int(m_actionType));
     if (!m_actionCode.empty()) {
-        xml.tag("action", QString::fromStdString(m_actionCode));
+        xml.tag("action", String::fromStdString(m_actionCode));
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 void ActionIcon::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "action") {
-            m_actionCode = e.readElementText().toStdString();
+            m_actionCode = e.readText().toStdString();
         } else if (tag == "subtype") {
             m_actionType = static_cast<ActionIconType>(e.readInt());
         } else {
@@ -92,38 +100,35 @@ void ActionIcon::read(XmlReader& e)
     }
 }
 
-RectF ActionIcon::boundingBox() const
-{
-    return RectF(0, 0, m_extent, m_extent);
-}
-
 void ActionIcon::layout()
 {
-    setbbox(boundingBox());
+    FontMetrics fontMetrics(m_iconFont);
+    setbbox(fontMetrics.boundingRect(Char(m_icon)));
 }
 
-void ActionIcon::draw(mu::draw::Painter* painter) const
+void ActionIcon::draw(Painter* painter) const
 {
     TRACE_OBJ_DRAW;
-    painter->drawText(boundingBox(), Qt::AlignCenter, QChar(m_icon));
+    painter->setFont(m_iconFont);
+    painter->drawText(bbox(), draw::AlignCenter, Char(m_icon));
 }
 
-QVariant ActionIcon::getProperty(Pid pid) const
+engraving::PropertyValue ActionIcon::getProperty(Pid pid) const
 {
     switch (pid) {
     case Pid::ACTION:
-        return QString::fromStdString(actionCode());
+        return String::fromStdString(actionCode());
     default:
         break;
     }
     return EngravingItem::getProperty(pid);
 }
 
-bool ActionIcon::setProperty(Pid pid, const QVariant& v)
+bool ActionIcon::setProperty(Pid pid, const PropertyValue& v)
 {
     switch (pid) {
     case Pid::ACTION:
-        m_actionCode = v.toString().toStdString();
+        m_actionCode = v.value<String>().toStdString();
         triggerLayout();
         break;
     default:

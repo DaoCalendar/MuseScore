@@ -21,17 +21,126 @@
  */
 
 #include "key.h"
-#include "io/xml.h"
-#include "utils.h"
-#include "score.h"
-#include "pitchspelling.h"
-#include "keylist.h"
+
+#include "rw/xml.h"
+
 #include "accidental.h"
 #include "part.h"
+#include "pitchspelling.h"
+#include "score.h"
+#include "utils.h"
+
+#include "log.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
+// transposition table for microtonal accidentals
+const SymId accTable[] = {
+    SymId::noSym,
+    // standard accidentals
+    SymId::accidentalTripleFlat,
+    SymId::accidentalDoubleFlat,
+    SymId::accidentalFlat,
+    SymId::accidentalNatural,
+    SymId::accidentalSharp,
+    SymId::accidentalDoubleSharp,
+    SymId::accidentalTripleSharp,
+    SymId::noSym,
+    //  natural sharp
+    SymId::accidentalNatural,
+    SymId::accidentalNaturalSharp,
+    SymId::accidentalSharp,
+    SymId::noSym,
+    //  natural flat
+    SymId::accidentalDoubleFlat,
+    SymId::accidentalNaturalFlat,
+    SymId::accidentalNatural,
+    SymId::noSym,
+    //  natural sharp sharp
+    SymId::accidentalSharp,
+    SymId::accidentalSharpSharp,
+    SymId::accidentalTripleSharp,
+    SymId::noSym,
+    // Gould quarter tone
+    //  arrow down
+    SymId::accidentalFiveQuarterTonesFlatArrowDown,
+    SymId::accidentalThreeQuarterTonesFlatArrowDown,
+    SymId::accidentalQuarterToneFlatNaturalArrowDown,
+    SymId::accidentalQuarterToneSharpArrowDown,
+    SymId::accidentalThreeQuarterTonesSharpArrowDown,
+    SymId::accidentalFiveQuarterTonesFlatArrowDown,
+    SymId::noSym,
+    //  arrow up
+    SymId::accidentalThreeQuarterTonesFlatArrowUp,
+    SymId::accidentalQuarterToneFlatArrowUp,
+    SymId::accidentalQuarterToneSharpNaturalArrowUp,
+    SymId::accidentalThreeQuarterTonesSharpArrowUp,
+    SymId::accidentalFiveQuarterTonesSharpArrowUp,
+    SymId::noSym,
+    // Stein-Zimmermann
+    //  basic
+    SymId::accidentalThreeQuarterTonesFlatZimmermann,
+    SymId::accidentalQuarterToneFlatStein,
+    SymId::accidentalQuarterToneSharpStein,
+    SymId::accidentalThreeQuarterTonesSharpStein,
+    SymId::noSym,
+    //  narrow (as variant of above)
+    SymId::accidentalNarrowReversedFlatAndFlat,
+    SymId::accidentalNarrowReversedFlat,
+    SymId::accidentalQuarterToneSharpStein,
+    // Extended Helmholtz-Ellis (just intonation)
+    //  one syntonic comma down arrow
+    SymId::accidentalDoubleFlatOneArrowDown,
+    SymId::accidentalFlatOneArrowDown,
+    SymId::accidentalNaturalOneArrowDown,
+    SymId::accidentalSharpOneArrowDown,
+    SymId::accidentalDoubleSharpOneArrowDown,
+    SymId::noSym,
+    //   one syntonic comma up arrow
+    SymId::accidentalDoubleFlatOneArrowUp,
+    SymId::accidentalFlatOneArrowUp,
+    SymId::accidentalNaturalOneArrowUp,
+    SymId::accidentalSharpOneArrowUp,
+    SymId::accidentalDoubleSharpOneArrowUp,
+    SymId::noSym,
+    //   two syntonic commas down
+    SymId::accidentalDoubleFlatTwoArrowsDown,
+    SymId::accidentalFlatTwoArrowsDown,
+    SymId::accidentalNaturalTwoArrowsDown,
+    SymId::accidentalSharpTwoArrowsDown,
+    SymId::accidentalDoubleSharpTwoArrowsDown,
+    SymId::noSym,
+    //   two syntonic commas up
+    SymId::accidentalDoubleFlatTwoArrowsUp,
+    SymId::accidentalFlatTwoArrowsUp,
+    SymId::accidentalNaturalTwoArrowsUp,
+    SymId::accidentalSharpTwoArrowsUp,
+    SymId::accidentalDoubleSharpTwoArrowsUp,
+    SymId::noSym,
+    //   three syntonic commas down
+    SymId::accidentalDoubleFlatThreeArrowsDown,
+    SymId::accidentalFlatThreeArrowsDown,
+    SymId::accidentalNaturalThreeArrowsDown,
+    SymId::accidentalSharpThreeArrowsDown,
+    SymId::accidentalDoubleSharpThreeArrowsDown,
+    SymId::noSym,
+    //   three syntonic commas up
+    SymId::accidentalDoubleFlatThreeArrowsUp,
+    SymId::accidentalFlatThreeArrowsUp,
+    SymId::accidentalNaturalThreeArrowsUp,
+    SymId::accidentalSharpThreeArrowsUp,
+    SymId::accidentalDoubleSharpThreeArrowsUp,
+    SymId::noSym,
+    //   equal tempered semitone
+    SymId::accidentalDoubleFlatEqualTempered,
+    SymId::accidentalFlatEqualTempered,
+    SymId::accidentalNaturalEqualTempered,
+    SymId::accidentalSharpEqualTempered,
+    SymId::accidentalDoubleSharpEqualTempered,
+    SymId::noSym
+};
+
 //---------------------------------------------------------
 //   enforceLimits - ensure _key
 //   is within acceptable limits (-7 .. +7).
@@ -42,10 +151,10 @@ void KeySigEvent::enforceLimits()
 {
     if (_key < Key::MIN) {
         _key = Key::MIN;
-        qDebug("key < -7");
+        LOGD("key < -7");
     } else if (_key > Key::MAX) {
         _key = Key::MAX;
-        qDebug("key > 7");
+        LOGD("key > 7");
     }
 }
 
@@ -55,16 +164,16 @@ void KeySigEvent::enforceLimits()
 
 void KeySigEvent::print() const
 {
-    qDebug("<KeySigEvent: ");
+    LOGD("<KeySigEvent: ");
     if (!isValid()) {
-        qDebug("invalid>");
+        LOGD("invalid>");
     } else {
         if (isAtonal()) {
-            qDebug("atonal>");
+            LOGD("atonal>");
         } else if (custom()) {
-            qDebug("custom>");
+            LOGD("custom>");
         } else {
-            qDebug("accidental %d>", int(_key));
+            LOGD("accidental %d>", int(_key));
         }
     }
 }
@@ -75,8 +184,7 @@ void KeySigEvent::print() const
 
 void KeySigEvent::setKey(Key v)
 {
-    _key      = v;
-    _custom   = false;
+    _key    = v;
     enforceLimits();
 }
 
@@ -90,14 +198,15 @@ bool KeySigEvent::operator==(const KeySigEvent& e) const
         return false;
     }
     if (_custom && !isAtonal()) {
-        if (e._keySymbols.size() != _keySymbols.size()) {
+        if (e._customKeyDefs.size() != _customKeyDefs.size()) {
             return false;
         }
-        for (int i = 0; i < _keySymbols.size(); ++i) {
-            if (e._keySymbols[i].sym != _keySymbols[i].sym) {
+        for (size_t i = 0; i < _customKeyDefs.size(); ++i) {
+            // check note and sym, don't care xAlt and octAlt
+            if (e._customKeyDefs[i].degree != _customKeyDefs[i].degree || e._customKeyDefs[i].sym != _customKeyDefs[i].sym) {
                 return false;
             }
-            // TODO: position matters
+            // TODO: position matters // does it?
         }
         return true;
     }
@@ -210,7 +319,7 @@ void AccidentalState::init(Key key)
 {
     memset(state, ACC_STATE_NATURAL, MAX_ACC_STATE);
     // The numerical value of key tells us the number of sharps (or flats, if negative) in the key signature
-    if (key > 0) {
+    if (key > 0 && key <= Key::MAX) {
         for (int i = 0; i < int(key); ++i) {
             // First F#, then C#, then G#, etc.
             int idx = tpc2step(Tpc::TPC_F_S + i);
@@ -222,7 +331,7 @@ void AccidentalState::init(Key key)
                 state[j] = ACC_STATE_SHARP;
             }
         }
-    } else {
+    } else if (key < 0 && key >= Key::MIN) {
         for (int i = 0; i > int(key); --i) {
             // First Bb, then Eb, then Ab, etc.
             int idx = tpc2step(Tpc::TPC_B_B + i);
@@ -241,24 +350,22 @@ void AccidentalState::init(Key key)
 //   init
 //---------------------------------------------------------
 
-void AccidentalState::init(const KeySigEvent& keySig, ClefType clef)
+void AccidentalState::init(const KeySigEvent& keySig)
 {
+    init(keySig.key());
     if (keySig.custom()) {
-        memset(state, ACC_STATE_NATURAL, MAX_ACC_STATE);
-        for (const KeySym& s : keySig.keySymbols()) {
-            AccidentalVal a = sym2accidentalVal(s.sym);
-            int line = int(s.spos.y() * 2);
-            int idx       = relStep(line, clef) % 7;
+        for (const CustDef& d : keySig.customKeyDefs()) {
+            SymId sym = keySig.symInKey(d.sym, d.degree);
+            int degree = keySig.degInKey(d.degree);
+            AccidentalVal a = sym2accidentalVal(sym);
             for (int octave = 0; octave < (11 * 7); octave += 7) {
-                int i = idx + octave;
+                int i = degree + octave;
                 if (i >= MAX_ACC_STATE) {
                     break;
                 }
-                state[i] = int(a) - int(AccidentalVal::MIN);
+                state[i] = static_cast<uint8_t>(int(a) - int(AccidentalVal::MIN));
             }
         }
-    } else {
-        init(keySig.key());
     }
 }
 
@@ -268,7 +375,7 @@ void AccidentalState::init(const KeySigEvent& keySig, ClefType clef)
 
 AccidentalVal AccidentalState::accidentalVal(int line) const
 {
-    Q_ASSERT(line >= MIN_ACC_STATE && line < MAX_ACC_STATE);
+    assert(line >= MIN_ACC_STATE && line < MAX_ACC_STATE);
     return AccidentalVal((state[line] & 0x0f) + int(AccidentalVal::MIN));
 }
 
@@ -278,7 +385,7 @@ AccidentalVal AccidentalState::accidentalVal(int line) const
 
 bool AccidentalState::tieContext(int line) const
 {
-    Q_ASSERT(line >= MIN_ACC_STATE && line < MAX_ACC_STATE);
+    assert(line >= MIN_ACC_STATE && line < MAX_ACC_STATE);
     return state[line] & TIE_CONTEXT;
 }
 
@@ -288,9 +395,48 @@ bool AccidentalState::tieContext(int line) const
 
 void AccidentalState::setAccidentalVal(int line, AccidentalVal val, bool tieContext)
 {
-    Q_ASSERT(line >= MIN_ACC_STATE && line < MAX_ACC_STATE);
+    assert(line >= MIN_ACC_STATE && line < MAX_ACC_STATE);
     // casts needed to work around a bug in Xcode 4.2 on Mac, see #25910
-    Q_ASSERT(int(val) >= int(AccidentalVal::MIN) && int(val) <= int(AccidentalVal::MAX));
+    assert(int(val) >= int(AccidentalVal::MIN) && int(val) <= int(AccidentalVal::MAX));
     state[line] = (int(val) - int(AccidentalVal::MIN)) | (tieContext ? TIE_CONTEXT : 0);
+}
+
+//---------------------------------------------------------
+//   degInKey
+//    degree to "absolute degree"
+//    first degree in F major is F: 0 -> 3, ...
+//---------------------------------------------------------
+
+int KeySigEvent::degInKey(int degree) const
+{
+    return (degree + ((static_cast<int>(key()) + 7) * 4)) % 7;
+}
+
+//---------------------------------------------------------
+//   symInKey
+//---------------------------------------------------------
+
+SymId KeySigEvent::symInKey(SymId sym, int degree) const
+{
+    degree = degInKey(degree);
+    int keyval = static_cast<int>(key());
+    int accIndex = std::distance(std::begin(accTable), std::find(std::begin(accTable), std::end(accTable), sym));
+
+    // non transposed key
+    if (keyval == 0 || abs(keyval) > 7) {
+        return sym;
+    }
+
+    // sym is not transposable (it is not in table)
+    if (!(accIndex < std::end(accTable) - std::begin(accTable))) {
+        return SymId::noSym;
+    }
+
+    for (int i = 1; i <= abs(keyval); ++i) {
+        if ((degree * 2 + 2) % 7 == (keyval < 0 ? 8 - i : i) % 7) {
+            accIndex += keyval < 0 ? -1 : 1;
+        }
+    }
+    return accTable[accIndex];
 }
 }

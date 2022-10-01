@@ -21,23 +21,24 @@
  */
 
 #include "input.h"
-#include "segment.h"
+
+#include "articulation.h"
+#include "chord.h"
+#include "durationtype.h"
+#include "hook.h"
+#include "measure.h"
+#include "note.h"
 #include "part.h"
+#include "rest.h"
+#include "score.h"
+#include "segment.h"
+#include "select.h"
 #include "staff.h"
 #include "stem.h"
-#include "hook.h"
-#include "score.h"
-#include "chord.h"
-#include "rest.h"
-#include "measure.h"
-#include "accidental.h"
-#include "durationtype.h"
-#include "select.h"
-#include "articulation.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 class DrumSet;
 
 //---------------------------------------------------------
@@ -46,7 +47,7 @@ class DrumSet;
 
 const Drumset* InputState::drumset() const
 {
-    if (_segment == 0 || _track == -1) {
+    if (_segment == 0 || _track == mu::nidx) {
         return 0;
     }
     return _segment->score()->staff(_track / VOICES)->part()->instrument(_segment->tick())->drumset();
@@ -58,17 +59,20 @@ const Drumset* InputState::drumset() const
 
 StaffGroup InputState::staffGroup() const
 {
-    if (_segment == 0 || _track == -1) {
+    if (_segment == 0 || _track == mu::nidx) {
         return StaffGroup::STANDARD;
     }
 
-    StaffGroup staffGroup = _segment->score()->staff(_track / VOICES)->staffType(_segment->tick())->group();
-    Instrument* instrument = _segment->score()->staff(_track / VOICES)->part()->instrument(_segment->tick());
+    Fraction tick = _segment->tick();
+    const Staff* staff = _segment->score()->staff(_track / VOICES);
+    StaffGroup staffGroup = staff->staffType(tick)->group();
+    const Instrument* instrument = staff->part()->instrument(tick);
 
     // if not tab, pitched/unpitched input depends on instrument, not staff (override StaffGroup)
     if (staffGroup != StaffGroup::TAB) {
         staffGroup = instrument->useDrumset() ? StaffGroup::PERCUSSION : StaffGroup::STANDARD;
     }
+
     return staffGroup;
 }
 
@@ -87,8 +91,8 @@ Fraction InputState::tick() const
 
 ChordRest* InputState::cr() const
 {
-    // _track could potentially be -1, for instance after navigation through a frame
-    return _segment && _track >= 0 ? toChordRest(_segment->element(_track)) : 0;
+    // _track could potentially be invalid, for instance after navigation through a frame
+    return _segment && _track != mu::nidx ? toChordRest(_segment->element(_track)) : 0;
 }
 
 //---------------------------------------------------------
@@ -98,7 +102,7 @@ ChordRest* InputState::cr() const
 void InputState::setDots(int n)
 {
     if (n && (!_duration.isValid() || _duration.isZero() || _duration.isMeasure())) {
-        _duration = TDuration::DurationType::V_QUARTER;
+        _duration = DurationType::V_QUARTER;
     }
     _duration.setDots(n);
 }
@@ -142,7 +146,7 @@ ChordRest* InputState::chordRest(EngravingItem* e)
 
 void InputState::update(Selection& selection)
 {
-    setDuration(TDuration::DurationType::V_INVALID);
+    setDuration(DurationType::V_INVALID);
     setRest(false);
     setAccidentalType(AccidentalType::NONE);
     Note* n1 = nullptr;
@@ -165,8 +169,8 @@ void InputState::update(Selection& selection)
                     articulationsIds.insert(artic->symId());
                 }
 
-                articulationsIds = Ms::splitArticulations(articulationsIds);
-                articulationsIds = Ms::flipArticulations(articulationsIds, Ms::Placement::ABOVE);
+                articulationsIds = mu::engraving::splitArticulations(articulationsIds);
+                articulationsIds = mu::engraving::flipArticulations(articulationsIds, PlacementV::ABOVE);
                 for (const SymId& articulationSymbolId: articulationsIds) {
                     if (std::find(articulationSymbolIds.begin(), articulationSymbolIds.end(),
                                   articulationSymbolId) == articulationSymbolIds.end()) {
@@ -180,7 +184,7 @@ void InputState::update(Selection& selection)
                 for (Articulation* artic: n->chord()->articulations()) {
                     articulationsIds.insert(artic->symId());
                 }
-                articulationSymbolIds = Ms::flipArticulations(articulationsIds, Ms::Placement::ABOVE);
+                articulationSymbolIds = mu::engraving::flipArticulations(articulationsIds, PlacementV::ABOVE);
 
                 n1 = n;
             }
@@ -189,7 +193,7 @@ void InputState::update(Selection& selection)
         if (ChordRest* cr = chordRest(e)) {
             if (cr1) {
                 if (cr->durationType() != cr1->durationType()) {
-                    setDuration(TDuration::DurationType::V_INVALID);
+                    setDuration(DurationType::V_INVALID);
                     differentDurations = true;
                 }
                 if ((cr->isRest() && !cr1->isRest()) || (!cr->isRest() && cr1->isRest())) {
@@ -211,9 +215,11 @@ void InputState::update(Selection& selection)
     setArticulationIds(joinArticulations(articulationSymbolIds));
 
     EngravingItem* e = selection.element();
-    if (e == 0) {
-        setTrack(selection.activeTrack());
-        setSegment(selection.startSegment());
+    if (!e) {
+        if (!selection.isNone()) {
+            setTrack(selection.activeTrack());
+            setSegment(selection.startSegment());
+        }
         return;
     }
 

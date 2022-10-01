@@ -29,7 +29,7 @@
 #include "context/iglobalcontext.h"
 
 namespace mu::inspector {
-class StemSettingsModel : public AbstractInspectorModel, public async::Asyncable
+class StemSettingsModel : public AbstractInspectorModel
 {
     Q_OBJECT
 
@@ -41,8 +41,6 @@ class StemSettingsModel : public AbstractInspectorModel, public async::Asyncable
     Q_PROPERTY(PropertyItem * stemDirection READ stemDirection CONSTANT)
 
     Q_PROPERTY(bool useStraightNoteFlags READ useStraightNoteFlags WRITE setUseStraightNoteFlags NOTIFY useStraightNoteFlagsChanged)
-
-    INJECT(inspector, context::IGlobalContext, context)
 
 public:
     explicit StemSettingsModel(QObject* parent, IElementRepositoryService* repository);
@@ -61,13 +59,18 @@ public:
 signals:
     void useStraightNoteFlagsChanged();
 
-protected:
+private:
+    void onStemDirectionChanged(mu::engraving::DirectionV newDirection);
+
     void createProperties() override;
     void requestElements() override;
     void loadProperties() override;
     void resetProperties() override;
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
 
-private:
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
+
     PropertyItem* m_isStemHidden = nullptr;
     PropertyItem* m_thickness = nullptr;
     PropertyItem* m_length = nullptr;

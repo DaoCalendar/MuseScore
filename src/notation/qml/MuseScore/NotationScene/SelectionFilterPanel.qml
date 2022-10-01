@@ -26,9 +26,8 @@ import MuseScore.NotationScene 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Ui 1.0
 
-Rectangle {
+Item {
     id: root
-    color: ui.theme.backgroundPrimaryColor
     enabled: selectionFilterModel.enabled
 
     property NavigationSection navigationSection: null
@@ -38,7 +37,7 @@ Rectangle {
         name: "SelectionFilter"
         section: root.navigationSection
         direction: NavigationPanel.Vertical
-        enabled: root.visible && root.enabled
+        enabled: root.enabled && root.visible
         order: 2
     }
 
@@ -46,14 +45,15 @@ Rectangle {
         selectionFilterModel.load()
     }
 
-    ListView {
+    StyledListView {
         anchors.fill: parent
-        anchors.margins: 12
-        boundsBehavior: Flickable.StopAtBounds
-        clip: true
-        spacing: 12
 
-        ScrollBar.vertical: StyledScrollBar {}
+        topMargin: 12
+        leftMargin: topMargin
+        rightMargin: topMargin
+        bottomMargin: topMargin
+
+        spacing: 12
 
         model: SelectionFilterModel {
             id: selectionFilterModel

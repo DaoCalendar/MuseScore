@@ -41,7 +41,7 @@ InspectorSectionView {
         columnSpacing: 4
 
         Repeater {
-            model: root.model ? root.model.models() : []
+            model: root.model ? root.model.models : []
 
             delegate: PopupViewButton {
                 id: button
@@ -55,7 +55,6 @@ InspectorSectionView {
                 visible: !modelData["isEmpty"]
 
                 navigation.panel: root.navigationPanel
-                navigation.name: loader.viewObjectName
                 navigation.row: root.navigationRow(index)
 
                 popupContent: NotationInspectorSectionLoader {
@@ -66,14 +65,18 @@ InspectorSectionView {
                     model: modelData
 
                     navigationPanel: button.popupNavigationPanel
+
+                    Component.onCompleted: {
+                        button.navigation.name = loader.viewObjectName
+                    }
                 }
 
-                onEnsureContentVisibleRequested: {
+                onEnsureContentVisibleRequested: function(invisibleContentHeight) {
                     root.ensureContentVisibleRequested(invisibleContentHeight)
                 }
 
                 onPopupOpened: {
-                    Qt.callLater(loader.focusOnFirst)
+                    root.popupOpened(popup, control)
                 }
             }
         }

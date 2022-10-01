@@ -24,33 +24,31 @@
 #define __TIMEDIALOG_H__
 
 #include "ui_timedialog.h"
-#include "libmscore/fraction.h"
 
 #include "modularity/ioc.h"
 #include "ipaletteconfiguration.h"
+#include "internal/ipaletteprovider.h"
 
 namespace mu::palette {
 class PaletteWidget;
 class PaletteScrollArea;
-}
-
-namespace Ms {
-class TimeSig;
-class Score;
-class Chord;
 
 class TimeDialog : public QWidget, Ui::TimeDialogBase
 {
     Q_OBJECT
 
-    INJECT(palette, mu::palette::IPaletteConfiguration, configuration)
+    Q_PROPERTY(bool showTimePalette READ showTimePalette WRITE setShowTimePalette)
 
-    mu::palette::PaletteScrollArea* _timePalette = nullptr;
-    mu::palette::PaletteWidget* sp = nullptr;
-    bool _dirty = false;
+    INJECT(palette, IPaletteConfiguration, configuration)
+    INJECT(palette, IPaletteProvider, paletteProvider)
 
-    int denominator() const;
-    int denominator2Idx(int) const;
+public:
+    TimeDialog(QWidget* parent = 0);
+    TimeDialog(const TimeDialog& dialog);
+
+    bool dirty() const;
+    bool showTimePalette() const;
+    void save();
 
 private slots:
     void addClicked();
@@ -58,16 +56,16 @@ private slots:
     void nChanged(int);
     void paletteChanged(int idx);
     void textChanged();
-    void setDirty() { _dirty = true; }
+    void setDirty();
+    void setShowTimePalette(bool val);
 
-signals:
-    void timeSigAdded(const std::shared_ptr<TimeSig>);
+private:
+    int denominator() const;
+    int denominator2Idx(int) const;
 
-public:
-    TimeDialog(QWidget* parent = 0);
-    bool dirty() const { return _dirty; }
-    void showTimePalette(bool val);
-    void save();
+    PaletteScrollArea* _timePalette = nullptr;
+    PaletteWidget* sp = nullptr;
+    bool _dirty = false;
 };
 }
 

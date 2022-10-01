@@ -27,16 +27,15 @@
 #include "libmscore/spanner.h"
 
 #include "utils/scorerw.h"
-#include "utils/scorecomp.h"
 
 #include "log.h"
 
-static const QString REMOVE_DATA_DIR("remove_data/");
-
+using namespace mu;
 using namespace mu::engraving;
-using namespace Ms;
 
-class RemoveTests : public ::testing::Test
+static const String REMOVE_DATA_DIR("remove_data/");
+
+class Engraving_RemoveTests : public ::testing::Test
 {
 };
 
@@ -45,7 +44,7 @@ class RemoveTests : public ::testing::Test
 //---------------------------------------------------------
 
 struct StaffCheckData {
-    int staffIdx;
+    staff_idx_t staffIdx;
     bool staffHasElements;
 };
 
@@ -58,23 +57,23 @@ static void inStaff(void* staffCheckData, EngravingItem* e)
 {
     StaffCheckData* checkData = static_cast<StaffCheckData*>(staffCheckData);
     if (e->staffIdx() == checkData->staffIdx) {
-        LOGE() << e->name() << "is in staff" << checkData->staffIdx;
+        LOGE() << e->typeName() << " is in staff " << checkData->staffIdx;
         checkData->staffHasElements = true;
     }
 }
 
-static bool staffHasElements(Score* score, int staffIdx)
+static bool staffHasElements(Score* score, staff_idx_t staffIdx)
 {
     for (auto i = score->spannerMap().cbegin(); i != score->spannerMap().cend(); ++i) {
         Spanner* s = i->second;
         if (s->staffIdx() == staffIdx) {
-            LOGE() << s->name() << "is in staff" << staffIdx;
+            LOGE() << s->typeName() << " is in staff " << staffIdx;
             return true;
         }
     }
     for (Spanner* s : score->unmanagedSpanners()) {
         if (s->staffIdx() == staffIdx) {
-            qDebug() << s->name() << "is in staff" << staffIdx;
+            LOGD() << s->typeName() << " is in staff " << staffIdx;
             return true;
         }
     }
@@ -89,9 +88,9 @@ static bool staffHasElements(Score* score, int staffIdx)
 //    belonging to it are not removed in excerpts.
 //---------------------------------------------------------
 
-TEST_F(RemoveTests, removeStaff)
+TEST_F(Engraving_RemoveTests, removeStaff)
 {
-    MasterScore* score = ScoreRW::readScore(REMOVE_DATA_DIR + "remove_staff.mscx");
+    MasterScore* score = ScoreRW::readScore(REMOVE_DATA_DIR + u"remove_staff.mscx");
     EXPECT_TRUE(score);
 
     // Remove the second staff and see what happens
@@ -101,7 +100,7 @@ TEST_F(RemoveTests, removeStaff)
 
     EXPECT_FALSE(staffHasElements(score, 1));
     for (Excerpt* ex : score->excerpts()) {
-        Score* s = ex->partScore();
+        Score* s = ex->excerptScore();
         EXPECT_TRUE(staffHasElements(s, 1));
     }
 

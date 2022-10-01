@@ -20,7 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "playbackconfiguration.h"
+
 #include "settings.h"
+#include "types/string.h"
+
 #include "playbacktypes.h"
 
 using namespace mu::playback;
@@ -38,7 +41,13 @@ static const Settings::Key MIXER_SOUND_SECTION_VISIBLE_KEY(moduleName, "playback
 static const Settings::Key MIXER_AUDIO_FX_SECTION_VISIBLE_KEY(moduleName, "playback/mixer/audioFxSectionVisible");
 static const Settings::Key MIXER_BALANCE_SECTION_VISIBLE_KEY(moduleName, "playback/mixer/balanceSectionVisible");
 static const Settings::Key MIXER_VOLUME_SECTION_VISIBLE_KEY(moduleName, "playback/mixer/volumeSectionVisible");
+static const Settings::Key MIXER_FADER_SECTION_VISIBLE_KEY(moduleName, "playback/mixer/faderSectionVisible");
+static const Settings::Key MIXER_MUTE_AND_SOLO_SECTION_VISIBLE_KEY(moduleName, "playback/mixer/muteAndSoloSectionVisible");
 static const Settings::Key MIXER_TITLE_SECTION_VISIBLE_KEY(moduleName, "playback/mixer/titleSectionVisible");
+
+static const Settings::Key DEFAULT_SOUND_PROFILE_FOR_NEW_PROJECTS(moduleName, "playback/profiles/defaultProfileName");
+static const SoundProfileName BASIC_PROFILE_NAME(u"MuseScore Basic");
+static const SoundProfileName MUSE_PROFILE_NAME(u"Muse Sounds");
 
 static Settings::Key mixerSectionVisibleKey(MixerSectionType sectionType)
 {
@@ -48,6 +57,8 @@ static Settings::Key mixerSectionVisibleKey(MixerSectionType sectionType)
     case MixerSectionType::AudioFX: return MIXER_AUDIO_FX_SECTION_VISIBLE_KEY;
     case MixerSectionType::Balance: return MIXER_BALANCE_SECTION_VISIBLE_KEY;
     case MixerSectionType::Volume: return MIXER_VOLUME_SECTION_VISIBLE_KEY;
+    case MixerSectionType::Fader: return MIXER_FADER_SECTION_VISIBLE_KEY;
+    case MixerSectionType::MuteAndSolo: return MIXER_MUTE_AND_SOLO_SECTION_VISIBLE_KEY;
     case MixerSectionType::Title: return MIXER_TITLE_SECTION_VISIBLE_KEY;
     case MixerSectionType::Unknown: break;
     }
@@ -60,11 +71,14 @@ void PlaybackConfiguration::init()
     settings()->setDefaultValue(PLAY_NOTES_WHEN_EDITING, Val(true));
     settings()->setDefaultValue(PLAY_CHORD_WHEN_EDITING, Val(true));
     settings()->setDefaultValue(PLAY_HARMONY_WHEN_EDITING, Val(true));
-    settings()->setDefaultValue(PLAYBACK_CURSOR_TYPE_KEY, Val(static_cast<int>(PlaybackCursorType::STEPPED)));
+    settings()->setDefaultValue(PLAYBACK_CURSOR_TYPE_KEY, Val(PlaybackCursorType::STEPPED));
 
     for (MixerSectionType sectionType : allMixerSectionTypes()) {
-        settings()->setDefaultValue(mixerSectionVisibleKey(sectionType), Val(true));
+        bool sectionEnabledByDefault = sectionType != MixerSectionType::Volume;
+        settings()->setDefaultValue(mixerSectionVisibleKey(sectionType), Val(sectionEnabledByDefault));
     }
+
+    settings()->setDefaultValue(DEFAULT_SOUND_PROFILE_FOR_NEW_PROJECTS, Val(BASIC_PROFILE_NAME.toStdString()));
 }
 
 bool PlaybackConfiguration::playNotesWhenEditing() const
@@ -99,7 +113,7 @@ void PlaybackConfiguration::setPlayHarmonyWhenEditing(bool value)
 
 PlaybackCursorType PlaybackConfiguration::cursorType() const
 {
-    return static_cast<PlaybackCursorType>(settings()->value(PLAYBACK_CURSOR_TYPE_KEY).toInt());
+    return settings()->value(PLAYBACK_CURSOR_TYPE_KEY).toEnum<PlaybackCursorType>();
 }
 
 bool PlaybackConfiguration::isMixerSectionVisible(MixerSectionType sectionType) const
@@ -110,4 +124,24 @@ bool PlaybackConfiguration::isMixerSectionVisible(MixerSectionType sectionType) 
 void PlaybackConfiguration::setMixerSectionVisible(MixerSectionType sectionType, bool visible)
 {
     settings()->setSharedValue(mixerSectionVisibleKey(sectionType), Val(visible));
+}
+
+const SoundProfileName& PlaybackConfiguration::basicSoundProfileName() const
+{
+    return BASIC_PROFILE_NAME;
+}
+
+const SoundProfileName& PlaybackConfiguration::museSoundProfileName() const
+{
+    return MUSE_PROFILE_NAME;
+}
+
+SoundProfileName PlaybackConfiguration::defaultProfileForNewProjects() const
+{
+    return String::fromStdString(settings()->value(DEFAULT_SOUND_PROFILE_FOR_NEW_PROJECTS).toString());
+}
+
+void PlaybackConfiguration::setDefaultProfileForNewProjects(const SoundProfileName& name)
+{
+    settings()->setSharedValue(DEFAULT_SOUND_PROFILE_FOR_NEW_PROJECTS, Val(name.toStdString()));
 }

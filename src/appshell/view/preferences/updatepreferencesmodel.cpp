@@ -23,6 +23,7 @@
 #include "updatepreferencesmodel.h"
 
 #include "log.h"
+#include "translation.h"
 
 using namespace mu::appshell;
 
@@ -33,17 +34,12 @@ UpdatePreferencesModel::UpdatePreferencesModel(QObject* parent)
 
 bool UpdatePreferencesModel::isAppUpdatable() const
 {
-    return configuration()->isAppUpdatable();
+    return updateConfiguration()->isAppUpdatable();
 }
 
 bool UpdatePreferencesModel::needCheckForNewAppVersion() const
 {
-    return configuration()->needCheckForUpdate();
-}
-
-bool UpdatePreferencesModel::needCheckForNewExtensionsVersion() const
-{
-    return extensionsConfiguration()->needCheckForUpdate();
+    return updateConfiguration()->needCheckForUpdate();
 }
 
 void UpdatePreferencesModel::setNeedCheckForNewAppVersion(bool value)
@@ -52,16 +48,11 @@ void UpdatePreferencesModel::setNeedCheckForNewAppVersion(bool value)
         return;
     }
 
-    configuration()->setNeedCheckForUpdate(value);
+    updateConfiguration()->setNeedCheckForUpdate(value);
     emit needCheckForNewAppVersionChanged(value);
 }
 
-void UpdatePreferencesModel::setNeedCheckForNewExtensionsVersion(bool value)
+QString UpdatePreferencesModel::museScorePrivacyPolicyUrl() const
 {
-    if (value == needCheckForNewExtensionsVersion()) {
-        return;
-    }
-
-    extensionsConfiguration()->setNeedCheckForUpdate(value);
-    emit needCheckForNewExtensionsVersionChanged(value);
+    return QString::fromStdString(updateConfiguration()->museScorePrivacyPolicyUrl());
 }

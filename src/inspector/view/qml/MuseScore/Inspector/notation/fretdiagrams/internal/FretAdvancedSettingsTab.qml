@@ -65,6 +65,7 @@ FocusableItem {
                 maxValue: 300
                 minValue: 1
 
+                navigationName: "Scale"
                 navigationPanel: root.navigationPanel
                 navigationRowStart: root.navigationRowStart
             }
@@ -83,6 +84,7 @@ FocusableItem {
                 maxValue: 12
                 minValue: 4
 
+                navigationName: "Strings"
                 navigationPanel: root.navigationPanel
                 navigationRowStart: scaleSection.navigationRowEnd + 1
             }
@@ -106,24 +108,26 @@ FocusableItem {
                 maxValue: 6
                 minValue: 3
 
+                navigationName: "VisibleFrets"
                 navigationPanel: root.navigationPanel
                 navigationRowStart: stringsSection.navigationRowEnd + 1
             }
 
             SpinBoxPropertyView {
-                id: startingFretNumber
+                id: fretNumber
                 anchors.left: parent.horizontalCenter
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
-                titleText: qsTrc("inspector", "Starting fret number")
-                propertyItem: root.model ? root.model : null
+                titleText: qsTrc("inspector", "Fret number")
+                propertyItem: root.model ? root.model.fretNumber : null
 
                 step: 1
                 decimals: 0
                 maxValue: 12
                 minValue: 1
 
+                navigationName: "FretNumber"
                 navigationPanel: root.navigationPanel
                 navigationRowStart: visibleFrets.navigationRowEnd + 1
             }
@@ -135,24 +139,20 @@ FocusableItem {
             propertyItem: root.model ? root.model.placement : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: startingFretNumber.navigationRowEnd + 1
+            navigationRowStart: fretNumber.navigationRowEnd + 1
         }
 
-        CheckBox {
+        CheckBoxPropertyView {
             anchors.left: parent.left
             anchors.right: parent.horizontalCenter
             anchors.rightMargin: 2
 
-            isIndeterminate: root.model ? root.model.isNutVisible.isUndefined : false
-            checked: root.model && !isIndeterminate ? root.model.isNutVisible.value : false
             text: qsTrc("inspector", "Show nut")
+            propertyItem: root.model ? root.model.isNutVisible : false
 
             navigation.name: "MultipleDotsCheckBox"
             navigation.panel: root.navigationPanel
             navigation.row: placementSection.navigationRowEnd + 2
-            navigation.enabled: root.enabled
-
-            onClicked: { root.model.isNutVisible.value = !checked }
         }
     }
 }

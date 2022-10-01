@@ -24,15 +24,19 @@
 #include "importmidi_chord.h"
 #include "importmidi_fraction.h"
 #include "importmidi_operations.h"
+#include "../midishared/midifile.h"
+
 #include "engraving/libmscore/masterscore.h"
 #include "engraving/libmscore/staff.h"
 #include "engraving/libmscore/measure.h"
 #include "engraving/libmscore/harmony.h"
-#include "engraving/compat/midi/midifile.h"
+#include "engraving/libmscore/factory.h"
 
 // From XF Format Specifications V 2.01 (January 13, 1999, YAMAHA CORPORATION)
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiChordName {
 int readFirstHalf(uchar byte)
 {
@@ -228,9 +232,9 @@ void setChordNames(QList<MTrack>& tracks)
 
             Measure* measure = score->tick2measure(onTime.fraction());
             Segment* seg = measure->getSegment(SegmentType::ChordRest, onTime.fraction());
-            const int t = staff->idx() * VOICES;
+            const track_idx_t t = staff->idx() * VOICES;
 
-            Harmony* h = new Harmony(seg);
+            Harmony* h = mu::engraving::Factory::createHarmony(seg);
             h->setHarmony(chordName);
             h->setTrack(t);
             seg->add(h);
@@ -238,4 +242,4 @@ void setChordNames(QList<MTrack>& tracks)
     }
 }
 } // namespace MidiChordName
-} // namespace Ms
+} // namespace mu::iex::midi

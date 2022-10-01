@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
     - master
+    
   schedule: 
     - cron: '0 4 */1 */1 *' # At 04:00 on every day-of-month
   workflow_dispatch:
@@ -23,7 +24,7 @@ on:
 
 jobs:
   build_mu4:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - name: Cancel Previous Runs
       uses: styfle/cancel-workflow-action@0.9.1
@@ -31,7 +32,7 @@ jobs:
         access_token: ${{ github.token }}
     - name: Clone repository
       uses: actions/checkout@v2
-    - name: Сcache cache files
+    - name: Ccache cache files
       uses: actions/cache@v2
       with:
         path: ~/.ccache
@@ -41,6 +42,8 @@ jobs:
       run: |
         sudo bash ./build/ci/tools/setup_ccache.sh     
     - name: "Configure workflow"
+      env:
+        pull_request_title: ${{ github.event.pull_request.title }}
       run: |
         sudo bash ./build/ci/tools/make_build_mode_env.sh -e ${{ github.event_name }} -m ${{ github.event.inputs.build_mode }}
         BUILD_MODE=$(cat ./build.artifacts/env/build_mode.env)
@@ -58,6 +61,22 @@ jobs:
         if [ "$BUILD_MODE" == "nightly_build" ]; then 
           if [ "${{ github.repository }}" != "musescore/MuseScore" ]; then 
             DO_BUILD='false'
+          fi
+        fi
+
+        DO_UPDATE_TS='false'
+        if [[ "$BUILD_MODE" == "testing_build" || "$BUILD_MODE" == "stable_build" ]]; then 
+            DO_UPDATE_TS='true'
+            if [ -z "${{ secrets.TRANSIFEX_API_TOKEN }}" ]; then 
+              echo "warning: not set TRANSIFEX_API_TOKEN, update .ts disabled" 
+              DO_UPDATE_TS='false'
+            fi 
+        fi
+
+        DO_PLACEHOLDER_TRANSLATIONS='false'
+        if [[ "$DO_BUILD" == "true" ]]; then
+          if [[ "$BUILD_MODE" == "nightly_build" || "$BUILD_MODE" == "devel_build" ]]; then
+            DO_PLACEHOLDER_TRANSLATIONS='true'
           fi
         fi
 
@@ -79,13 +98,18 @@ jobs:
           DO_PUBLISH='false'
         fi
 
-        UPLOAD_ARTIFACT_NAME="$(tr "\":<>|*?/\\" "_" <<<"MU4_${{ github.run_id }}_Lin_${{ github.event.pull_request.number }}_${{ github.event.pull_request.title }}")"
+        if [ "${{ github.event_name }}" == "pull_request" ]; then PR_INFO="_${{ github.event.pull_request.number }}_${pull_request_title}"; fi
+        UPLOAD_ARTIFACT_NAME="$(tr '":<>|*?/\\' '_' <<<"MU4_${{ github.run_id }}_Lin${PR_INFO}")"
 
         echo "github.repository: ${{ github.repository }}"
         echo "BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
         echo "BUILD_MODE: $BUILD_MODE"
         echo "DO_BUILD=$DO_BUILD" >> $GITHUB_ENV
         echo "DO_BUILD: $DO_BUILD"
+        echo "DO_UPDATE_TS=$DO_UPDATE_TS" >> $GITHUB_ENV
+        echo "DO_UPDATE_TS: $DO_UPDATE_TS"
+        echo "DO_PLACEHOLDER_TRANSLATIONS=$DO_PLACEHOLDER_TRANSLATIONS" >> $GITHUB_ENV
+        echo "DO_PLACEHOLDER_TRANSLATIONS: $DO_PLACEHOLDER_TRANSLATIONS"
         echo "DO_PUBLISH=$DO_PUBLISH" >> $GITHUB_ENV
         echo "DO_PUBLISH: $DO_PUBLISH"
         echo "DO_UPLOAD_SYMBOLS=$DO_UPLOAD_SYMBOLS" >> $GITHUB_ENV
@@ -101,19 +125,35 @@ jobs:
       if: env.DO_BUILD == 'true'
       run: |
         sudo bash ./build/ci/linux/setup.sh
+    - name: Generate _en.ts files
+      if: env.DO_BUILD == 'true'
+      run: |
+        sudo bash ./build/ci/translation/run_lupdate.sh
+    - name: Update .ts files
+      if: env.DO_UPDATE_TS == 'true'
+      run: |
+        sudo bash ./build/ci/translation/tx_install.sh -t ${{ secrets.TRANSIFEX_API_TOKEN }} -s linux
+        sudo bash ./build/ci/translation/tx_pull.sh
+    - name: Generate placeholder.ts files
+      if: env.DO_PLACEHOLDER_TRANSLATIONS == 'true'
+      run: |
+        sudo python3 ./tools/translations/placeholder_translations.py
+    - name: Generate .qm files
+      if: env.DO_BUILD == 'true'
+      run: |
+        sudo bash ./build/ci/translation/run_lrelease.sh     
     - name: Build
       if: env.DO_BUILD == 'true'
       run: |
-        T_ID=${{ secrets.TELEMETRY_TRACK_ID }}; if [ -z "$T_ID" ]; then T_ID="''"; fi
         YT_API_KEY=${{ secrets.YOUTUBE_API_KEY }}; if [ -z "$YT_API_KEY" ]; then YT_API_KEY="''"; fi
         C_URL=${SENTRY_URL}; if [ -z "$C_URL" ]; then C_URL="''"; fi
-        sudo bash ./build/ci/linux/build.sh -n ${{ github.run_id }} --telemetry $T_ID --youtube_api_key $YT_API_KEY --crash_log_url $C_URL
+        sudo bash ./build/ci/linux/build.sh -n ${{ github.run_id }} --youtube_api_key $YT_API_KEY --crash_log_url $C_URL
         echo "============== ccache ==============="
         ccache -s
     - name: Generate dump symbols
       if: env.DO_BUILD == 'true'
       run: |
-        sudo bash ./build/ci/linux/dumpsyms.sh
+        sudo bash ./build/ci/linux/dumpsyms.sh  
     - name: Package 
       if: env.DO_BUILD == 'true'
       run: |

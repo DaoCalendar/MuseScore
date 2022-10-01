@@ -26,14 +26,13 @@
 #include <QQuickItem>
 
 #include "abstractnavigation.h"
-#include "async/asyncable.h"
 
 namespace mu::ui {
 class NavigationPanel;
-class NavigationControl : public AbstractNavigation, public INavigationControl, public async::Asyncable
+class NavigationControl : public AbstractNavigation, public INavigationControl
 {
     Q_OBJECT
-    Q_PROPERTY(mu::ui::NavigationPanel* panel READ panel_property WRITE setPanel NOTIFY panelChanged)
+    Q_PROPERTY(mu::ui::NavigationPanel * panel READ panel_property WRITE setPanel NOTIFY panelChanged)
 
 public:
     explicit NavigationControl(QObject* parent = nullptr);
@@ -56,10 +55,12 @@ public:
 
     void onEvent(EventPtr e) override;
 
-    void trigger() override;
-    async::Channel<INavigationControl*> activeRequested() const override;
+    QWindow* window() const override;
 
-    Q_INVOKABLE void requestActive();
+    void trigger() override;
+
+    Q_INVOKABLE void requestActive(bool enableHighlight = false) override;
+    Q_INVOKABLE void requestActiveByInteraction(bool enableHighlight = false);
 
 public slots:
     void setPanel(NavigationPanel* panel);
@@ -72,9 +73,7 @@ private slots:
     void onPanelDestroyed();
 
 private:
-
     NavigationPanel* m_panel = nullptr;
-    async::Channel<INavigationControl*> m_forceActiveRequested;
 };
 }
 

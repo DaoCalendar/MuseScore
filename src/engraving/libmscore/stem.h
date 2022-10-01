@@ -25,13 +25,15 @@
 
 #include "engravingitem.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Chord;
 
 class Stem final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, Stem)
 public:
 
+    Stem(const Stem&) = default;
     Stem& operator=(const Stem&) = delete;
 
     Stem* clone() const override { return new Stem(*this); }
@@ -43,6 +45,7 @@ public:
 
     bool isEditable() const override { return true; }
     void startEdit(EditData&) override;
+    void startEditDrag(EditData&) override;
     void editDrag(EditData&) override;
 
     bool acceptDrop(EditData&) const override;
@@ -53,45 +56,47 @@ public:
     bool readProperties(XmlReader&) override;
 
     void reset() override;
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
-    int vStaffIdx() const override;
+    staff_idx_t vStaffIdx() const override;
 
-    Chord* chord() const { return toChord(parent()); }
+    Chord* chord() const { return toChord(explicitParent()); }
     bool up() const;
 
-    double baseLength() const { return m_baseLength; }
-    void setBaseLength(double baseLength);
+    Millimetre baseLength() const { return m_baseLength; }
+    void setBaseLength(Millimetre baseLength);
 
-    double userLength() const { return m_userLength; }
-    void setUserLength(double userLength) { m_userLength = userLength; }
+    Millimetre userLength() const { return m_userLength; }
+    void setUserLength(Millimetre userLength) { m_userLength = userLength; }
 
-    double lineWidth() const { return m_lineWidth; }
+    Millimetre lineWidth() const { return m_lineWidth; }
     double lineWidthMag() const { return m_lineWidth * mag(); }
-    void setLineWidth(double lineWidth) { m_lineWidth = lineWidth; }
+    void setLineWidth(Millimetre lineWidth) { m_lineWidth = lineWidth; }
 
     mu::PointF p2() const { return m_line.p2(); }
     mu::PointF flagPosition() const;
     double length() const { return m_baseLength + m_userLength; }
 
-    EditBehavior normalModeEditBehavior() const override { return EditBehavior::Edit; }
+    bool needStartEditingAfterSelecting() const override { return true; }
     int gripsCount() const override { return 1; }
     Grip initialEditModeGrip() const override { return Grip::START; }
     Grip defaultGrip() const override { return Grip::START; }
     std::vector<mu::PointF> gripsPositions(const EditData&) const override;
 
 private:
-    friend class mu::engraving::Factory;
+    friend class Factory;
     Stem(Chord* parent = 0);
 
     mu::LineF m_line;
 
-    double m_baseLength = 0.0;
-    double m_userLength = 0.0;
+    Millimetre m_baseLength = Millimetre(0.0);
+    Millimetre m_userLength = Millimetre(0.0);
 
-    double m_lineWidth = 0.0;
+    Millimetre m_lineWidth = Millimetre(0.0);
+
+    bool sameVoiceKerningLimited() const override { return true; }
 };
 }
 #endif

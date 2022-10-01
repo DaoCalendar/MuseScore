@@ -34,35 +34,36 @@ class Score;
 class Selection;
 }
 
-namespace mu {
-namespace notation {
+namespace mu::notation {
 class IGetScore;
+class Notation;
 class NotationAccessibility : public INotationAccessibility, public async::Asyncable
 {
 public:
-    NotationAccessibility(const IGetScore* getScore, async::Notification selectionChangedNotification);
+    NotationAccessibility(const Notation* notation);
 
     ValCh<std::string> accessibilityInfo() const override;
 
+    void setMapToScreenFunc(const mu::engraving::AccessibleMapToScreenFunc& func) override;
+
+    void setEnabled(bool enabled) override;
+
+    void setTriggeredCommand(const std::string& command) override;
+
 private:
-    const Ms::Score* score() const;
-    const Ms::Selection* selection() const;
+    const engraving::Score* score() const;
+    const engraving::Selection* selection() const;
 
     void updateAccessibilityInfo();
+
     void setAccessibilityInfo(const QString& info);
 
     QString rangeAccessibilityInfo() const;
     QString singleElementAccessibilityInfo() const;
 
-    std::pair<int, float> barbeat(const EngravingItem* element) const;
-    QString formatSingleElementBarsAndBeats(const EngravingItem* element) const;
-    QString formatStartBarsAndBeats(const EngravingItem* element) const;
-    QString formatEndBarsAndBeats(const EngravingItem* element) const;
-
     const IGetScore* m_getScore = nullptr;
     ValCh<std::string> m_accessibilityInfo;
 };
-}
 }
 
 #endif // MU_NOTATION_NOTATIONACCESSIBILITY_H

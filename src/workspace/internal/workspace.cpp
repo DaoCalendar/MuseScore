@@ -33,9 +33,14 @@ using namespace mu;
 using namespace mu::workspace;
 using namespace mu::framework;
 
-Workspace::Workspace(const io::path& filePath)
+Workspace::Workspace(const io::path_t& filePath)
     : m_file(filePath)
 {
+    multiInstancesProvider()->resourceChanged().onReceive(this, [this](const std::string& resourceName){
+        if (resourceName == fileResourceName()) {
+            reload();
+        }
+    });
 }
 
 std::string Workspace::name() const
@@ -66,11 +71,6 @@ RetVal<QByteArray> Workspace::rawData(const DataKey& key) const
         return RetVal<QByteArray>(make_ret(Err::NotLoaded));
     }
 
-    QByteArray data = m_file.data(key_to_string(key));
-    if (data.isEmpty()) {
-        return RetVal<QByteArray>(make_ret(Err::NoData));
-    }
-
     RetVal<QByteArray> rv;
     rv.ret = make_ret(Ret::Code::Ok);
     rv.val = m_file.data(key_to_string(key));
@@ -83,25 +83,41 @@ Ret Workspace::setRawData(const DataKey& key, const QByteArray& data)
     return make_ret(Ret::Code::Ok);
 }
 
+async::Notification Workspace::reloadNotification()
+{
+    return m_reloadNotification;
+}
+
 bool Workspace::isLoaded() const
 {
     return m_file.isLoaded();
 }
 
-io::path Workspace::filePath() const
+io::path_t Workspace::filePath() const
 {
     return m_file.filePath();
 }
 
 Ret Workspace::load()
 {
-    mi::ResourceLockGuard resource_guard(multiInstancesProvider(), "WORKSPACE_FILE");
+    mi::ReadResourceLockGuard resource_guard(multiInstancesProvider(), fileResourceName());
     return m_file.load();
 }
 
 Ret Workspace::save()
 {
-    mi::ResourceLockGuard resource_guard(multiInstancesProvider(), "WORKSPACE_FILE");
+    mi::WriteResourceLockGuard resource_guard(multiInstancesProvider(), fileResourceName());
     m_file.setMeta("app_version", Val(Version::version()));
     return m_file.save();
+}
+
+void Workspace::reload()
+{
+    load();
+    m_reloadNotification.notify();
+}
+
+std::string Workspace::fileResourceName() const
+{
+    return filePath().toStdString();
 }

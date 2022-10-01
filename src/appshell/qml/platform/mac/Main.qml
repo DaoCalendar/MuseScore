@@ -40,14 +40,24 @@ AppWindow {
     Component.onCompleted: {
         menuModel.load()
 
-        for (var i in menuModel.items) {
-            var item = menuModel.items[i]
+        var items = menuModel.items
+        for (var i in items) {
+            var item = items[i]
             var menu = makeMenu(item)
 
             for (var j in item.subitems) {
                 var menuItem = makeMenuItem(menu, item.subitems[j])
                 menu.addItem(menuItem)
             }
+
+            item.subitemsChanged.connect(function(subitems, menuId) {
+                for (var l in menuBar.menus) {
+                    var menu = menuBar.menus[l]
+                    if (menu.id === menuId) {
+                        menuBar.menus[l].subitems = subitems
+                    }
+                }
+            })
 
             menuBar.addMenu(menu)
         }
@@ -57,11 +67,14 @@ AppWindow {
                 menuBar.menus[i].subitems = menuModel.items[i].subitems
             }
         })
+
+        window.init()
     }
 
     function makeMenu(menuInfo) {
         var menu = menuComponent.createObject(menuBar)
 
+        menu.id = menuInfo.id
         menu.title = menuInfo.title
         menu.enabled = menuInfo.enabled
         menu.subitems = menuInfo.subitems
@@ -73,12 +86,12 @@ AppWindow {
         var menuItem = menuItemComponent.createObject(parentMenu)
 
         menuItem.id = itemInfo.id
-        menuItem.text = itemInfo.title
+        menuItem.text = itemInfo.title + "\t" + itemInfo.portableShortcuts
         menuItem.enabled = itemInfo.enabled
         menuItem.checked = itemInfo.checked
         menuItem.checkable = itemInfo.checkable
-        menuItem.shortcut = itemInfo.shortcut
         menuItem.separator = !Boolean(itemInfo.title)
+        menuItem.role = itemInfo.role
 
         return menuItem
     }
@@ -87,6 +100,7 @@ AppWindow {
         id: menuComponent
 
         PLATFORM.Menu {
+            property string id: ""
             property var subitems: []
 
             onAboutToShow: {
@@ -123,6 +137,8 @@ AppWindow {
     }
 
     WindowContent {
+        id: window
+
         anchors.fill: parent
     }
 }

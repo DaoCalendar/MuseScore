@@ -33,14 +33,15 @@ Item {
 
     property NavigationPanel navigation: NavigationPanel {
         name: "PreferencesMenuPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Both
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
         }
 
-        onNavigationEvent: {
+        onNavigationEvent: function(event) {
             if (event.type === NavigationEvent.AboutActive) {
                 event.setData("controlIndex", prv.currentItemNavigationIndex)
             }
@@ -94,7 +95,7 @@ Item {
             }
         }
 
-        itemDelegate: GradientTabButton {
+        itemDelegate: PageTabButton {
             property bool expanded: Boolean(model) ? model.itemRole.expanded : false
             property int navigationRow: styleData.index.row
             property int navigationColumn: styleData.depth
@@ -115,12 +116,10 @@ Item {
             navigation.panel: root.navigation
             navigation.row: navigationRow
             navigation.column: navigationColumn
-            navigation.enabled: enabled
             navigation.accessible.name: title
             navigation.accessible.role: MUAccessible.ListItem
             navigation.onActiveChanged: {
                 if (navigation.active) {
-                    prv.currentItemNavigationIndex = [navigationRow, navigationColumn]
                     treeView.model.selectRow(styleData.index)
                 }
             }
@@ -148,8 +147,8 @@ Item {
             }
 
             onCheckedChanged: {
-                if (checked && !navigation.active) {
-                    Qt.callLater(navigation.requestActive)
+                if (checked) {
+                    prv.currentItemNavigationIndex = [navigationRow, navigationColumn]
                 }
             }
 

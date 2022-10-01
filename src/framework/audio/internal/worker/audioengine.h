@@ -26,9 +26,10 @@
 
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
-#include "retval.h"
+#include "async/notification.h"
+#include "types/retval.h"
 
-#include "iaudiodriver.h"
+#include "../../iaudiodriver.h"
 #include "internal/worker/mixer.h"
 #include "internal/iaudiobuffer.h"
 
@@ -43,9 +44,15 @@ public:
     Ret init(IAudioBufferPtr bufferPtr);
     void deinit();
 
+    sample_rate_t sampleRate() const;
+
     void setSampleRate(unsigned int sampleRate);
     void setReadBufferSize(uint16_t readBufferSize);
     void setAudioChannelsCount(const audioch_t count);
+
+    RenderMode mode() const;
+    void setMode(const RenderMode newMode);
+    async::Notification modeChanged() const;
 
     MixerPtr mixer() const;
 
@@ -54,8 +61,13 @@ private:
 
     bool m_inited = false;
 
+    sample_rate_t m_sampleRate = 0;
+
     MixerPtr m_mixer = nullptr;
     IAudioBufferPtr m_buffer = nullptr;
+
+    RenderMode m_currentMode = RenderMode::Undefined;
+    async::Notification m_modeChanges;
 };
 }
 

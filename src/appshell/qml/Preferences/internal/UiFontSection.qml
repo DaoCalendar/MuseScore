@@ -26,7 +26,7 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Appearance")
+    title: qsTrc("appshell/preferences", "Appearance")
 
     property alias allFonts: selectFontControl.model
 
@@ -36,41 +36,40 @@ BaseSection {
     signal fontChangeRequested(var newFontIndex)
     signal bodyTextSizeChangeRequested(var newBodyTextSize)
 
-    Column {
-        spacing: 8
+    ComboBoxWithTitle {
+        id: selectFontControl
 
-        ComboBoxWithTitle {
-            id: selectFontControl
+        title: qsTrc("appshell/preferences", "Font face:")
+        columnWidth: root.columnWidth
 
-            title: qsTrc("appshell", "Font face:")
-            titleWidth: root.columnWidth
+        navigation.name: "FontFaceBox"
+        navigation.panel: root.navigation
+        navigation.row: 1
 
-            navigation.name: "FontFaceBox"
-            navigation.panel: root.navigation
-            navigation.row: 1
-
-            onValueEdited: {
-                root.fontChangeRequested(currentIndex)
-            }
+        onValueEdited: function(newIndex, newValue) {
+            root.fontChangeRequested(newIndex)
         }
+    }
 
-        IncrementalPropertyControlWithTitle {
-            id: bodyTextSizeControl
+    IncrementalPropertyControlWithTitle {
+        id: bodyTextSizeControl
 
-            title: qsTrc("appshell", "Body text size:")
-            titleWidth: root.columnWidth
+        title: qsTrc("appshell/preferences", "Body text size:")
+        columnWidth: root.columnWidth
+        control.width: 112
 
-            minValue: 8
-            maxValue: 24
-            measureUnitsSymbol: qsTrc("appshell", "pt")
+        minValue: 10
+        maxValue: 18
 
-            navigation.name: "BodyTextControl"
-            navigation.panel: root.navigation
-            navigation.row: 2
+        //: Abbreviation of "points", used to specify a font size
+        measureUnitsSymbol: qsTrc("global", "pt")
 
-            onValueEdited: {
-                root.bodyTextSizeChangeRequested(newValue)
-            }
+        navigation.name: "BodyTextControl"
+        navigation.panel: root.navigation
+        navigation.row: 2
+
+        onValueEdited: function(newValue) {
+            root.bodyTextSizeChangeRequested(newValue)
         }
     }
 }

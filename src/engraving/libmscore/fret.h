@@ -26,20 +26,12 @@
 #include "engravingitem.h"
 #include "harmony.h"
 
-#include "infrastructure/draw/font.h"
+#include "draw/types/font.h"
 
 namespace mu::engraving {
 class Factory;
-}
-
-namespace Ms {
 class StringData;
 class Chord;
-
-enum class Orientation : signed char {
-    VERTICAL,
-    HORIZONTAL
-};
 
 // Keep this in order - not used directly for comparisons, but the dots will appear in
 // this order in fret multidot mode. See fretproperties.cpp.
@@ -102,11 +94,11 @@ public:
     static const std::vector<FretItem::MarkerTypeNameItem> markerTypeNameMap;
     static const std::vector<FretItem::DotTypeNameItem> dotTypeNameMap;
 
-    static QChar markerToChar(FretMarkerType t);
-    static QString markerTypeToName(FretMarkerType t);
-    static FretMarkerType nameToMarkerType(QString n);
-    static QString dotTypeToName(FretDotType t);
-    static FretDotType nameToDotType(QString n);
+    static Char markerToChar(FretMarkerType t);
+    static String markerTypeToName(FretMarkerType t);
+    static FretMarkerType nameToMarkerType(String n);
+    static String dotTypeToName(FretDotType t);
+    static FretDotType nameToDotType(String n);
 };
 
 // The three main storage containers used by fret diagrams
@@ -132,7 +124,7 @@ public:
 //   @@ FretDiagram
 ///    Fretboard diagram
 //
-//   @P userMag    qreal
+//   @P userMag    double
 //   @P strings    int  number of strings
 //   @P frets      int  number of frets
 //   @P fretOffset int
@@ -142,6 +134,8 @@ public:
 
 class FretDiagram final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, FretDiagram)
+
     int _strings       { 6 };
     int _frets         { 4 };
     int _fretOffset    { 0 };
@@ -160,16 +154,16 @@ class FretDiagram final : public EngravingItem
 
     Harmony* _harmony  { nullptr };
 
-    qreal stringLw;
-    qreal nutLw;
-    qreal stringDist;
-    qreal fretDist;
+    double stringLw;
+    double nutLw;
+    double stringDist;
+    double fretDist;
     mu::draw::Font font;
-    qreal _userMag     { 1.0 };                 // allowed 0.1 - 10.0
-    qreal markerSize;
+    double _userMag     { 1.0 };                 // allowed 0.1 - 10.0
+    double markerSize;
     int _numPos;
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
     FretDiagram(Segment* parent = nullptr);
     FretDiagram(const FretDiagram&);
 
@@ -185,16 +179,15 @@ public:
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
 
     void draw(mu::draw::Painter*) const override;
     EngravingItem* linkedClone() override;
     FretDiagram* clone() const override { return new FretDiagram(*this); }
 
-    Segment* segment() const { return toSegment(parent()); }
+    Segment* segment() const { return toSegment(explicitParent()); }
 
-    static std::shared_ptr<FretDiagram> createFromString(Score* score, const QString& s);
+    static std::shared_ptr<FretDiagram> createFromString(Score* score, const String& s);
 
     void layout() override;
     void write(XmlWriter& xml) const override;
@@ -202,7 +195,7 @@ public:
     void writeOld(XmlWriter& xml) const;
     void read(XmlReader&) override;
     void readNew(XmlReader&);
-    QVector<mu::LineF> dragAnchorLines() const override;
+    std::vector<mu::LineF> dragAnchorLines() const override;
     mu::PointF pagePos() const override;
 
     // read / write MusicXML
@@ -231,9 +224,9 @@ public:
     bool showNut() const { return _showNut; }
     void setShowNut(bool val) { _showNut = val; }
 
-    QString harmonyText() const { return _harmony ? _harmony->plainText() : QString(); }
-    qreal centerX() const;
-    void setHarmony(QString harmonyText);
+    String harmonyText() const { return _harmony ? _harmony->plainText() : String(); }
+    double centerX() const;
+    void setHarmony(String harmonyText);
 
     std::vector<FretItem::Dot> dot(int s, int f = 0) const;
     FretItem::Marker marker(int s) const;
@@ -245,7 +238,7 @@ public:
 
     Harmony* harmony() const { return _harmony; }
 
-    void init(Ms::StringData*, Chord*);
+    void init(StringData*, Chord*);
     void add(EngravingItem*) override;
     void remove(EngravingItem*) override;
 
@@ -255,20 +248,22 @@ public:
     void endEditDrag(EditData& editData) override;
     void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
-    qreal userMag() const { return _userMag; }
-    void setUserMag(qreal m) { _userMag = m; }
+    double userMag() const { return _userMag; }
+    void setUserMag(double m) { _userMag = m; }
 
-    virtual QString accessibleInfo() const override;
-    virtual QString screenReaderInfo() const override;
+    String accessibleInfo() const override;
+    String screenReaderInfo() const override;
 
     friend class FretUndoData;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 
-Q_DECLARE_METATYPE(Ms::FretDiagram*)
+#ifndef NO_QT_SUPPORT
+Q_DECLARE_METATYPE(mu::engraving::FretDiagram*)
+#endif
 
 #endif

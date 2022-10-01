@@ -41,10 +41,14 @@ RowLayout {
     signal moveSelectionDownRequested()
 
     property NavigationPanel navigationPanel: NavigationPanel {
-        name: "CostomiseControlPanel"
+        name: "CustomiseControlPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
-        accessible.name: qsTrc("notation", "Costomise control")
-        onActiveChanged: {
+
+        //: Accessibility description of the button group at the top of the "Customize toolbar" popup
+        accessible.name: qsTrc("notation", "Customization actions")
+
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
@@ -77,7 +81,7 @@ RowLayout {
         navigation.name: text
         navigation.panel: root.navigationPanel
         navigation.column: 1
-        navigation.accessible.name: qsTrc("uicomponents", "Delete")
+        navigation.accessible.name: qsTrc("notation", "Delete")
 
         onClicked: {
             root.removeSelectionRequested()
@@ -94,7 +98,7 @@ RowLayout {
         navigation.name: text
         navigation.panel: root.navigationPanel
         navigation.column: 2
-        navigation.accessible.name: qsTrc("uicomponents", "Up")
+        navigation.accessible.name: qsTrc("notation", "Move up")
 
         onClicked: {
             root.moveSelectionUpRequested()
@@ -111,7 +115,7 @@ RowLayout {
         navigation.name: text
         navigation.panel: root.navigationPanel
         navigation.column: 3
-        navigation.accessible.name: qsTrc("uicomponents", "Down")
+        navigation.accessible.name: qsTrc("notation", "Move down")
 
         onClicked: {
             root.moveSelectionDownRequested()

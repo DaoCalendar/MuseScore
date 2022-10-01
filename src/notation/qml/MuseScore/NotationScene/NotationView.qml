@@ -32,14 +32,20 @@ import "internal"
 FocusScope {
     id: root
 
-    property alias isNavigatorVisible: notationNavigator.visible
+    property alias name: notationView.objectName
+    property alias publishMode: notationView.publishMode
 
-    signal textEdittingStarted()
+    property alias paintView: notationView
+
+    property alias isNavigatorVisible: notationNavigator.visible
+    property alias isMainView: notationView.isMainView
+
+    property alias defaultNavigationControl: fakeNavCtrl
 
     NavigationSection {
         id: navSec
         name: "NotationView"
-        order: 4
+        order: 5
         enabled: root.visible
     }
 
@@ -54,7 +60,6 @@ FocusScope {
 
     Component.onCompleted: {
         notationView.load()
-        notationNavigator.load()
     }
 
     ColumnLayout {
@@ -68,7 +73,7 @@ FocusScope {
             navigationSection: navSec
         }
 
-        SeparatorLine {}
+        SeparatorLine { visible: tabPanel.visible }
 
         SplitView {
             id: splitView
@@ -78,11 +83,7 @@ FocusScope {
 
             orientation: notationNavigator.orientation === Qt.Horizontal ? Qt.Vertical : Qt.Horizontal
 
-            background: Rectangle {
-                color: notationView.backgroundColor
-            }
-
-            NotationZoomPinchArea {
+            NotationScrollAndZoomArea {
                 SplitView.fillWidth: true
                 SplitView.fillHeight: true
 
@@ -94,6 +95,7 @@ FocusScope {
                         id: navPanel
                         name: "ScoreView"
                         section: navSec
+                        enabled: notationView.enabled && notationView.visible
                         direction: NavigationPanel.Both
                         order: 2
                     }
@@ -101,35 +103,39 @@ FocusScope {
                     NavigationControl {
                         id: fakeNavCtrl
                         name: "Score"
+                        enabled: notationView.enabled && notationView.visible
 
                         panel: navPanel
                         order: 1
 
-                        accessible.role: MUAccessible.Panel
-                        accessible.name: "Score"
-
                         onActiveChanged: {
                             if (fakeNavCtrl.active) {
-                                notationView.selectOnNavigationActive()
+                                notationView.forceFocusIn()
+
+                                if (navPanel.highlight) {
+                                    notationView.selectOnNavigationActive()
+                                }
+                            } else {
+                                notationView.focus = false
                             }
                         }
                     }
 
-                    onTextEdittingStarted: {
-                        root.textEdittingStarted()
+                    NavigationFocusBorder {
+                        navigationCtrl: fakeNavCtrl
+                        drawOutsideParent: false
                     }
 
-                    onShowContextMenuRequested: function (elementType, pos) {
+                    onActiveFocusRequested: {
+                        fakeNavCtrl.requestActive()
+                    }
+
+                    onShowContextMenuRequested: function (elementType, viewPos) {
                         contextMenuModel.loadItems(elementType)
-
-                        if (contextMenuLoader.isMenuOpened) {
-                            contextMenuLoader.update(contextMenuModel.items, pos.x, pos.y)
-                        } else {
-                            contextMenuLoader.open(contextMenuModel.items, pos.x, pos.y)
-                        }
+                        contextMenuLoader.show(viewPos, contextMenuModel.items)
                     }
 
-                    onHideContextMenuRequested: function() {
+                    onHideContextMenuRequested: {
                         contextMenuLoader.close()
                     }
 
@@ -137,93 +143,58 @@ FocusScope {
                         notationNavigator.setCursorRect(viewport)
                     }
 
-                    onHorizontalScrollChanged: {
-                        if (!horizontalScrollBar.pressed) {
-                            horizontalScrollBar.setPosition(notationView.startHorizontalScrollPosition)
-                        }
-                    }
-
-                    onVerticalScrollChanged: {
-                        if (!verticalScrollBar.pressed) {
-                            verticalScrollBar.setPosition(notationView.startVerticalScrollPosition)
-                        }
-                    }
-
-                    StyledScrollBar {
-                        id: verticalScrollBar
-
-                        anchors.top: parent.top
-                        anchors.bottomMargin: prv.scrollbarMargin
-                        anchors.bottom: parent.bottom
-                        anchors.right: parent.right
-
-                        orientation: Qt.Vertical
-
-                        color: "black"
-                        border.width: 1
-                        border.color: "white"
-
-                        size: notationView.verticalScrollSize
-
-                        onPositionChanged: {
-                            if (pressed) {
-                                notationView.scrollVertical(position)
-                            }
-                        }
-                    }
-
-                    StyledScrollBar {
-                        id: horizontalScrollBar
-
-                        anchors.bottom: parent.bottom
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.rightMargin: prv.scrollbarMargin
-
-                        orientation: Qt.Horizontal
-
-                        color: "black"
-                        border.width: 1
-                        border.color: "white"
-
-                        size: notationView.horizontalScrollSize
-
-                        onPositionChanged: {
-                            if (pressed) {
-                                notationView.scrollHorizontal(position)
-                            }
-                        }
-                    }
-
-                    StyledMenuLoader {
+                    ContextMenuLoader {
                         id: contextMenuLoader
 
-                        navigation: fakeNavCtrl
-
-                        onHandleMenuItem: function (itemId) {
+                        onHandleMenuItem: function(itemId) {
                             contextMenuModel.handleMenuItem(itemId)
                         }
                     }
                 }
             }
 
-            NotationNavigator {
+            Loader {
                 id: notationNavigator
 
-                property bool isVertical: orientation === Qt.Vertical
+                property var orientation: notationNavigator.item ? notationNavigator.item.orientation : Qt.Horizontal
 
                 visible: false
 
                 SplitView.preferredHeight: 100
                 SplitView.preferredWidth: 100
+                SplitView.minimumWidth: 30
+                SplitView.minimumHeight: 30
 
-                onMoveNotationRequested: function (dx, dy) {
-                    notationView.moveCanvas(dx, dy)
+                sourceComponent: notationNavigator.visible ? navigatorComp : null
+
+                function setCursorRect(viewport) {
+                    if (notationNavigator.item) {
+                        notationNavigator.item.setCursorRect(viewport)
+                    }
+                }
+            }
+
+            Component {
+                id: navigatorComp
+
+                NotationNavigator {
+
+                    property bool isVertical: orientation === Qt.Vertical
+
+                    objectName: root.name + "Navigator"
+
+                    Component.onCompleted: {
+                        load()
+                    }
+
+                    onMoveNotationRequested: function(dx, dy) {
+                        notationView.moveCanvas(dx, dy)
+                    }
                 }
             }
 
             handle: Rectangle {
-                id: background
+                id: resizingHandle
 
                 implicitWidth: 4
                 implicitHeight: 4
@@ -233,17 +204,17 @@ FocusScope {
                 states: [
                     State {
                         name: "PRESSED"
-                        when: background.SplitHandle.pressed
+                        when: resizingHandle.SplitHandle.pressed
                         PropertyChanges {
-                            target: background
+                            target: resizingHandle
                             opacity: ui.theme.accentOpacityHit
                         }
                     },
                     State {
                         name: "HOVERED"
-                        when: background.SplitHandle.hovered
+                        when: resizingHandle.SplitHandle.hovered
                         PropertyChanges {
-                            target: background
+                            target: resizingHandle
                             opacity: ui.theme.accentOpacityHover
                         }
                     }

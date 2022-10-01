@@ -49,18 +49,9 @@ Item {
             anchors.fill: parent
 
             onClicked: {
-                instrumentsTreeModel.selectionModel.clear()
+                instrumentsTreeModel.clearSelection()
             }
         }
-    }
-
-    NavigationPanel {
-        id: navigationTreePanel
-        name: "InstrumentsTree"
-        section: root.navigationSection
-        direction: NavigationPanel.Both
-        enabled: root.visible
-        order: 3
     }
 
     InstrumentsPanelContextMenuModel {
@@ -69,6 +60,12 @@ Item {
 
     Component.onCompleted: {
         contextMenuModel.load()
+    }
+
+    QtObject {
+        id: prv
+
+        property string currentItemNavigationName: ""
     }
 
     ColumnLayout {
@@ -88,7 +85,6 @@ Item {
             Layout.rightMargin: contentColumn.sideMargin
 
             navigation.section: root.navigationSection
-            navigation.enabled: root.visible
             navigation.order: 2
 
             isMovingUpAvailable: instrumentsTreeModel.isMovingUpAvailable
@@ -120,31 +116,26 @@ Item {
             Layout.leftMargin: 20
             Layout.rightMargin: 20
 
-            text: qsTrc("instruments", "There are no instruments in your score. To choose some, press <b>Add</b>, or use the shortcut <b>‘i’</b>")
+            text: Boolean(instrumentsTreeModel.addInstrumentsKeyboardShortcut)
+                  //: Keep in sync with the text of the "Add" button at the top of the Instruments panel (InstrumentsControlPanel.qml)
+                  ? qsTrc("instruments", "There are no instruments in your score. To choose some, press <b>Add</b>, or use the keyboard shortcut %1.")
+                    .arg("<b>" + instrumentsTreeModel.addInstrumentsKeyboardShortcut + "</b>")
+                  //: Keep in sync with the text of the "Add" button at the top of the Instruments panel (InstrumentsControlPanel.qml)
+                  : qsTrc("instruments", "There are no instruments in your score. To choose some, press <b>Add</b>.")
             visible: instrumentsTreeModel.isEmpty && instrumentsTreeModel.isAddingAvailable
 
             verticalAlignment: Qt.AlignTop
             wrapMode: Text.WordWrap
         }
 
-        Flickable {
+        StyledFlickable {
             id: flickable
 
             Layout.fillWidth: true
             Layout.fillHeight: true
 
             contentWidth: width
-            contentHeight: instrumentsTreeView.height
-
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            interactive: height < contentHeight
-
-            ScrollBar.vertical: StyledScrollBar {
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-            }
+            contentHeight: instrumentsTreeView.implicitHeight
 
             TreeView {
                 id: instrumentsTreeView
@@ -152,7 +143,9 @@ Item {
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                height: flickableItem.contentHeight + 2 //! HACK +2 needs for correct show focus border
+
+                implicitHeight: flickableItem.contentHeight
+                flickableItem.interactive: false
 
                 visible: !instrumentsTreeModel.isEmpty
 
@@ -160,12 +153,26 @@ Item {
                     id: instrumentsTreeModel
                 }
 
-                selection: instrumentsTreeModel ? instrumentsTreeModel.selectionModel : null
+                selection: instrumentsTreeModel ? instrumentsTreeModel.selectionModel() : null
 
                 alternatingRowColors: false
                 backgroundVisible: false
                 headerVisible: false
                 frameVisible: false
+
+                property NavigationPanel navigationTreePanel : NavigationPanel {
+                    name: "InstrumentsTree"
+                    section: root.navigationSection
+                    direction: NavigationPanel.Both
+                    enabled: instrumentsTreeView.enabled && instrumentsTreeView.visible
+                    order: 3
+
+                    onNavigationEvent: function(event) {
+                        if (event.type === NavigationEvent.AboutActive) {
+                            event.setData("controlName", prv.currentItemNavigationName)
+                        }
+                    }
+                }
 
                 TableViewColumn {
                     role: "itemRole"
@@ -197,14 +204,13 @@ Item {
                 itemDelegate: DropArea {
                     id: dropArea
 
-                    property bool isSelectable: model ? model.itemRole.isSelectable : false
 
                     Loader {
                         id: treeItemDelegateLoader
 
-                        property var delegateType: model ? model.itemRole.type : InstrumentsTreeItemType.UNDEFINED
-                        property bool isExpandable: model ? model.itemRole.isExpandable : false
-                        property bool isEditable: model ? model.itemRole.isEditable : false
+                        property var item: model ? model.itemRole : null
+                        property int delegateType: model ? model.itemRole.type : InstrumentsTreeItemType.UNDEFINED
+                        property bool isSelected: model ? model.itemRole.isSelected : false
 
                         height: parent.height
                         width: parent.width
@@ -212,37 +218,25 @@ Item {
                         sourceComponent: instrumentsTreeView.isControl(delegateType) ?
                                              controlItemDelegateComponent : treeItemDelegateComponent
 
-                        property bool isSelected: false
-
-                        function updateIsSelected() {
-                            treeItemDelegateLoader.isSelected = instrumentsTreeModel.isSelected(styleData.index)
-                        }
-
-                        Connections {
-                            target: instrumentsTreeModel
-
-                            function onSelectionChanged() {
-                                treeItemDelegateLoader.updateIsSelected()
-                            }
-                        }
-
                         Component {
                             id: treeItemDelegateComponent
 
                             InstrumentsTreeItemDelegate {
                                 treeView: instrumentsTreeView
 
-                                navigationPanel: navigationTreePanel
-                                navigationRow: model ? model.index : 0
-
-                                type: treeItemDelegateLoader.delegateType
-                                isSelected: treeItemDelegateLoader.isSelected
-                                isDragAvailable: dropArea.isSelectable
-                                isExpandable: treeItemDelegateLoader.isExpandable
-                                isEditable: treeItemDelegateLoader.isEditable
+                                item: treeItemDelegateLoader.item
 
                                 sideMargin: contentColumn.sideMargin
                                 popupAnchorItem: root
+
+                                navigation.name: model ? model.itemRole.title : "ItemInstrumentsTree"
+                                navigation.panel: instrumentsTreeView.navigationTreePanel
+                                navigation.row: model ? model.index : 0
+                                navigation.onActiveChanged: {
+                                    if (navigation.active) {
+                                        prv.currentItemNavigationName = navigation.name
+                                    }
+                                }
 
                                 onClicked: {
                                     instrumentsTreeModel.selectRow(styleData.index)
@@ -260,13 +254,13 @@ Item {
                                     }
                                 }
 
-                                onVisibleChanged: {
-                                    treeItemDelegateLoader.updateIsSelected()
+                                onRemoveSelectionRequested: {
+                                    instrumentsTreeModel.removeSelectedRows()
                                 }
 
                                 property real contentYBackup: 0
 
-                                onPopupOpened: {
+                                onPopupOpened: function(popupX, popupY, popupHeight) {
                                     contentYBackup = flickable.contentY
                                     var mappedPopupY = mapToItem(flickable, popupX, popupY).y
 
@@ -281,6 +275,10 @@ Item {
                                 onPopupClosed: {
                                     flickable.contentY = contentYBackup
                                 }
+
+                                onVisibilityChanged: function(visible) {
+                                    instrumentsTreeModel.toggleVisibilityOfSelectedRows(visible);
+                                }
                             }
                         }
 
@@ -290,7 +288,7 @@ Item {
                             InstrumentsTreeItemControl {
                                 isSelected: treeItemDelegateLoader.isSelected
 
-                                navigation.panel: navigationTreePanel
+                                navigation.panel: instrumentsTreeView.navigationTreePanel
                                 navigation.row: model ? model.index : 0
 
                                 sideMargin: contentColumn.sideMargin
@@ -298,16 +296,12 @@ Item {
                                 onClicked: {
                                     styleData.value.appendNewItem()
                                 }
-
-                                onVisibleChanged: {
-                                    treeItemDelegateLoader.updateIsSelected()
-                                }
                             }
                         }
                     }
 
-                    onEntered: {
-                        if (styleData.index === drag.source.index || !styleData.value.canAcceptDrop(drag.source.type)) {
+                    onEntered: function(drag) {
+                        if (styleData.index === drag.source.index || !styleData.value.canAcceptDrop(drag.source.item)) {
                             return
                         }
 

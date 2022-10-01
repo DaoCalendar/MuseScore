@@ -22,22 +22,24 @@
 #ifndef MU_PLUGINS_PLUGINSMODEL_H
 #define MU_PLUGINS_PLUGINSMODEL_H
 
-#include "ipluginsservice.h"
-#include "iinteractive.h"
-
-#include "modularity/ioc.h"
-#include "async/asyncable.h"
-
 #include <QAbstractListModel>
 #include <QList>
+
+#include "async/asyncable.h"
+
+#include "modularity/ioc.h"
+#include "iinteractive.h"
+#include "ipluginsservice.h"
+#include "ipluginsconfiguration.h"
 
 namespace mu::plugins {
 class PluginsModel : public QAbstractListModel, public async::Asyncable
 {
     Q_OBJECT
 
-    INJECT(plugins, IPluginsService, service)
     INJECT(plugins, framework::IInteractive, interactive)
+    INJECT(plugins, IPluginsService, service)
+    INJECT(plugins, IPluginsConfiguration, configuration)
 
 public:
     explicit PluginsModel(QObject* parent = nullptr);
@@ -47,13 +49,11 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     Q_INVOKABLE void load();
-    Q_INVOKABLE void install(QString codeKey);
-    Q_INVOKABLE void uninstall(QString codeKey);
-    Q_INVOKABLE void update(QString codeKey);
-    Q_INVOKABLE void restart(QString codeKey);
-    Q_INVOKABLE void openFullDescription(QString codeKey);
+    Q_INVOKABLE void setEnable(const QString& codeKey, bool enable);
+    Q_INVOKABLE void editShortcut(QString codeKey);
+    Q_INVOKABLE void reloadPlugins();
 
-    Q_INVOKABLE QStringList categories() const;
+    Q_INVOKABLE QVariantList categories() const;
 
 signals:
     void finished();
@@ -64,9 +64,10 @@ private:
         rName,
         rDescription,
         rThumbnailUrl,
-        rInstalled,
+        rEnabled,
         rCategory,
-        rHasUpdate
+        rVersion,
+        rShortcuts
     };
 
     void updatePlugin(const PluginInfo& plugin);

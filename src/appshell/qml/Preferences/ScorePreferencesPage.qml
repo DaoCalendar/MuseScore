@@ -20,7 +20,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.15
 
 import MuseScore.UiComponents 1.0
 import MuseScore.Preferences 1.0
@@ -30,8 +29,6 @@ import "internal"
 PreferencesPage {
     id: root
 
-    contentHeight: content.height
-
     ScorePreferencesModel {
         id: scorePreferencesModel
     }
@@ -40,30 +37,12 @@ PreferencesPage {
         scorePreferencesModel.load()
     }
 
-    Column {
-        id: content
-
+    DefaultFilesSection {
         width: parent.width
-        spacing: root.sectionsSpacing
 
-        DefaultFilesSection {
-            model: scorePreferencesModel
+        model: scorePreferencesModel
 
-            navigation.section: root.navigationSection
-            navigation.order: root.navigationOrderStart + 1
-        }
-
-        SeparatorLine { }
-
-        ScoreViewSection {
-            isShowMIDIControls: scorePreferencesModel.isShowMIDIControls
-
-            navigation.section: root.navigationSection
-            navigation.order: root.navigationOrderStart + 2
-
-            onShowMIDIControlsChangeRequested: {
-                scorePreferencesModel.isShowMIDIControls = show
-            }
-        }
+        navigation.section: root.navigationSection
+        navigation.order: root.navigationOrderStart + 1
     }
 }

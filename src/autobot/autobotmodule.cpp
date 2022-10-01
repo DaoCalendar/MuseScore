@@ -29,10 +29,10 @@
 
 #include "internal/autobot.h"
 #include "internal/autobotconfiguration.h"
-#include "view/autobotmodel.h"
 #include "view/autobotscriptsmodel.h"
+#include "view/testcaserunmodel.h"
 
-#include "engraving/infrastructure/draw/painter.h"
+#include "draw/painter.h"
 #include "internal/draw/abpaintprovider.h"
 #include "internal/autobotactionscontroller.h"
 #include "internal/autobotactions.h"
@@ -45,6 +45,9 @@
 #include "internal/api/navigationapi.h"
 #include "internal/api/contextapi.h"
 #include "internal/api/shortcutsapi.h"
+#include "internal/api/interactiveapi.h"
+#include "internal/api/keyboardapi.h"
+#include "internal/api/accessibilityapi.h"
 
 #include "diagnostics/idiagnosticspathsregister.h"
 
@@ -68,7 +71,7 @@ void AutobotModule::registerExports()
 
     modularity::ioc()->registerExport<IApiRegister>(moduleName(), new ApiRegister());
 
-    draw::Painter::extended = AbPaintProvider::instance();
+    // draw::Painter::extended = AbPaintProvider::instance();
 }
 
 void AutobotModule::resolveImports()
@@ -77,6 +80,7 @@ void AutobotModule::resolveImports()
     if (ir) {
         ir->registerQmlUri(Uri("musescore://autobot/batchtests"), "MuseScore/Autobot/BatchTestsDialog.qml");
         ir->registerQmlUri(Uri("musescore://autobot/scripts"), "MuseScore/Autobot/ScriptsDialog.qml");
+        ir->registerQmlUri(Uri("musescore://autobot/selectfile"), "MuseScore/Autobot/AutobotSelectFileDialog.qml");
     }
 
     auto ar = modularity::ioc()->resolve<ui::IUiActionsRegister>(moduleName());
@@ -92,13 +96,16 @@ void AutobotModule::resolveImports()
         api->regApiCreator("actions", "api.dispatcher", new ApiCreator<DispatcherApi>());
         api->regApiCreator("ui", "api.navigation", new ApiCreator<NavigationApi>());
         api->regApiCreator("shortcuts", "api.shortcuts", new ApiCreator<ShortcutsApi>());
+        api->regApiCreator("global", "api.interactive", new ApiCreator<InteractiveApi>());
+        api->regApiCreator("ui", "api.keyboard", new ApiCreator<KeyboardApi>());
+        api->regApiCreator("accessibility", "api.accessibility", new ApiCreator<AccessibilityApi>());
     }
 }
 
 void AutobotModule::registerUiTypes()
 {
-    qmlRegisterType<AutobotModel>("MuseScore.Autobot", 1, 0, "AutobotModel");
     qmlRegisterType<AutobotScriptsModel>("MuseScore.Autobot", 1, 0, "AutobotScriptsModel");
+    qmlRegisterType<TestCaseRunModel>("MuseScore.Autobot", 1, 0, "TestCaseRunModel");
 }
 
 void AutobotModule::onInit(const framework::IApplication::RunMode&)
@@ -109,10 +116,12 @@ void AutobotModule::onInit(const framework::IApplication::RunMode&)
     //! --- Diagnostics ---
     auto pr = modularity::ioc()->resolve<diagnostics::IDiagnosticsPathsRegister>(moduleName());
     if (pr) {
-        for (const io::path& p : s_configuration->scriptsDirPaths()) {
+        for (const io::path_t& p : s_configuration->scriptsDirPaths()) {
             pr->reg("autobotScriptsPath", p);
         }
-        pr->reg("autobotTestingFilesPath", s_configuration->testingFilesDirPath());
+        for (const io::path_t& p : s_configuration->testingFilesDirPaths()) {
+            pr->reg("autobotTestingFilesPath", p);
+        }
         pr->reg("autobotDataPath", s_configuration->dataPath());
         pr->reg("autobotSavingFilesPath", s_configuration->savingFilesPath());
         pr->reg("autobotReportsPath", s_configuration->reportsPath());

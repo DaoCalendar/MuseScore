@@ -27,7 +27,7 @@
 using namespace mu::uicomponents;
 
 PopupWindow_QQuickView::PopupWindow_QQuickView(QObject* parent)
-    : QObject(parent)
+    : IPopupWindow(parent)
 {
     setObjectName("PopupWindow");
 }
@@ -56,20 +56,22 @@ void PopupWindow_QQuickView::init(QQmlEngine* engine, std::shared_ptr<ui::IUiCon
     // popup
     else {
         Qt::WindowFlags flags(
-            Qt::FramelessWindowHint              // Without border
+            Qt::Tool
+            | Qt::FramelessWindowHint            // Without border
             | Qt::NoDropShadowWindowHint         // Without system shadow
             | Qt::BypassWindowManagerHint        // Otherwise, it does not work correctly on Gnome (Linux) when resizing)
             );
 
-#ifdef Q_OS_MACOS
-        flags.setFlag(Qt::Tool);
-#else
-        flags.setFlag(Qt::Dialog);
-#endif
-
         m_view->setFlags(flags);
         m_view->setColor(QColor(Qt::transparent));
     }
+
+    // TODO: Can't use new `connect` syntax because the QQuickView::closing
+    // has a parameter of type QQuickCloseEvent, which is not public, so we
+    // can't include any header for it and it will always be an incomplete
+    // type, which is not allowed for the new `connect` syntax.
+    //connect(m_view, &QQuickWindow::closing, this, &PopupWindow_QQuickView::aboutToClose);
+    connect(m_view, SIGNAL(closing(QQuickCloseEvent*)), this, SIGNAL(aboutToClose(QQuickCloseEvent*)));
 
     m_view->installEventFilter(this);
 }
@@ -77,13 +79,14 @@ void PopupWindow_QQuickView::init(QQmlEngine* engine, std::shared_ptr<ui::IUiCon
 void PopupWindow_QQuickView::setContent(QQuickItem* item)
 {
     m_view->setContent(QUrl(), nullptr, item);
+    m_view->setObjectName(item->objectName() + "_(PopupWindow_QQuickView)");
 
     connect(item, &QQuickItem::implicitWidthChanged, [this, item]() {
         if (!m_view->isVisible()) {
             return;
         }
         if (item->implicitWidth() != m_view->width()) {
-            m_view->resize(item->implicitWidth(), item->implicitHeight());
+            updateSize(QSize(item->implicitWidth(), item->implicitHeight()));
         }
     });
 
@@ -92,7 +95,7 @@ void PopupWindow_QQuickView::setContent(QQuickItem* item)
             return;
         }
         if (item->implicitHeight() != m_view->height()) {
-            m_view->resize(item->implicitWidth(), item->implicitHeight());
+            updateSize(QSize(item->implicitWidth(), item->implicitHeight()));
         }
     });
 }
@@ -104,34 +107,55 @@ void PopupWindow_QQuickView::forceActiveFocus()
     }
 }
 
-void PopupWindow_QQuickView::show(QPoint p)
+void PopupWindow_QQuickView::show(QScreen* screen, QRect geometry, bool activateFocus)
 {
-    QWindow* top = mainWindow()->topWindow();
+    m_view->setGeometry(geometry);
+    m_view->setScreen(screen);
 
-    m_view->setPosition(p);
-    m_view->setTransientParent(top);
+    m_activeFocusOnParentOnClose = activateFocus;
+
+    if (!activateFocus) {
+        m_view->setFlag(Qt::WindowDoesNotAcceptFocus);
+    }
+
+    QWindow* parent = m_parentWindow ? m_parentWindow : interactiveProvider()->topWindow();
+    m_view->setTransientParent(parent);
+
+    connect(parent, &QWindow::visibleChanged, this, [this](){
+        if (!m_view->transientParent() || !m_view->transientParent()->isVisible()) {
+            close();
+        }
+    });
+
     m_view->show();
 
-    mainWindow()->pushWindow(m_view);
+    if (activateFocus) {
+        m_view->requestActivate();
+    }
 
-    m_view->requestActivate();
     QQuickItem* item = m_view->rootObject();
-    m_view->resize(item->implicitWidth(), item->implicitHeight());
+    updateSize(QSize(item->implicitWidth(), item->implicitHeight()));
 
-    QTimer::singleShot(0, [this]() {
-        forceActiveFocus();
-    });
+    if (activateFocus) {
+        QTimer::singleShot(0, [this]() {
+            forceActiveFocus();
+        });
+    }
 }
 
-void PopupWindow_QQuickView::setPosition(QPoint p)
+void PopupWindow_QQuickView::close()
 {
-    m_view->setPosition(p);
+    m_view->close();
 }
 
-void PopupWindow_QQuickView::hide()
+void PopupWindow_QQuickView::raise()
 {
-    mainWindow()->popWindow(m_view);
-    m_view->hide();
+    m_view->raise();
+}
+
+void PopupWindow_QQuickView::setPosition(QPoint position)
+{
+    m_view->setPosition(position);
 }
 
 QWindow* PopupWindow_QQuickView::qWindow() const
@@ -147,6 +171,33 @@ bool PopupWindow_QQuickView::isVisible() const
 QRect PopupWindow_QQuickView::geometry() const
 {
     return m_view ? m_view->geometry() : QRect();
+}
+
+QWindow* PopupWindow_QQuickView::parentWindow() const
+{
+    return m_parentWindow;
+}
+
+void PopupWindow_QQuickView::setParentWindow(QWindow* window)
+{
+    m_parentWindow = window;
+}
+
+bool PopupWindow_QQuickView::resizable() const
+{
+    return m_resizable;
+}
+
+void PopupWindow_QQuickView::setResizable(bool resizable)
+{
+    if (m_resizable == resizable) {
+        return;
+    }
+
+    m_resizable = resizable;
+    if (m_view) {
+        updateSize(m_view->size());
+    }
 }
 
 void PopupWindow_QQuickView::setPosition(const QPoint& position) const
@@ -178,4 +229,21 @@ bool PopupWindow_QQuickView::eventFilter(QObject* watched, QEvent* event)
     }
 
     return QObject::eventFilter(watched, event);
+}
+
+void PopupWindow_QQuickView::updateSize(const QSize& newSize)
+{
+    if (!m_view) {
+        return;
+    }
+
+    if (m_resizable) {
+        m_view->setMinimumSize(newSize);
+        m_view->setMaximumSize(QSize(16777215, 16777215));
+        m_view->resize(m_view->size().expandedTo(newSize));
+    } else {
+        m_view->setMinimumSize(newSize);
+        m_view->setMaximumSize(newSize);
+        m_view->resize(newSize);
+    }
 }

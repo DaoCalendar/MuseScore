@@ -29,8 +29,6 @@ import "internal"
 PreferencesPage {
     id: root
 
-    contentHeight: content.height
-
     IOPreferencesModel {
         id: ioModel
     }
@@ -40,22 +38,17 @@ PreferencesPage {
     }
 
     Column {
-        id: content
-
         width: parent.width
         spacing: root.sectionsSpacing
-
-        readonly property int firstColumnWidth: 220
 
         AudioApiSection {
             currentAudioApiIndex: ioModel.currentAudioApiIndex
             audioApiList: ioModel.audioApiList()
-            firstColumnWidth: content.firstColumnWidth
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
 
-            onCurrentAudioApiIndexChangeRequested: {
+            onCurrentAudioApiIndexChangeRequested: function(newIndex) {
                 ioModel.currentAudioApiIndex = newIndex
             }
         }
@@ -63,24 +56,32 @@ PreferencesPage {
         SeparatorLine {}
 
         MidiDevicesSection {
-            currentInputDeviceIndex: ioModel.currentMidiInputDeviceIndex
-            currentOutputDeviceIndex: ioModel.currentMidiOutputDeviceIndex
+            inputDeviceId: ioModel.midiInputDeviceId
+            outputDeviceId: ioModel.midiOutputDeviceId
             inputDevices: ioModel.midiInputDevices
             outputDevices: ioModel.midiOutputDevices
-            firstColumnWidth: content.firstColumnWidth
+
+            isMIDI20OutputSupported: ioModel.isMIDI20OutputSupported
+            useMIDI20Output: ioModel.useMIDI20Output
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 2
 
-            onCurrentInputDeviceIndexChangeRequested: {
-                ioModel.currentMidiInputDeviceIndex = newIndex
+            onInputDeviceIdChangeRequested: function(newId) {
+                ioModel.inputDeviceSelected(newId)
             }
 
-            onCurrentOuputDeviceIndexChangeRequested: {
-                ioModel.currentMidiOutputDeviceIndex = newIndex
+            onOutputDeviceIdChangeRequested: function(newId) {
+                ioModel.outputDeviceSelected(newId)
+            }
+
+            onUseMIDI20OutputChangeRequested: function(use) {
+                ioModel.useMIDI20Output = use
             }
         }
 
+        /*
+         * TODO: https://github.com/musescore/MuseScore/issues/9807
         SeparatorLine {}
 
         AudioEngineSection {
@@ -91,5 +92,6 @@ PreferencesPage {
                 ioModel.restartAudioAndMidiDevices()
             }
         }
+         */
     }
 }

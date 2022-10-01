@@ -20,12 +20,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __ICON_H__
-#define __ICON_H__
+#ifndef MU_LIBMSCORE_ACTIONICON_H
+#define MU_LIBMSCORE_ACTIONICON_H
 
 #include "engravingitem.h"
 
-namespace Ms {
+namespace mu::engraving {
 enum class ActionIconType {
     UNDEFINED = -1,
 
@@ -38,15 +38,15 @@ enum class ActionIconType {
     GRACE16_AFTER,
     GRACE32_AFTER,
 
-    BEAM_START,
-    BEAM_MID,
-    BEAM_NONE,
-    BEAM_BEGIN_32,
-    BEAM_BEGIN_64,
     BEAM_AUTO,
+    BEAM_NONE,
+    BEAM_BREAK_LEFT,
+    BEAM_BREAK_INNER_8TH,
+    BEAM_BREAK_INNER_16TH,
+    BEAM_JOIN,
 
-    BEAM_FEATHERED_SLOWER,
-    BEAM_FEATHERED_FASTER,
+    BEAM_FEATHERED_DECELERATE,
+    BEAM_FEATHERED_ACCELERATE,
 
     VFRAME,
     HFRAME,
@@ -54,14 +54,14 @@ enum class ActionIconType {
     FFRAME,
     MEASURE,
 
-    BRACKETS,
     PARENTHESES,
-    BRACES,
+    BRACKETS,
 };
 
 //! Dummy element, used for drag&drop
 class ActionIcon final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, ActionIcon)
 public:
     ActionIcon(EngravingItem* score);
     ~ActionIcon() override = default;
@@ -74,24 +74,25 @@ public:
     void setActionType(ActionIconType val);
     void setAction(const std::string& actionCode, char16_t icon);
 
-    qreal extent() const;
-    void setExtent(qreal extent);
+    double fontSize() const;
+    void setFontSize(double size);
 
     void write(XmlWriter&) const override;
     void read(XmlReader&) override;
     void draw(mu::draw::Painter*) const override;
     void layout() override;
 
-    QVariant getProperty(Pid) const override;
-    bool setProperty(Pid, const QVariant&) override;
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid, const PropertyValue&) override;
+
+    static constexpr double DEFAULT_FONT_SIZE = 16.0;
 
 private:
-    mu::RectF boundingBox() const;
-
     ActionIconType m_actionType { ActionIconType::UNDEFINED };
     std::string m_actionCode;
     char16_t m_icon = 0;
-    qreal m_extent { 40 };
+    mu::draw::Font m_iconFont;
 };
-}     // namespace Ms
-#endif
+}
+
+#endif // MU_LIBMSCORE_ACTIONICON_H

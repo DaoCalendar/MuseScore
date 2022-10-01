@@ -29,14 +29,10 @@ using namespace mu::ui;
 NavigationApi::NavigationApi(IApiEngine* e)
     : ApiObject(e)
 {
-    //! NOTE Disable reset on mouse press for testing purpose
-    navigation()->setIsResetOnMousePress(false);
 }
 
 NavigationApi::~NavigationApi()
 {
-    //! NOTE Return default
-    navigation()->setIsResetOnMousePress(true);
 }
 
 void NavigationApi::nextPanel()
@@ -74,9 +70,26 @@ void NavigationApi::escape()
     dispatcher()->dispatch("nav-escape");
 }
 
-bool NavigationApi::goToControl(const QString& section, const QString& panel, const QString& contol)
+bool NavigationApi::goToControl(const QString& section, const QString& panel, const QJSValue& controlNameOrIndex)
 {
-    bool ok = navigation()->requestActivateByName(section.toStdString(), panel.toStdString(), contol.toStdString());
+    bool ok = false;
+    if (controlNameOrIndex.isString()) {
+        ok = navigation()->requestActivateByName(section.toStdString(), panel.toStdString(), controlNameOrIndex.toString().toStdString());
+    } else if (controlNameOrIndex.isArray()) {
+        if (controlNameOrIndex.property("length").toInt() == 2) {
+            INavigation::Index idx;
+            idx.row = controlNameOrIndex.property(0).toInt();
+            idx.column = controlNameOrIndex.property(1).toInt();
+            ok = navigation()->requestActivateByIndex(section.toStdString(), panel.toStdString(), idx);
+        } else {
+            LOGE() << "bad argument `control`: " << controlNameOrIndex.toString();
+            ok = false;
+        }
+    } else {
+        LOGE() << "bad argument `control`: " << controlNameOrIndex.toString();
+        ok = false;
+    }
+
     return ok;
 }
 
@@ -85,9 +98,9 @@ void NavigationApi::trigger()
     dispatcher()->dispatch("nav-trigger-control");
 }
 
-bool NavigationApi::triggerControl(const QString& section, const QString& panel, const QString& contol)
+bool NavigationApi::triggerControl(const QString& section, const QString& panel, const QJSValue& controlNameOrIndex)
 {
-    bool ok = goToControl(section, panel, contol);
+    bool ok = goToControl(section, panel, controlNameOrIndex);
     if (ok) {
         trigger();
     }
@@ -110,4 +123,9 @@ QString NavigationApi::activeControl() const
 {
     INavigationControl* c = navigation()->activeControl();
     return c ? c->name() : QString();
+}
+
+void NavigationApi::dump() const
+{
+    navigation()->dump();
 }

@@ -47,37 +47,33 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
 
-signals:
-    void elementsModified();
-    void modelChanged();
-
 private:
     enum RoleNames {
-        InspectorDataRole = Qt::UserRole + 1,
-        InspectorTitleRole
+        InspectorSectionModelRole = Qt::UserRole + 1
     };
 
-    void setElementList(const QList<Ms::EngravingItem*>& selectedElementList);
+    void listenSelectionChanged();
 
-    void buildModelsForEmptySelection(const ElementKeySet& selectedElementKeySet);
-    void buildModelsForSelectedElements(const ElementKeySet& selectedElementKeySet);
+    void setElementList(const QList<mu::engraving::EngravingItem*>& selectedElementList,
+                        notation::SelectionState selectionState = notation::SelectionState::NONE);
 
-    void createModelsBySectionType(const QList<AbstractInspectorModel::InspectorSectionType>& sectionTypeList,
-                                   const ElementKeySet& selectedElementKeySet = {});
-    void removeUnusedModels(const ElementKeySet& newElementKeySet,
-                            const QList<AbstractInspectorModel::InspectorSectionType>& exclusions = QList<AbstractInspectorModel::InspectorSectionType>());
+    void buildModelsForEmptySelection();
+    void buildModelsForSelectedElements(const ElementKeySet& selectedElementKeySet, bool isRangeSelection);
+
+    void createModelsBySectionType(const QList<InspectorSectionType>& sectionTypeList, const ElementKeySet& selectedElementKeySet = {});
+    void removeUnusedModels(const ElementKeySet& newElementKeySet, bool isRangeSelection,
+                            const QList<InspectorSectionType>& exclusions = QList<InspectorSectionType>());
+
+    bool isModelAllowed(const AbstractInspectorModel* model, const InspectorModelTypeSet& allowedModelTypes,
+                        const InspectorSectionTypeSet& allowedSectionTypes) const;
 
     void sortModels();
 
-    bool isModelAlreadyExists(const AbstractInspectorModel::InspectorSectionType modelType) const;
+    AbstractInspectorModel* modelBySectionType(InspectorSectionType sectionType) const;
 
-    void subscribeOnSelectionChanges();
-
-    QHash<int, QByteArray> m_roleNames;
     QList<AbstractInspectorModel*> m_modelList;
 
     IElementRepositoryService* m_repository = nullptr;
-    notation::INotationPtr m_notation;
 };
 }
 

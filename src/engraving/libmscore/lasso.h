@@ -25,19 +25,21 @@
 
 #include "engravingitem.h"
 
-#include "iengravingconfiguration.h"
 #include "modularity/ioc.h"
+#include "iengravingconfiguration.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Lasso
 //---------------------------------------------------------
 
 class Lasso : public EngravingItem
 {
-public:
-    INJECT(notation, mu::engraving::IEngravingConfiguration, engravingConfiguration)
+    OBJECT_ALLOCATOR(engraving, Lasso)
 
+    INJECT(engraving, IEngravingConfiguration, engravingConfiguration)
+
+public:
     Lasso(Score*);
     virtual Lasso* clone() const override { return new Lasso(*this); }
 
@@ -48,13 +50,10 @@ public:
     void editDrag(EditData&) override;
     void endDrag(EditData&) override {}
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-
     int gripsCount() const override { return 8; }
     Grip initialEditModeGrip() const override { return Grip(7); }
     Grip defaultGrip() const override { return Grip(7); }
     std::vector<mu::PointF> gripsPositions(const EditData&) const override;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

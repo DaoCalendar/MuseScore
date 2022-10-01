@@ -73,11 +73,11 @@ QVariant PartListModel::data(const QModelIndex& index, int role) const
 
     switch (role) {
     case RoleTitle:
-        return excerpt->title();
+        return excerpt->name();
     case RoleIsSelected:
         return m_selectionModel->isSelected(index);
-    case RoleIsCreated:
-        return excerpt->isCreated();
+    case RoleIsCustom:
+        return excerpt->isCustom();
     }
 
     return QVariant();
@@ -93,7 +93,7 @@ QHash<int, QByteArray> PartListModel::roleNames() const
     static const QHash<int, QByteArray> roles {
         { RoleTitle, "title" },
         { RoleIsSelected, "isSelected" },
-        { RoleIsCreated, "isCreated" }
+        { RoleIsCustom, "isCustom" }
     };
 
     return roles;
@@ -104,24 +104,9 @@ bool PartListModel::hasSelection() const
     return m_selectionModel->hasSelection();
 }
 
-bool PartListModel::isRemovingAvailable() const
-{
-    if (!m_selectionModel->hasSelection()) {
-        return false;
-    }
-
-    for (int index : m_selectionModel->selectedRows()) {
-        if (!m_excerpts[index]->isCreated()) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void PartListModel::createNewPart()
 {
-    IExcerptNotationPtr excerpt = masterNotation()->newExcerptBlankNotation();
+    IExcerptNotationPtr excerpt = masterNotation()->createEmptyExcerpt();
 
     int index = m_excerpts.size();
     insertExcerpt(index, excerpt);
@@ -145,11 +130,19 @@ void PartListModel::removePart(int partIndex)
         return;
     }
 
-    constexpr int partCount = 1;
+    if (!m_excerpts[partIndex]->isEmpty()) {
+        std::string question = mu::trc("notation", "Are you sure you want to delete this part?");
 
-    if (userAgreesToRemoveParts(partCount)) {
-        doRemovePart(partIndex);
+        IInteractive::Button btn = interactive()->question("", question, {
+            IInteractive::Button::Yes, IInteractive::Button::No
+        }).standardButton();
+
+        if (btn != IInteractive::Button::Yes) {
+            return;
+        }
     }
+
+    doRemovePart(partIndex);
 }
 
 void PartListModel::doRemovePart(int partIndex)
@@ -158,7 +151,7 @@ void PartListModel::doRemovePart(int partIndex)
         return;
     }
 
-    bool isCurrentContation = context()->currentNotation() == m_excerpts[partIndex]->notation();
+    bool isCurrentNotation = context()->currentNotation() == m_excerpts[partIndex]->notation();
 
     beginRemoveRows(QModelIndex(), partIndex, partIndex);
 
@@ -167,7 +160,7 @@ void PartListModel::doRemovePart(int partIndex)
 
     endRemoveRows();
 
-    if (isCurrentContation) {
+    if (isCurrentNotation) {
         context()->setCurrentNotation(context()->currentMasterNotation()->notation());
     }
 }
@@ -179,11 +172,11 @@ void PartListModel::setPartTitle(int partIndex, const QString& title)
     }
 
     IExcerptNotationPtr excerpt = m_excerpts[partIndex];
-    if (excerpt->title() == title) {
+    if (excerpt->name() == title) {
         return;
     }
 
-    excerpt->setTitle(title);
+    excerpt->setName(title);
 
     notifyAboutNotationChanged(partIndex);
 }
@@ -195,11 +188,11 @@ void PartListModel::validatePartTitle(int partIndex)
     }
 
     IExcerptNotationPtr excerpt = m_excerpts[partIndex];
-    if (!excerpt->title().isEmpty()) {
+    if (!excerpt->name().isEmpty()) {
         return;
     }
 
-    excerpt->setTitle(defaultPartTitle());
+    excerpt->setName(defaultPartTitle());
 
     notifyAboutNotationChanged(partIndex);
 }
@@ -217,10 +210,10 @@ void PartListModel::copyPart(int partIndex)
     }
 
     IExcerptNotationPtr copy = m_excerpts[partIndex]->clone();
-    QString title = copy->title();
-    title += qtrc("notation", " (copy)");
+    QString title = copy->name();
+    title += " " + qtrc("notation", "(copy)");
 
-    copy->setTitle(title);
+    copy->setName(title);
 
     insertExcerpt(partIndex + 1, copy);
 }
@@ -229,62 +222,48 @@ void PartListModel::insertExcerpt(int destinationIndex, IExcerptNotationPtr exce
 {
     beginInsertRows(QModelIndex(), destinationIndex, destinationIndex);
     m_excerpts.insert(destinationIndex, excerpt);
+    masterNotation()->addExcerpts({ excerpt });
     endInsertRows();
 
     emit partAdded(destinationIndex);
     selectPart(destinationIndex);
 }
 
-void PartListModel::removeSelectedParts()
-{
-    QList<int> rows = m_selectionModel->selectedRows();
-    if (rows.empty()) {
-        return;
-    }
-
-    if (!userAgreesToRemoveParts(rows.count())) {
-        return;
-    }
-
-    QList<IExcerptNotationPtr> excerptsToRemove;
-
-    for (int row : rows) {
-        excerptsToRemove.push_back(m_excerpts[row]);
-    }
-
-    for (IExcerptNotationPtr excerpt : excerptsToRemove) {
-        int row = m_excerpts.indexOf(excerpt);
-        doRemovePart(row);
-    }
-
-    m_selectionModel->clear();
-}
-
-bool PartListModel::userAgreesToRemoveParts(int partCount) const
-{
-    QString question = mu::qtrc("notation", "Are you sure you want to delete %1?")
-                       .arg(partCount > 1 ? "these parts" : "this part");
-
-    IInteractive::Result result = interactive()->question("", question.toStdString(), {
-        IInteractive::Button::Yes, IInteractive::Button::No
-    });
-
-    return result.standardButton() == IInteractive::Button::Yes;
-}
-
 void PartListModel::openSelectedParts()
 {
     QList<int> rows = m_selectionModel->selectedRows();
+    std::sort(rows.begin(), rows.end());
+
+    openNotations(rows);
+}
+
+void PartListModel::openAllParts()
+{
+    QList<int> rows;
+
+    for (int i = 0; i < m_excerpts.size(); ++i) {
+        rows << i;
+    }
+
+    openNotations(rows);
+}
+
+void PartListModel::openNotations(const QList<int>& rows) const
+{
     if (rows.empty()) {
         return;
     }
 
-    ExcerptNotationList newExcerpts;
+    ExcerptNotationList excerpts;
     for (int index : rows) {
-        newExcerpts.push_back(m_excerpts[index]);
+        excerpts.push_back(m_excerpts[index]);
     }
 
-    masterNotation()->addExcerpts(newExcerpts);
+    masterNotation()->addExcerpts(excerpts);
+
+    for (int index : rows) {
+        masterNotation()->setExcerptIsOpen(m_excerpts[index]->notation(), true);
+    }
 
     context()->setCurrentNotation(m_excerpts[rows.last()]->notation());
 }

@@ -21,17 +21,16 @@
  */
 
 #include "tremolobar.h"
-#include "draw/pen.h"
-#include "io/xml.h"
+
+#include "draw/types/pen.h"
+#include "rw/xml.h"
+
 #include "score.h"
-#include "undo.h"
-#include "staff.h"
-#include "chord.h"
-#include "note.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   tremoloBarStyle
 //---------------------------------------------------------
@@ -40,25 +39,25 @@ static const ElementStyle tremoloBarStyle {
     { Sid::tremoloBarLineWidth,  Pid::LINE_WIDTH },
 };
 
-static const QList<PitchValue> DIP_CURVE = { PitchValue(0, 0),
-                                             PitchValue(30, -100),
-                                             PitchValue(60, 0) };
+static const PitchValues DIP_CURVE = { PitchValue(0, 0),
+                                       PitchValue(30, -100),
+                                       PitchValue(60, 0) };
 
-static const QList<PitchValue> DIVE_CURVE = { PitchValue(0, 0),
-                                              PitchValue(60, -150) };
+static const PitchValues DIVE_CURVE = { PitchValue(0, 0),
+                                        PitchValue(60, -150) };
 
-static const QList<PitchValue> RELEASE_UP_CURVE = { PitchValue(0, -150),
-                                                    PitchValue(60, 0) };
+static const PitchValues RELEASE_UP_CURVE = { PitchValue(0, -150),
+                                              PitchValue(60, 0) };
 
-static const QList<PitchValue> INVERTED_DIP_CURVE = { PitchValue(0, 0),
-                                                      PitchValue(30, 100),
-                                                      PitchValue(60, 0) };
+static const PitchValues INVERTED_DIP_CURVE = { PitchValue(0, 0),
+                                                PitchValue(30, 100),
+                                                PitchValue(60, 0) };
 
-static const QList<PitchValue> RETURN_CURVE = { PitchValue(0, 0),
-                                                PitchValue(60, 150) };
+static const PitchValues RETURN_CURVE = { PitchValue(0, 0),
+                                          PitchValue(60, 150) };
 
-static const QList<PitchValue> RELEASE_DOWN_CURVE = { PitchValue(0, 150),
-                                                      PitchValue(60, 0) };
+static const PitchValues RELEASE_DOWN_CURVE = { PitchValue(0, 150),
+                                                PitchValue(60, 0) };
 
 //---------------------------------------------------------
 //   TremoloBar
@@ -76,8 +75,8 @@ TremoloBar::TremoloBar(EngravingItem* parent)
 
 void TremoloBar::layout()
 {
-    qreal _spatium = spatium();
-    if (parent()) {
+    double _spatium = spatium();
+    if (explicitParent()) {
         setPos(0.0, -_spatium * 3.0);
     } else {
         setPos(PointF());
@@ -91,15 +90,15 @@ void TremoloBar::layout()
      *  consistently to values that make sense to draw with the
      *  Musescore scale. */
 
-    qreal timeFactor  = m_userMag / 1.0;
-    qreal pitchFactor = -_spatium * .02;
+    double timeFactor  = m_userMag / 1.0;
+    double pitchFactor = -_spatium * .02;
 
     m_polygon.clear();
-    for (auto v : qAsConst(m_points)) {
+    for (auto v : m_points) {
         m_polygon << PointF(v.time * timeFactor, v.pitch * pitchFactor);
     }
 
-    qreal w = m_lw.val();
+    double w = m_lw.val();
     setbbox(m_polygon.boundingRect().adjusted(-w, -w, w, w));
 }
 
@@ -122,15 +121,14 @@ void TremoloBar::draw(mu::draw::Painter* painter) const
 
 void TremoloBar::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     writeProperty(xml, Pid::MAG);
     writeProperty(xml, Pid::LINE_WIDTH);
     writeProperty(xml, Pid::PLAY);
     for (const PitchValue& v : m_points) {
-        xml.tagE(QString("point time=\"%1\" pitch=\"%2\" vibrato=\"%3\"")
-                 .arg(v.time).arg(v.pitch).arg(v.vibrato));
+        xml.tag("point", { { "time", v.time }, { "pitch", v.pitch }, { "vibrato", v.vibrato } });
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -146,7 +144,7 @@ void TremoloBar::read(XmlReader& e)
             pv.time    = e.intAttribute("time");
             pv.pitch   = e.intAttribute("pitch");
             pv.vibrato = e.intAttribute("vibrato");
-            m_points.append(pv);
+            m_points.push_back(pv);
             e.readNext();
         } else if (tag == "mag") {
             m_userMag = e.readDouble(0.1, 10.0);
@@ -164,11 +162,11 @@ void TremoloBar::read(XmlReader& e)
 //   getProperty
 //---------------------------------------------------------
 
-QVariant TremoloBar::getProperty(Pid propertyId) const
+PropertyValue TremoloBar::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::LINE_WIDTH:
-        return lineWidth();
+        return lineWidth().val();
     case Pid::MAG:
         return userMag();
     case Pid::PLAY:
@@ -176,7 +174,7 @@ QVariant TremoloBar::getProperty(Pid propertyId) const
     case Pid::TREMOLOBAR_TYPE:
         return static_cast<int>(parseTremoloBarTypeFromCurve(m_points));
     case Pid::TREMOLOBAR_CURVE:
-        return pitchValuesToVariant(m_points);
+        return m_points;
     default:
         return EngravingItem::getProperty(propertyId);
     }
@@ -186,11 +184,11 @@ QVariant TremoloBar::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool TremoloBar::setProperty(Pid propertyId, const QVariant& v)
+bool TremoloBar::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::LINE_WIDTH:
-        setLineWidth(v.value<Spatium>());
+        setLineWidth(Spatium(v.value<double>()));
         break;
     case Pid::MAG:
         setUserMag(v.toDouble());
@@ -203,7 +201,7 @@ bool TremoloBar::setProperty(Pid propertyId, const QVariant& v)
         updatePointsByTremoloBarType(static_cast<TremoloBarType>(v.toInt()));
         break;
     case Pid::TREMOLOBAR_CURVE:
-        setPoints(pitchValuesFromVariant(v));
+        setPoints(v.value<PitchValues>());
         break;
     default:
         return EngravingItem::setProperty(propertyId, v);
@@ -216,7 +214,7 @@ bool TremoloBar::setProperty(Pid propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant TremoloBar::propertyDefault(Pid pid) const
+PropertyValue TremoloBar::propertyDefault(Pid pid) const
 {
     switch (pid) {
     case Pid::MAG:
@@ -226,12 +224,12 @@ QVariant TremoloBar::propertyDefault(Pid pid) const
     case Pid::TREMOLOBAR_TYPE:
         return static_cast<int>(TremoloBarType::DIP);
     case Pid::TREMOLOBAR_CURVE:
-        return QVariant::fromValue(DIP_CURVE);
+        return DIP_CURVE;
     default:
         for (const StyledProperty& p : *styledProperties()) {
             if (p.pid == pid) {
-                if (propertyType(pid) == P_TYPE::SP_REAL) {
-                    return score()->styleP(p.sid);
+                if (propertyType(pid) == P_TYPE::MILLIMETRE) {
+                    return score()->styleMM(p.sid);
                 }
                 return score()->styleV(p.sid);
             }
@@ -240,7 +238,7 @@ QVariant TremoloBar::propertyDefault(Pid pid) const
     }
 }
 
-TremoloBarType TremoloBar::parseTremoloBarTypeFromCurve(const QList<PitchValue>& curve) const
+TremoloBarType TremoloBar::parseTremoloBarTypeFromCurve(const PitchValues& curve) const
 {
     if (curve == DIP_CURVE) {
         return TremoloBarType::DIP;
@@ -254,9 +252,9 @@ TremoloBarType TremoloBar::parseTremoloBarTypeFromCurve(const QList<PitchValue>&
         return TremoloBarType::RETURN;
     } else if (curve == RELEASE_DOWN_CURVE) {
         return TremoloBarType::RELEASE_DOWN;
-    } else {
-        return TremoloBarType::CUSTOM;
     }
+
+    return TremoloBarType::CUSTOM;
 }
 
 void TremoloBar::updatePointsByTremoloBarType(const TremoloBarType type)
@@ -266,21 +264,21 @@ void TremoloBar::updatePointsByTremoloBarType(const TremoloBarType type)
         m_points = DIP_CURVE;
         break;
     case TremoloBarType::DIVE:
-        m_points = RELEASE_UP_CURVE;
+        m_points = DIVE_CURVE;
         break;
     case TremoloBarType::RELEASE_UP:
-        m_points = INVERTED_DIP_CURVE;
+        m_points = RELEASE_UP_CURVE;
         break;
     case TremoloBarType::INVERTED_DIP:
-        m_points = RETURN_CURVE;
+        m_points = INVERTED_DIP_CURVE;
         break;
     case TremoloBarType::RETURN:
-        m_points = RELEASE_DOWN_CURVE;
+        m_points = RETURN_CURVE;
         break;
     case TremoloBarType::RELEASE_DOWN:
         m_points = RELEASE_DOWN_CURVE;
         break;
-    default:
+    case TremoloBarType::CUSTOM:
         break;
     }
 }

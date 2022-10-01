@@ -23,16 +23,17 @@
 
 #include <QPageSize>
 
+#include "engraving/libmscore/page.h"
+#include "engraving/libmscore/masterscore.h"
+#include "engraving/libmscore/mscore.h"
+#include "engraving/libmscore/excerpt.h"
 #include "engraving/style/pagestyle.h"
 
-#include "widgetstatestore.h"
-#include "libmscore/page.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/mscore.h"
-#include "libmscore/excerpt.h"
+#include "ui/view/widgetstatestore.h"
 
 using namespace mu::notation;
-using namespace Ms;
+using namespace mu::ui;
+using namespace mu::engraving;
 
 PageSettings::PageSettings(QWidget* parent)
     : QDialog(parent)
@@ -146,7 +147,7 @@ bool PageSettings::styleValueBool(StyleId styleId) const
     return globalContext()->currentNotation()->style()->styleValue(styleId).toBool();
 }
 
-void PageSettings::setStyleValue(StyleId styleId, const QVariant& newValue) const
+void PageSettings::setStyleValue(StyleId styleId, const PropertyValue& newValue) const
 {
     globalContext()->currentNotation()->style()->setStyleValue(styleId, newValue);
 }
@@ -181,7 +182,7 @@ void PageSettings::updateValues()
     }
     spatiumEntry->setSingleStep(singleStepScale);
 
-    double f = mm ? INCH : 1.0;
+    double f = mm ? mu::engraving::INCH : 1.0;
 
     double w = styleValueDouble(Sid::pageWidth);
     double h = styleValueDouble(Sid::pageHeight);
@@ -326,7 +327,7 @@ void PageSettings::applyToAllParts()
         return;
     }
     for (Excerpt* e : score()->masterScore()->excerpts()) {
-        applyToScore(e->partScore());
+        applyToScore(e->excerptScore());
     }
     _changeFlag = false;
 }

@@ -20,12 +20,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
-#include "measure.h"
-#include "segment.h"
 #include "chordrest.h"
+#include "measure.h"
 #include "range.h"
-#include "tuplet.h"
+#include "score.h"
+#include "segment.h"
 #include "spanner.h"
 #include "tie.h"
 #include "undo.h"
@@ -33,7 +32,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   cmdSplitMeasure
 //---------------------------------------------------------
@@ -47,7 +46,6 @@ void Score::cmdSplitMeasure(ChordRest* cr)
 
 //---------------------------------------------------------
 //   splitMeasure
-//    return true on success
 //---------------------------------------------------------
 
 void Score::splitMeasure(Segment* segment)
@@ -61,8 +59,8 @@ void Score::splitMeasure(Segment* segment)
         return;
     }
     Measure* measure = segment->measure();
-    for (int staffIdx = 0; staffIdx < nstaves(); ++staffIdx) {
-        if (measure->isMeasureRepeatGroup(staffIdx)) {
+    for (size_t staffIdx = 0; staffIdx < nstaves(); ++staffIdx) {
+        if (measure->isMeasureRepeatGroup(static_cast<int>(staffIdx))) {
             MScore::setError(MsError::CANNOT_SPLIT_MEASURE_REPEAT);
             return;
         }
@@ -94,10 +92,10 @@ void Score::splitMeasure(Segment* segment)
         }
     }
 
-    // Make sure ties are the beginning the split measure are restored.
+    // Make sure ties to the beginning of the split measure are restored.
     std::vector<Tie*> ties;
-    for (int track = 0; track < ntracks(); track++) {
-        Chord* chord = measure->findChord(stick, track);
+    for (size_t track = 0; track < ntracks(); track++) {
+        Chord* chord = measure->findChord(stick, static_cast<int>(track));
         if (chord) {
             for (Note* note : chord->notes()) {
                 Tie* tie = note->tieBack();
@@ -114,9 +112,13 @@ void Score::splitMeasure(Segment* segment)
     undoInsertTime(measure->tick(), -measure->ticks());
 
     // create empty measures:
-    insertMeasure(ElementType::MEASURE, nm, true, false);
+    InsertMeasureOptions options;
+    options.createEmptyMeasures = true;
+    options.moveSignaturesClef = false;
+
+    insertMeasure(ElementType::MEASURE, nm, options);
     Measure* m2 = toMeasure(nm ? nm->prev() : lastMeasure());
-    insertMeasure(ElementType::MEASURE, m2, true, false);
+    insertMeasure(ElementType::MEASURE, m2, options);
     Measure* m1 = toMeasure(m2->prev());
 
     Fraction tick = segment->tick();
@@ -133,7 +135,7 @@ void Score::splitMeasure(Segment* segment)
     if (ticks1.denominator() < measure->ticks().denominator()) {
         if (measure->ticks().denominator() % m1->timesig().denominator() == 0) {
             int mult = measure->ticks().denominator() / ticks1.denominator();
-            // *= operator audomatically reduces via GCD, so rather do literal multiplication:
+            // *= operator automatically reduces via GCD, so rather do literal multiplication:
             ticks1.setDenominator(ticks1.denominator() * mult);
             ticks1.setNumerator(ticks1.numerator() * mult);
         }
@@ -145,11 +147,15 @@ void Score::splitMeasure(Segment* segment)
             ticks2.setNumerator(ticks2.numerator() * mult);
         }
     }
+    if (ticks1.denominator() > 128 || ticks2.denominator() > 128) {
+        MScore::setError(MsError::CANNOT_SPLIT_MEASURE_TOO_SHORT);
+        return;
+    }
     m1->adjustToLen(ticks1, false);
     m2->adjustToLen(ticks2, false);
     range.write(this, m1->tick());
 
-    // Restore ties the the beginning of the split measure.
+    // Restore ties to the beginning of the split measure.
     for (auto tie : ties) {
         tie->setEndNote(searchTieNote(tie->startNote()));
         undoAddElement(tie);

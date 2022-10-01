@@ -23,6 +23,7 @@
 #define MU_VST_VSTAUDIOCLIENT_H
 
 #include "audio/audiotypes.h"
+#include "mpe/events.h"
 
 #include "vstplugin.h"
 #include "vsttypes.h"
@@ -36,13 +37,17 @@ public:
 
     void init(VstPluginType&& type, VstPluginPtr plugin, audio::audioch_t&& audioChannelsCount = 2);
 
-    bool handleEvent(const midi::Event& e);
+    bool handleEvent(const VstEvent& event);
+    bool handleParamChange(const PluginParamInfo& param);
+    void setVolumeGain(const audio::gain_t newVolumeGain);
 
     audio::samples_t process(float* output, audio::samples_t samplesPerChannel);
     void flush();
 
     void setBlockSize(unsigned int samples);
     void setSampleRate(unsigned int sampleRate);
+
+    ParamsMapping paramsMapping(const std::set<Steinberg::Vst::CtrlNumber>& controllers) const;
 
 private:
     struct SamplesInfo {
@@ -60,18 +65,29 @@ private:
     void setUpProcessData();
     void updateProcessSetup();
     void extractInputSamples(const audio::samples_t& sampleCount, const float* sourceBuffer);
-    void fillOutputBuffer(unsigned int samples, float* output);
+    bool fillOutputBuffer(unsigned int samples, float* output);
 
-    bool convertMidiToVst(const mu::midi::Event& in, VstEvent& out) const;
+    void ensureActivity();
+    void disableActivity();
+
+    void flushBuffers();
+
+    bool m_isActive = false;
+    audio::gain_t m_volumeGain = 1.f; // 0.0 - 1.0
 
     VstPluginPtr m_pluginPtr = nullptr;
     mutable PluginComponentPtr m_pluginComponent = nullptr;
 
     SamplesInfo m_samplesInfo;
 
+    std::vector<int> m_activeOutputBusses;
+    std::vector<int> m_activeInputBusses;
+
     VstEventList m_eventList;
     VstProcessData m_processData;
     VstProcessContext m_processContext;
+
+    bool m_needUnprepareProcessData = false;
 
     VstPluginType m_type = VstPluginType::Undefined;
     audio::audioch_t m_audioChannelsCount = 0;

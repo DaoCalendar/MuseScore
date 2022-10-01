@@ -35,23 +35,19 @@ PreferencesPage {
     }
 
     Column {
-        anchors.fill: parent
+        width: parent.width
         spacing: root.sectionsSpacing
 
         AutomaticUpdateSection {
             isAppUpdatable: updateModel.isAppUpdatable()
             needCheckForNewAppVersion: updateModel.needCheckForNewAppVersion
-            needCheckForNewExtensionsVersion: updateModel.needCheckForNewExtensionsVersion
+            museScorePrivacyPolicyUrl: updateModel.museScorePrivacyPolicyUrl()
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
 
-            onNeedCheckForNewAppVersionChangeRequested: {
+            onNeedCheckForNewAppVersionChangeRequested: function(check) {
                 updateModel.needCheckForNewAppVersion = check
-            }
-
-            onNeedCheckForNewExtensionsVersionChangeRequested: {
-                updateModel.needCheckForNewExtensionsVersion = check
             }
         }
     }

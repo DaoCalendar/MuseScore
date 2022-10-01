@@ -22,11 +22,12 @@
 #ifndef MU_NOTATION_TUPLETDIALOG_H
 #define MU_NOTATION_TUPLETDIALOG_H
 
-#include "libmscore/duration.h"
+#include "libmscore/durationelement.h"
 #include "ui_tupletdialog.h"
 
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
+#include "actions/iactionsdispatcher.h"
 
 //---------------------------------------------------------
 //   TupletDialog
@@ -37,6 +38,7 @@ class TupletDialog : public QDialog, Ui::TupletDialog
     Q_OBJECT
 
     INJECT(notation, context::IGlobalContext, globalContext)
+    INJECT(notation, actions::IActionsDispatcher, dispatcher)
 
     virtual void hideEvent(QHideEvent*);
 

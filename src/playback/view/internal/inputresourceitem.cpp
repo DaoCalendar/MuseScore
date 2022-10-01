@@ -4,12 +4,14 @@
 
 #include "log.h"
 #include "translation.h"
+#include "stringutils.h"
 
 using namespace mu::playback;
 using namespace mu::audio;
 
-static const QString VST_MENU_ITEM_ID("VST");
-static const QString SOUNDFONTS_MENU_ITEM_ID = QString::fromStdString(mu::trc("playback", "Soundfonts"));
+static const QString VST_MENU_ITEM_ID("VST3");
+static const QString SOUNDFONTS_MENU_ITEM_ID = QString::fromStdString(mu::trc("playback", "SoundFonts"));
+static const QString MUSE_MENU_ITEM_ID("Muse Sounds");
 
 InputResourceItem::InputResourceItem(QObject* parent)
     : AbstractAudioResourceItem(parent)
@@ -25,10 +27,18 @@ void InputResourceItem::requestAvailableResources()
         QVariantList result;
 
         if (!isBlank()) {
-            const QString& currentResourceId = QString::fromStdString(m_currentInputParams.resourceMeta.id);
+            QString currentResourceId = QString::fromStdString(m_currentInputParams.resourceMeta.id);
+
             result << buildMenuItem(currentResourceId,
-                                    currentResourceId,
+                                    title(),
                                     true /*checked*/);
+
+            result << buildSeparator();
+        }
+
+        auto museResourcesSearch = m_availableResourceMap.find(AudioResourceType::MuseSamplerSoundPack);
+        if (museResourcesSearch != m_availableResourceMap.end()) {
+            result << buildMuseMenuItem(museResourcesSearch->second);
 
             result << buildSeparator();
         }
@@ -82,10 +92,14 @@ void InputResourceItem::setParams(const audio::AudioInputParams& newParams)
 
     emit titleChanged();
     emit isBlankChanged();
+    emit isActiveChanged();
 }
 
 QString InputResourceItem::title() const
 {
+    if (m_currentInputParams.type() == mu::audio::AudioSourceType::MuseSampler) {
+        return m_currentInputParams.resourceMeta.attributeVal(u"museName").toQString();
+    }
     return QString::fromStdString(m_currentInputParams.resourceMeta.id);
 }
 
@@ -94,9 +108,54 @@ bool InputResourceItem::isBlank() const
     return !m_currentInputParams.isValid();
 }
 
+bool InputResourceItem::isActive() const
+{
+    return m_currentInputParams.isValid();
+}
+
 bool InputResourceItem::hasNativeEditorSupport() const
 {
     return m_currentInputParams.resourceMeta.hasNativeEditorSupport;
+}
+
+QVariantMap InputResourceItem::buildMuseMenuItem(const ResourceByVendorMap& resourcesByVendor) const
+{
+    String currentCategory = m_currentInputParams.resourceMeta.attributeVal(u"museCategory");
+
+    QVariantList subItemsByType;
+
+    for (const auto& pair : resourcesByVendor) {
+        std::map<String, std::vector<std::tuple<int, String, const AudioResourceMeta&> > > categoryMap;
+        for (const AudioResourceMeta& resourceMeta : pair.second) {
+            const String& category = resourceMeta.attributeVal(u"museCategory");
+            const String& name = resourceMeta.attributeVal(u"museName");
+            int unique_id = resourceMeta.attributeVal(u"museUID").toInt();
+
+            categoryMap[category].push_back({ unique_id, name, resourceMeta });
+        }
+
+        for (const auto& category : categoryMap) {
+            QVariantList subItemsByCategory;
+            for (const auto& inst : category.second) {
+                QString instName = std::get<1>(inst).toQString();
+                auto instId = std::get<2>(inst).id;
+                subItemsByCategory << buildMenuItem(QString::fromStdString(instId),
+                                                    instName,
+                                                    m_currentInputParams.resourceMeta.id == instId);
+            }
+
+            QString categoryString = category.first.toQString();
+            subItemsByType << buildMenuItem(categoryString,
+                                            categoryString,
+                                            currentCategory == category.first,
+                                            subItemsByCategory);
+        }
+    }
+
+    return buildMenuItem(MUSE_MENU_ITEM_ID,
+                         MUSE_MENU_ITEM_ID,
+                         m_currentInputParams.resourceMeta.type == AudioResourceType::MuseSamplerSoundPack,
+                         subItemsByType);
 }
 
 QVariantMap InputResourceItem::buildVstMenuItem(const ResourceByVendorMap& resourcesByVendor) const
@@ -153,9 +212,10 @@ void InputResourceItem::updateCurrentParams(const AudioResourceMeta& newMeta)
 
     emit titleChanged();
     emit isBlankChanged();
+    emit isActiveChanged();
     emit inputParamsChanged();
 
-    requestToLaunchNativeEditorView();
+    updateNativeEditorView();
 }
 
 void InputResourceItem::updateAvailableResources(const AudioResourceMetaList& availableResources)
@@ -166,5 +226,11 @@ void InputResourceItem::updateAvailableResources(const AudioResourceMetaList& av
         ResourceByVendorMap& resourcesByVendor = m_availableResourceMap[meta.type];
         AudioResourceMetaList& resourcesMetaList = resourcesByVendor[meta.vendor];
         resourcesMetaList.push_back(meta);
+    }
+
+    for (auto& [type, resourcesByVendor] : m_availableResourceMap) {
+        for (auto& [vendor, resourceMetaList] : resourcesByVendor) {
+            sortResourcesList(resourceMetaList);
+        }
     }
 }

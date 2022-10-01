@@ -29,12 +29,12 @@
 */
 
 #include "engravingitem.h"
-#include "layoutbreak.h"
 
-namespace Ms {
+namespace mu::engraving {
+class LayoutBreak;
+class Measure;
 class Score;
 class System;
-class Measure;
 
 //---------------------------------------------------------
 //   Repeat
@@ -72,6 +72,8 @@ constexpr bool operator&(Repeat t1, Repeat t2)
 
 class MeasureBase : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, MeasureBase)
+
     MeasureBase* _next    { 0 };
     MeasureBase* _prev    { 0 };
 
@@ -80,7 +82,7 @@ class MeasureBase : public EngravingItem
     Fraction _tick         { Fraction(0, 1) };
     int _no                { 0 };         ///< Measure number, counting from zero
     int _noOffset          { 0 };         ///< Offset to measure number
-    qreal m_oldWidth       { 0 };         ///< Used to restore layout during recalculations in Score::collectSystem()
+    double m_oldWidth       { 0 };         ///< Used to restore layout during recalculations in Score::collectSystem()
 
 protected:
 
@@ -94,13 +96,13 @@ public:
 
     ~MeasureBase();
 
-    System* system() const { return (System*)parent(); }
+    System* system() const { return (System*)explicitParent(); }
     void setParent(System* s) { EngravingItem::setParent((EngravingObject*)(s)); }
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
+    virtual void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
 
     virtual void setScore(Score* s) override;
 
@@ -112,15 +114,16 @@ public:
     void setPrev(MeasureBase* e) { _prev = e; }
     MeasureBase* top() const;
 
-    Ms::Measure* nextMeasure() const;
-    Ms::Measure* prevMeasure() const;
-    Ms::Measure* nextMeasureMM() const;
-    Ms::Measure* prevMeasureMM() const;
+    Measure* nextMeasure() const;
+    Measure* prevMeasure() const;
+    Measure* nextMeasureMM() const;
+    Measure* prevMeasureMM() const;
 
     virtual void write(XmlWriter&) const override = 0;
-    virtual void write(XmlWriter&, int, bool, bool) const = 0;
+    virtual void write(XmlWriter&, staff_idx_t, bool, bool) const = 0;
 
     virtual void layout() override;
+    virtual void layoutCrossStaff() {}
 
     ElementList& el() { return _el; }
     const ElementList& el() const { return _el; }
@@ -128,11 +131,11 @@ public:
     const MeasureBase* findPotentialSectionBreak() const;
     LayoutBreak* sectionBreakElement() const;
 
-    void undoSetBreak(bool v, LayoutBreak::Type type);
-    void undoSetLineBreak(bool v) { undoSetBreak(v, LayoutBreak::Type::LINE); }
-    void undoSetPageBreak(bool v) { undoSetBreak(v, LayoutBreak::Type::PAGE); }
-    void undoSetSectionBreak(bool v) { undoSetBreak(v, LayoutBreak::Type::SECTION); }
-    void undoSetNoBreak(bool v) { undoSetBreak(v, LayoutBreak::Type::NOBREAK); }
+    void undoSetBreak(bool v, LayoutBreakType type);
+    void undoSetLineBreak(bool v) { undoSetBreak(v, LayoutBreakType::LINE); }
+    void undoSetPageBreak(bool v) { undoSetBreak(v, LayoutBreakType::PAGE); }
+    void undoSetSectionBreak(bool v) { undoSetBreak(v, LayoutBreakType::SECTION); }
+    void undoSetNoBreak(bool v) { undoSetBreak(v, LayoutBreakType::NOBREAK); }
 
     virtual void moveTicks(const Fraction& diff) { setTick(tick() + diff); }
 
@@ -142,7 +145,7 @@ public:
     virtual bool readProperties(XmlReader&) override;
 
     Fraction tick() const override;
-    void setTick(const Fraction& f) { _tick = f; }
+    void setTick(const Fraction& f);
 
     Fraction ticks() const { return _len; }
     void setTicks(const Fraction& f) { _len = f; }
@@ -151,11 +154,11 @@ public:
 
     void triggerLayout() const override;
 
-    qreal pause() const;
+    double pause() const;
 
-    virtual QVariant getProperty(Pid) const override;
-    virtual bool setProperty(Pid, const QVariant&) override;
-    virtual QVariant propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
     void clearElements();
     ElementList takeElements();
@@ -197,8 +200,8 @@ public:
     int index() const;
     int measureIndex() const;
 
-    void setOldWidth(qreal n) { m_oldWidth = n; }
-    qreal oldWidth() const { return m_oldWidth; }
+    void setOldWidth(double n) { m_oldWidth = n; }
+    double oldWidth() const { return m_oldWidth; }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

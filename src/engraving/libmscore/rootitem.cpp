@@ -23,19 +23,21 @@
 
 #include "score.h"
 
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+#include "../accessibility/accessibleroot.h"
+#endif
+
 using namespace mu::engraving;
-using namespace Ms;
 
 RootItem::RootItem(Score* score)
-    : EngravingItem(ElementType::INVALID, score), m_score(score)
+    : EngravingItem(ElementType::ROOT_ITEM, score), m_score(score)
 {
-    m_dummy = new compat::DummyElement(m_score);
+    m_dummy = new compat::DummyElement(this);
 }
 
 RootItem::~RootItem()
 {
-    //! TODO Please don't remove (igor.korsukov@gmail.com)
-    // delete m_dummy;
+    delete m_dummy;
 }
 
 compat::DummyElement* RootItem::dummy() const
@@ -43,8 +45,13 @@ compat::DummyElement* RootItem::dummy() const
     return m_dummy;
 }
 
-void RootItem::initDummy()
+void RootItem::init()
 {
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+    setupAccessible();
+#endif
+
+    m_dummy->setParent(this);
     m_dummy->init();
 }
 
@@ -53,12 +60,10 @@ EngravingObject* RootItem::scanParent() const
     return m_score->scanParent();
 }
 
-EngravingObject* RootItem::scanChild(int n) const
+#ifndef ENGRAVING_NO_ACCESSIBILITY
+AccessibleItemPtr RootItem::createAccessible()
 {
-    return m_score->scanChild(n);
+    return std::make_shared<AccessibleRoot>(this, AccessibleItem::Group);
 }
 
-int RootItem::scanChildCount() const
-{
-    return m_score->scanChildCount();
-}
+#endif

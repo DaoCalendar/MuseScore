@@ -24,17 +24,20 @@
 
 #include "qobjectdefs.h"
 
+#include "ui/view/iconcodes.h"
+#include "dataformatter.h"
+
 #include "libmscore/types.h"
 
 namespace mu::inspector {
 struct ElementKey
 {
-    Ms::ElementType type = Ms::ElementType::INVALID;
+    mu::engraving::ElementType type = mu::engraving::ElementType::INVALID;
     int subtype = -1;
 
     ElementKey() = default;
 
-    ElementKey(Ms::ElementType type, int subtype = -1)
+    ElementKey(mu::engraving::ElementType type, int subtype = -1)
         : type(type), subtype(subtype)
     {
     }
@@ -71,6 +74,22 @@ public:
 
     Q_ENUM(Placement)
 };
+
+inline double formatDoubleFunc(const QVariant& elementPropertyValue)
+{
+    return DataFormatter::roundDouble(elementPropertyValue.toDouble());
+}
+
+template<typename T>
+inline QVariant object(T type, QString title, ui::IconCode::Code iconCode = ui::IconCode::Code::NONE)
+{
+    QVariantMap obj;
+    obj["value"] = static_cast<int>(type);
+    obj["text"] = title;
+    obj["iconCode"] = static_cast<int>(iconCode);
+
+    return obj;
+}
 }
 
 #endif // MU_INSPECTOR_COMMONTYPES_H

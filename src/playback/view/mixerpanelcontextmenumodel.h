@@ -23,7 +23,7 @@
 #ifndef MU_PLAYBACK_MIXERPANELCONTEXTMENUMODEL_H
 #define MU_PLAYBACK_MIXERPANELCONTEXTMENUMODEL_H
 
-#include "ui/view/abstractmenumodel.h"
+#include "uicomponents/view/abstractmenumodel.h"
 #include "actions/actionable.h"
 
 #include "actions/iactionsdispatcher.h"
@@ -32,7 +32,7 @@
 #include "playback/playbacktypes.h"
 
 namespace mu::playback {
-class MixerPanelContextMenuModel : public ui::AbstractMenuModel, public actions::Actionable
+class MixerPanelContextMenuModel : public uicomponents::AbstractMenuModel, public actions::Actionable
 {
     Q_OBJECT
 
@@ -44,6 +44,8 @@ class MixerPanelContextMenuModel : public ui::AbstractMenuModel, public actions:
     Q_PROPERTY(bool audioFxSectionVisible READ audioFxSectionVisible NOTIFY audioFxSectionVisibleChanged)
     Q_PROPERTY(bool balanceSectionVisible READ balanceSectionVisible NOTIFY balanceSectionVisibleChanged)
     Q_PROPERTY(bool volumeSectionVisible READ volumeSectionVisible NOTIFY volumeSectionVisibleChanged)
+    Q_PROPERTY(bool faderSectionVisible READ faderSectionVisible NOTIFY faderSectionVisibleChanged)
+    Q_PROPERTY(bool muteAndSoloSectionVisible READ muteAndSoloSectionVisible NOTIFY muteAndSoloSectionVisibleChanged)
     Q_PROPERTY(bool titleSectionVisible READ titleSectionVisible NOTIFY titleSectionVisibleChanged)
 
 public:
@@ -54,6 +56,8 @@ public:
     bool audioFxSectionVisible() const;
     bool balanceSectionVisible() const;
     bool volumeSectionVisible() const;
+    bool faderSectionVisible() const;
+    bool muteAndSoloSectionVisible() const;
     bool titleSectionVisible() const;
 
     Q_INVOKABLE void load() override;
@@ -64,12 +68,14 @@ signals:
     void audioFxSectionVisibleChanged();
     void balanceSectionVisibleChanged();
     void volumeSectionVisibleChanged();
+    void faderSectionVisibleChanged();
+    void muteAndSoloSectionVisibleChanged();
     void titleSectionVisibleChanged();
 
 private:
     bool isSectionVisible(MixerSectionType sectionType) const;
 
-    ui::MenuItem buildViewMenuItem(MixerSectionType sectionType) const;
+    uicomponents::MenuItem* buildViewMenuItem(MixerSectionType sectionType);
 
     void toggleMixerSection(const actions::ActionData& args);
 };

@@ -33,6 +33,8 @@ Column {
     id: root
 
     property PropertyItem lineStyle: null
+    property alias possibleLineStyles: styleSection.model
+
     property PropertyItem dashLineLength: null
     property PropertyItem dashGapLength: null
 
@@ -43,6 +45,10 @@ Column {
     width: parent.width
 
     spacing: 12
+
+    function focusOnFirst() {
+        styleSection.focusOnFirst()
+    }
 
     FlatRadioButtonGroupPropertyView {
         id: styleSection
@@ -56,7 +62,6 @@ Column {
             { iconCode: IconCode.LINE_NORMAL, value: LineTypes.LINE_STYLE_SOLID, title: qsTrc("inspector", "Normal") },
             { iconCode: IconCode.LINE_DASHED, value: LineTypes.LINE_STYLE_DASHED, title: qsTrc("inspector", "Dashed") },
             { iconCode: IconCode.LINE_DOTTED, value: LineTypes.LINE_STYLE_DOTTED, title: qsTrc("inspector", "Dotted") },
-            { text: qsTrc("inspector", "Custom"), value: LineTypes.LINE_STYLE_CUSTOM, title: qsTrc("inspector", "Custom") }
         ]
     }
 
@@ -77,10 +82,11 @@ Column {
             propertyItem: root.dashLineLength
 
             step: 0.1
-            maxValue: 10
+            maxValue: 100
             minValue: 0.1
             decimals: 2
 
+            navigationName: "Dash"
             navigationPanel: root.navigationPanel
             navigationRowStart: styleSection.navigationRowEnd + 1
         }
@@ -98,10 +104,11 @@ Column {
             propertyItem: root.dashGapLength
 
             step: 0.1
-            maxValue: 10
+            maxValue: 100
             minValue: 0.1
             decimals: 2
 
+            navigationName: "Gap"
             navigationPanel: root.navigationPanel
             navigationRowStart: dashSection.navigationRowEnd + 1
         }

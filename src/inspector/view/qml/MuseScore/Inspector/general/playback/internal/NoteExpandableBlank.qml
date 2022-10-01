@@ -20,8 +20,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
+
 import MuseScore.UiComponents 1.0
 import MuseScore.Inspector 1.0
+
 import "../../../common"
 
 ExpandableBlank {
@@ -56,9 +58,9 @@ ExpandableBlank {
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 2
 
+                navigationName: "Velocity"
                 navigationPanel: root.navigation.panel
                 navigationRowStart: root.navigation.row + 1
-                navigationEnabled: root.navigation.enabled && root.enabled
 
                 titleText: qsTrc("inspector", "Velocity")
                 propertyItem: root.model ? root.model.velocity : null
@@ -75,29 +77,24 @@ ExpandableBlank {
                 anchors.leftMargin: 2
                 anchors.right: parent.right
 
+                navigationName: "Tuning"
                 navigationPanel: root.navigation.panel
                 navigationRowStart: velocitySection.navigationRowEnd + 1
-                navigationEnabled: root.navigation.enabled && root.enabled
 
-                titleText: qsTrc("inspector", "Tunings (cents)")
+                titleText: qsTrc("inspector", "Tuning (cents)")
                 propertyItem: root.model ? root.model.tuning : null
             }
         }
 
-        CheckBox {
+        CheckBoxPropertyView {
             id: overrideDynamicsSection
+
             navigation.name: "Override dynamics"
             navigation.panel: root.navigation.panel
-            navigation.column: root.navigation.column
             navigation.row: tuningsSection.navigationRowEnd + 1
-            navigation.enabled: root.navigation.enabled && root.enabled
 
             text: qsTrc("inspector", "Override dynamics")
-
-            isIndeterminate: root.model ? root.model.overrideDynamics.isUndefined : false
-            checked: root.model && !isIndeterminate ? root.model.overrideDynamics.value : false
-
-            onClicked: { root.model.overrideDynamics.value = !checked }
+            propertyItem: root.model ? root.model.overrideDynamics : null
         }
     }
 }

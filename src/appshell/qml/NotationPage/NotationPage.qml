@@ -51,31 +51,64 @@ DockPage {
         order: 2
     }
 
+    property NavigationSection keynavTopPanelSec: NavigationSection {
+        name: "NavigationTopPanel"
+        enabled: root.visible
+        order: 3
+    }
+
     property NavigationSection keynavLeftPanelSec: NavigationSection {
         name: "NavigationLeftPanel"
         enabled: root.visible
-        order: 3
+        order: 4
     }
 
     property NavigationSection keynavRightPanelSec: NavigationSection {
         name: "NavigationRightPanel"
         enabled: root.visible
-        order: 5
+        order: 6
+    }
+
+    property NavigationSection keynavBottomPanelSec: NavigationSection {
+        name: "NavigationBottomPanel"
+        enabled: root.visible
+        order: 7
     }
 
     function navigationPanelSec(location) {
-        if (location === DockBase.Right) {
-            return keynavRightPanelSec
+        switch(location) {
+        case Location.Top: return keynavTopPanelSec
+        case Location.Left: return keynavLeftPanelSec
+        case Location.Right: return keynavRightPanelSec
+        case Location.Bottom: return keynavBottomPanelSec
         }
-        return keynavLeftPanelSec
+
+        return null
     }
 
     onInited: {
         Qt.callLater(pageModel.init)
     }
 
-    readonly property int defaultPanelWidth: 300
-    readonly property int toolBarHeight: 48
+    readonly property int verticalPanelDefaultWidth: 300
+
+    readonly property int horizontalPanelMinHeight: 100
+    readonly property int horizontalPanelMaxHeight: 520
+
+    readonly property string verticalPanelsGroup: "VERTICAL_PANELS"
+    readonly property string horizontalPanelsGroup: "HORIZONTAL_PANELS"
+
+    readonly property var verticalPanelDropDestinations: [
+        { "dock": root.centralDock, "dropLocation": Location.Left, "dropDistance": root.verticalPanelDefaultWidth },
+        { "dock": root.centralDock, "dropLocation": Location.Right, "dropDistance": root.verticalPanelDefaultWidth }
+    ]
+
+    readonly property var horizontalPanelDropDestinations: [
+        root.panelTopDropDestination,
+        root.panelBottomDropDestination
+    ]
+
+    property var notationView: null
 
     mainToolBars: [
         DockToolBar {
@@ -84,9 +117,15 @@ DockPage {
             objectName: "notationToolBar"
             title: qsTrc("appshell", "Notation toolbar")
 
-            minimumWidth: 198
+            floatable: false
+            closable: false
+            resizable: false
+            separatorsVisible: false
 
-            contentComponent: NotationToolBar {
+            alignment: DockToolBarAlignment.Center
+            contentBottomPadding: 2
+
+            NotationToolBar {
                 navigation.section: root.topToolKeyNavSec
                 navigation.order: 2
 
@@ -104,11 +143,17 @@ DockPage {
             objectName: pageModel.playbackToolBarName()
             title: qsTrc("appshell", "Playback controls")
 
-            width: root.width / 3
-            minimumWidth: floating ? 526 : 452
-            minimumHeight: floating ? 56 : root.toolBarHeight
+            separatorsVisible: false
+            alignment: DockToolBarAlignment.Right
 
-            contentComponent: PlaybackToolBar {
+            contentBottomPadding: floating ? 8 : 2
+            contentTopPadding: floating ? 8 : 0
+
+            dropDestinations: [
+                { "dock": notationToolBar, "dropLocation": Location.Right }
+            ]
+
+            PlaybackToolBar {
                 navigation.section: root.topToolKeyNavSec
                 navigation.order: 3
 
@@ -118,14 +163,17 @@ DockPage {
 
         DockToolBar {
             objectName: pageModel.undoRedoToolBarName()
-            title: qsTrc("appshell", "Undo/redo toolbar")
+            title: qsTrc("appshell", "Undo/redo")
 
-            minimumWidth: 74
-            maximumWidth: 74
+            floatable: false
+            closable: false
+            resizable: false
+            separatorsVisible: false
 
-            movable: false
+            alignment: DockToolBarAlignment.Right
+            contentBottomPadding: 2
 
-            contentComponent: UndoRedoToolBar {
+            UndoRedoToolBar {
                 navigation.section: root.topToolKeyNavSec
                 navigation.order: 4
             }
@@ -139,18 +187,24 @@ DockPage {
             objectName: pageModel.noteInputBarName()
             title: qsTrc("appshell", "Note input")
 
-            horizontalPreferredSize: Qt.size(720, root.toolBarHeight)
-            verticalPreferredSize: Qt.size(root.toolBarHeight, 400)
+            dropDestinations: [
+                root.toolBarTopDropDestination,
+                root.toolBarBottomDropDestination,
+                root.toolBarLeftDropDestination,
+                root.toolBarRightDropDestination
+            ]
 
-            allowedAreas: { Qt.AllDockWidgetAreas }
+            thickness: orientation === Qt.Horizontal ? 40 : 76
 
-            contentComponent: NoteInputBar {
+            NoteInputBar {
                 orientation: noteInputBar.orientation
+                floating: noteInputBar.floating
+
+                maximumWidth: noteInputBar.width
+                maximumHeight: noteInputBar.height
 
                 navigation.section: root.noteInputKeyNavSec
                 navigation.order: 1
-
-                floating: noteInputBar.floating
             }
         }
     ]
@@ -164,14 +218,20 @@ DockPage {
 
             navigationSection: root.navigationPanelSec(palettesPanel.location)
 
-            width: root.defaultPanelWidth
-            minimumWidth: root.defaultPanelWidth
-            maximumWidth: root.defaultPanelWidth
+            width: root.verticalPanelDefaultWidth
+            minimumWidth: root.verticalPanelDefaultWidth
+            maximumWidth: root.verticalPanelDefaultWidth
 
-            tabifyPanel: instrumentsPanel
+            groupName: root.verticalPanelsGroup
+
+            dropDestinations: root.verticalPanelDropDestinations
 
             PalettesPanel {
                 navigationSection: palettesPanel.navigationSection
+
+                Component.onCompleted: {
+                    palettesPanel.contextMenuModel = contextMenuModel
+                }
             }
         },
 
@@ -183,11 +243,13 @@ DockPage {
 
             navigationSection: root.navigationPanelSec(instrumentsPanel.location)
 
-            width: root.defaultPanelWidth
-            minimumWidth: root.defaultPanelWidth
-            maximumWidth: root.defaultPanelWidth
+            width: root.verticalPanelDefaultWidth
+            minimumWidth: root.verticalPanelDefaultWidth
+            maximumWidth: root.verticalPanelDefaultWidth
 
-            tabifyPanel: inspectorPanel
+            groupName: root.verticalPanelsGroup
+
+            dropDestinations: root.verticalPanelDropDestinations
 
             InstrumentsPanel {
                 navigationSection: instrumentsPanel.navigationSection
@@ -206,14 +268,17 @@ DockPage {
 
             navigationSection: root.navigationPanelSec(inspectorPanel.location)
 
-            width: root.defaultPanelWidth
-            minimumWidth: root.defaultPanelWidth
-            maximumWidth: root.defaultPanelWidth
-            
-            tabifyPanel: selectionFilterPanel
+            width: root.verticalPanelDefaultWidth
+            minimumWidth: root.verticalPanelDefaultWidth
+            maximumWidth: root.verticalPanelDefaultWidth
+
+            groupName: root.verticalPanelsGroup
+
+            dropDestinations: root.verticalPanelDropDestinations
 
             InspectorForm {
                 navigationSection: inspectorPanel.navigationSection
+                notationView: root.notationView
             }
         },
 
@@ -221,17 +286,20 @@ DockPage {
             id: selectionFilterPanel
 
             objectName: pageModel.selectionFiltersPanelName()
-            title: qsTrc("appshell", "Selection Filter")
+            title: qsTrc("appshell", "Selection filter")
 
             navigationSection: root.navigationPanelSec(selectionFilterPanel.location)
 
-            width: root.defaultPanelWidth
-            minimumWidth: root.defaultPanelWidth
-            maximumWidth: root.defaultPanelWidth
+            width: root.verticalPanelDefaultWidth
+            minimumWidth: root.verticalPanelDefaultWidth
+            maximumWidth: root.verticalPanelDefaultWidth
 
-            // TODO: Temporarily disabled on startup, but can be enabled via the app menu, see:
-            // https://github.com/musescore/MuseScore/pull/8593
+            groupName: root.verticalPanelsGroup
+
+            //! NOTE: hidden by default
             visible: false
+
+            dropDestinations: root.verticalPanelDropDestinations
 
             SelectionFilterPanel {
                 navigationSection: selectionFilterPanel.navigationSection
@@ -248,53 +316,56 @@ DockPage {
             objectName: pageModel.mixerPanelName()
             title: qsTrc("appshell", "Mixer")
 
-            allowedAreas: Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea
+            height: 368
+            minimumHeight: root.horizontalPanelMinHeight
+            maximumHeight: root.horizontalPanelMaxHeight
 
-            height: minimumHeight
-            minimumHeight: 260
-            maximumHeight: 520
+            groupName: root.horizontalPanelsGroup
 
-            tabifyPanel: pianoRollPanel
-
-            // TODO: Temporarily disabled on startup, but can be enabled via the app menu, see:
-            // https://github.com/musescore/MuseScore/pull/8593
+            //! NOTE: hidden by default
             visible: false
 
-            Loader {
-                asynchronous: true
-                sourceComponent: MixerPanel {
-                    Component.onCompleted: {
-                        mixerPanel.contextMenuModel = contextMenuModel
-                    }
+            location: Location.Bottom
+
+            dropDestinations: root.horizontalPanelDropDestinations
+
+            navigationSection: root.navigationPanelSec(mixerPanel.location)
+
+            MixerPanel {
+                navigationSection: mixerPanel.navigationSection
+
+                Component.onCompleted: {
+                    mixerPanel.contextMenuModel = contextMenuModel
+                }
+
+                onResizeRequested: function(newWidth, newHeight) {
+                    mixerPanel.resize(newWidth, newHeight)
                 }
             }
         },
 
         DockPanel {
-            id: pianoRollPanel
+            id: pianoKeyboardPanel
 
-            objectName: pageModel.pianoPanelName()
-            title: qsTrc("appshell", "Piano Roll")
-
-            allowedAreas: Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea
+            objectName: pageModel.pianoKeyboardPanelName()
+            title: qsTrc("appshell", "Piano keyboard")
 
             height: 200
-            minimumHeight: 100
-            maximumHeight: 300
+            minimumHeight: root.horizontalPanelMinHeight
+            maximumHeight: root.horizontalPanelMaxHeight
 
-            tabifyPanel: timelinePanel
+            groupName: root.horizontalPanelsGroup
 
-            // TODO: Temporarily disabled on startup, but can be enabled via the app menu, see:
-            // https://github.com/musescore/MuseScore/pull/8593
+            //! NOTE: hidden by default
             visible: false
 
-            Rectangle {
-                anchors.fill: parent
-                color: ui.theme.backgroundPrimaryColor
+            location: Location.Bottom
 
-                StyledTextLabel {
-                    anchors.centerIn: parent
-                    text: pianoRollPanel.title
+            dropDestinations: root.horizontalPanelDropDestinations
+
+            PianoKeyboardPanel {
+                Component.onCompleted: {
+                    pianoKeyboardPanel.contextMenuModel = contextMenuModel
                 }
             }
         },
@@ -305,51 +376,63 @@ DockPage {
             objectName: pageModel.timelinePanelName()
             title: qsTrc("appshell", "Timeline")
 
-            allowedAreas: Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea
-
             height: 200
-            minimumHeight: 100
-            maximumHeight: 300
+            minimumHeight: root.horizontalPanelMinHeight
+            maximumHeight: root.horizontalPanelMaxHeight
 
-            // TODO: Temporarily disabled on startup, but can be enabled via the app menu, see:
-            // https://github.com/musescore/MuseScore/pull/8593
+            groupName: root.horizontalPanelsGroup
+
+            //! NOTE: hidden by default
             visible: false
 
-            Timeline {
-                anchors.fill: parent
-            }
+            location: Location.Bottom
+
+            dropDestinations: root.horizontalPanelDropDestinations
+
+            Timeline {}
         },
 
         DockPanel {
             id: drumsetPanel
 
             objectName: pageModel.drumsetPanelName()
-            title: qsTrc("appshell", "Drumset Tools")
+            title: qsTrc("appshell", "Drumset tools")
 
-            allowedAreas: Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea
+            height: 64
+            minimumHeight: 64
+            maximumHeight: 64
 
-            minimumHeight: 30
-            maximumHeight: 30
+            //! NOTE: hidden by default
+            visible: false
 
-            DrumsetPanel {
-                anchors.fill: parent
-            }
+            floatable: false
+            closable: false
+
+            location: Location.Bottom
+
+            DrumsetPanel {}
         }
     ]
 
     central: NotationView {
         id: notationView
+        name: "MainNotationView"
 
         isNavigatorVisible: pageModel.isNavigatorVisible
+        isMainView: true
 
-        onTextEdittingStarted: {
-            notationView.forceActiveFocus()
+        Component.onCompleted: {
+            root.notationView = notationView.paintView
+
+            root.setDefaultNavigationControl(defaultNavigationControl)
+        }
+
+        Component.onDestruction: {
+            root.setDefaultNavigationControl(null)
         }
     }
 
     statusBar: DockStatusBar {
-        id: notationStatusBar
-
         objectName: pageModel.statusBarName()
 
         NotationStatusBar {}

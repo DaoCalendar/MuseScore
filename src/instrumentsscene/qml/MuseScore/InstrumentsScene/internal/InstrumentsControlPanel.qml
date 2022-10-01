@@ -44,7 +44,7 @@ RowLayout {
 
     focus: true
 
-    Keys.onShortcutOverride: {
+    Keys.onShortcutOverride: function(event) {
         if (event.key === Qt.Key_Delete) {
             root.removingRequested()
         }
@@ -53,14 +53,18 @@ RowLayout {
     NavigationPanel {
         id: keynavSub
         name: "InstrumentsHeader"
+        enabled: root.enabled && root.visible
     }
 
     FlatButton {
         Layout.fillWidth: true
 
+        navigation.name: "Add"
         navigation.panel: keynavSub
         navigation.order: 1
+        accessible.name: qsTrc("instruments", "Add instruments")
 
+        //: Keep in sync with the message that appears if there are no instruments in the score (InstrumentsPanel.qml)
         text: qsTrc("instruments", "Add")
 
         enabled: root.isAddingAvailable
@@ -73,8 +77,11 @@ RowLayout {
     FlatButton {
         Layout.preferredWidth: width
 
+        navigation.name: "Up"
         navigation.panel: keynavSub
         navigation.order: 2
+
+        toolTipTitle: qsTrc("instruments", "Move selected instruments up")
 
         enabled: root.isMovingUpAvailable
 
@@ -88,8 +95,11 @@ RowLayout {
     FlatButton {
         Layout.preferredWidth: width
 
+        navigation.name: "Down"
         navigation.panel: keynavSub
         navigation.order: 3
+
+        toolTipTitle: qsTrc("instruments", "Move selected instruments down")
 
         enabled: root.isMovingDownAvailable
 
@@ -103,8 +113,11 @@ RowLayout {
     FlatButton {
         Layout.preferredWidth: width
 
+        navigation.name: "Remove"
         navigation.panel: keynavSub
         navigation.order: 4
+
+        toolTipTitle: qsTrc("instruments", "Remove selected instruments")
 
         enabled: root.isRemovingAvailable
 

@@ -20,7 +20,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
@@ -47,22 +46,21 @@ Column {
 
     CheckBox {
         id: showPedalSymbol
-        checked: root.model && root.model.pedalSymbolVisible
-
+        width: parent.width
         text: qsTrc("inspector", "Show pedal symbol")
 
         navigation.name: "ShowPedalSymbolCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRowStart
-        navigation.enabled: root.enabled
 
+        checked: root.model && root.model.pedalSymbolVisible
         onClicked: {
             root.model.pedalSymbolVisible = !checked
         }
     }
 
     LineTypeSection {
-        id: lineTypeSectuion
+        id: lineTypeSection
         startHookType: root.model ? root.model.startHookType : null
         endHookType: root.model ? root.model.lineType : null
 
@@ -76,25 +74,19 @@ Column {
         navigationRowStart: root.navigationRowStart + 1
     }
 
-    CheckBox {
+    CheckBoxPropertyView {
         id: showLineCheckBox
-        isIndeterminate: root.model && root.model.isLineVisible.isUndefined
-        checked: root.model && !isIndeterminate && root.model.isLineVisible.value
         visible: root.model && root.model.isChangingLineVisibilityAllowed
 
         text: qsTrc("inspector", "Show line with rosette")
+        propertyItem: root.model ? root.model.isLineVisible : null
 
         navigation.name: "ShowLineWithRosetteCheckBox"
         navigation.panel: root.navigationPanel
-        navigation.row: lineTypeSectuion.navigationRowEnd + 1
-        navigation.enabled: root.enabled && visible
-
-        onClicked: {
-            root.model.isLineVisible.value = !checked
-        }
+        navigation.row: lineTypeSection.navigationRowEnd + 1
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     LineStyleSection {
         lineStyle: root.model ? root.model.lineStyle : null

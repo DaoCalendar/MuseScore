@@ -24,13 +24,10 @@
 #define __BREATH_H__
 
 #include "engravingitem.h"
-#include "symid.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 //---------------------------------------------------------
 //   BreathType
 //---------------------------------------------------------
@@ -38,7 +35,7 @@ namespace Ms {
 struct BreathType {
     SymId id;
     bool isCaesura;
-    qreal pause;
+    double pause;
 };
 
 //---------------------------------------------------------
@@ -48,24 +45,28 @@ struct BreathType {
 
 class Breath final : public EngravingItem
 {
-    qreal _pause;
+    OBJECT_ALLOCATOR(engraving, Breath)
+
+    double _pause;
     SymId _symId;
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
     Breath(Segment* parent);
+
+    bool sameVoiceKerningLimited() const override { return true; }
 
 public:
 
     Breath* clone() const override { return new Breath(*this); }
 
-    qreal mag() const override;
+    double mag() const override;
 
     void setSymId(SymId id) { _symId = id; }
     SymId symId() const { return _symId; }
-    qreal pause() const { return _pause; }
-    void setPause(qreal v) { _pause = v; }
+    double pause() const { return _pause; }
+    void setPause(double v) { _pause = v; }
 
-    Segment* segment() const { return (Segment*)parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
 
     void draw(mu::draw::Painter*) const override;
     void layout() override;
@@ -73,17 +74,21 @@ public:
     void read(XmlReader&) override;
     mu::PointF pagePos() const override;        ///< position in page coordinates
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
     EngravingItem* nextSegmentElement() override;
     EngravingItem* prevSegmentElement() override;
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 
     bool isCaesura() const;
 
     static const std::vector<BreathType> breathList;
+
+protected:
+    void added() override;
+    void removed() override;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

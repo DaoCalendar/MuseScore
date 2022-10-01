@@ -25,7 +25,7 @@
 
 #include "textbase.h"
 
-namespace Ms {
+namespace mu::engraving {
 //-----------------------------------------------------------------------------
 //   @@ Sticking
 ///    Drum sticking
@@ -33,19 +33,24 @@ namespace Ms {
 
 class Sticking final : public TextBase
 {
-    QVariant propertyDefault(Pid id) const override;
+    OBJECT_ALLOCATOR(engraving, Sticking)
+
+    PropertyValue propertyDefault(Pid id) const override;
 
 public:
     Sticking(Segment* parent);
 
     Sticking* clone() const override { return new Sticking(*this); }
 
-    Segment* segment() const { return (Segment*)parent(); }
-    Measure* measure() const { return (Measure*)parent()->parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
+    Measure* measure() const { return (Measure*)explicitParent()->explicitParent(); }
 
     void layout() override;
     void write(XmlWriter& xml) const override;
     void read(XmlReader&) override;
+
+    bool isEditAllowed(EditData&) const override;
+    bool edit(EditData&) override;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

@@ -21,17 +21,17 @@
  */
 
 #include "pedal.h"
-#include "io/xml.h"
-#include "system.h"
-#include "measure.h"
-#include "chordrest.h"
-#include "staff.h"
 
+#include "rw/xml.h"
+
+#include "chordrest.h"
+#include "measure.h"
 #include "score.h"
+#include "system.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 static const ElementStyle pedalStyle {
     { Sid::pedalFontFace,                      Pid::BEGIN_FONT_FACE },
     { Sid::pedalFontFace,                      Pid::CONTINUE_FONT_FACE },
@@ -47,16 +47,15 @@ static const ElementStyle pedalStyle {
     { Sid::pedalTextAlign,                     Pid::END_TEXT_ALIGN },
     { Sid::pedalHookHeight,                    Pid::BEGIN_HOOK_HEIGHT },
     { Sid::pedalHookHeight,                    Pid::END_HOOK_HEIGHT },
-    { Sid::pedalBeginTextOffset,               Pid::BEGIN_TEXT_OFFSET },
-    { Sid::pedalBeginTextOffset,               Pid::CONTINUE_TEXT_OFFSET },
-    { Sid::pedalBeginTextOffset,               Pid::END_TEXT_OFFSET },
     { Sid::pedalLineWidth,                     Pid::LINE_WIDTH },
+    { Sid::pedalDashLineLen,                   Pid::DASH_LINE_LEN },
+    { Sid::pedalDashGapLen,                    Pid::DASH_GAP_LEN },
     { Sid::pedalPlacement,                     Pid::PLACEMENT },
     { Sid::pedalPosBelow,                      Pid::OFFSET },
 };
 
-const QString Pedal::PEDAL_SYMBOL = "<sym>keyboardPedalPed</sym>";
-const QString Pedal::STAR_SYMBOL = "<sym>keyboardPedalUp</sym>";
+const String Pedal::PEDAL_SYMBOL = u"<sym>keyboardPedalPed</sym>";
+const String Pedal::STAR_SYMBOL = u"<sym>keyboardPedalUp</sym>";
 
 PedalSegment::PedalSegment(Pedal* sp, System* parent)
     : TextLineBaseSegment(ElementType::PEDAL_SEGMENT, sp, parent, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
@@ -126,10 +125,10 @@ Pedal::Pedal(EngravingItem* parent)
 void Pedal::read(XmlReader& e)
 {
     if (score()->mscVersion() < 301) {
-        e.addSpanner(e.intAttribute("id", -1), this);
+        e.context()->addSpanner(e.intAttribute("id", -1), this);
     }
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (readStyledProperty(e, tag)) {
         } else if (!TextLineBase::readProperties(e)) {
             e.unknown();
@@ -143,10 +142,10 @@ void Pedal::read(XmlReader& e)
 
 void Pedal::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
 
     for (auto i : {
             Pid::END_HOOK_TYPE,
@@ -163,7 +162,7 @@ void Pedal::write(XmlWriter& xml) const
     }
 
     SLine::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -187,11 +186,11 @@ LineSegment* Pedal::createLineSegment(System* parent)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Pedal::propertyDefault(Pid propertyId) const
+engraving::PropertyValue Pedal::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::LINE_WIDTH:
-        return score()->styleP(Sid::pedalLineWidth);              // return point, not spatium
+        return score()->styleMM(Sid::pedalLineWidth);              // return point, not spatium
 
     case Pid::LINE_STYLE:
         return score()->styleV(Sid::pedalLineStyle);
@@ -204,11 +203,11 @@ QVariant Pedal::propertyDefault(Pid propertyId) const
     case Pid::BEGIN_TEXT_PLACE:
     case Pid::CONTINUE_TEXT_PLACE:
     case Pid::END_TEXT_PLACE:
-        return int(PlaceText::LEFT);
+        return TextPlace::LEFT;
 
     case Pid::BEGIN_HOOK_TYPE:
     case Pid::END_HOOK_TYPE:
-        return int(HookType::NONE);
+        return HookType::NONE;
 
     case Pid::LINE_VISIBLE:
         return true;
@@ -228,15 +227,15 @@ QVariant Pedal::propertyDefault(Pid propertyId) const
 
 PointF Pedal::linePos(Grip grip, System** sys) const
 {
-    qreal x = 0.0;
-    qreal nhw = score()->noteHeadWidth();
+    double x = 0.0;
+    double nhw = score()->noteHeadWidth();
     System* s = nullptr;
     if (grip == Grip::START) {
         ChordRest* c = toChordRest(startElement());
         if (c) {
             s = c->segment()->system();
             x = c->pos().x() + c->segment()->pos().x() + c->segment()->measure()->pos().x();
-            if (c->type() == ElementType::REST && c->durationType() == TDuration::DurationType::V_MEASURE) {
+            if (c->type() == ElementType::REST && c->durationType() == DurationType::V_MEASURE) {
                 x -= c->x();
             }
             if (beginHookType() == HookType::HOOK_45) {
@@ -261,8 +260,8 @@ PointF Pedal::linePos(Grip grip, System** sys) const
                     if (seg->segmentType() == SegmentType::ChordRest) {
                         // look for a chord/rest in any voice on this staff
                         bool crFound = false;
-                        int track = staffIdx() * VOICES;
-                        for (int i = 0; i < VOICES; ++i) {
+                        track_idx_t track = staffIdx() * VOICES;
+                        for (voice_idx_t i = 0; i < VOICES; ++i) {
                             if (seg->element(track + i)) {
                                 crFound = true;
                                 break;
@@ -291,7 +290,7 @@ PointF Pedal::linePos(Grip grip, System** sys) const
         } else if (c) {
             s = c->segment()->system();
             x = c->pos().x() + c->segment()->pos().x() + c->segment()->measure()->pos().x();
-            if (c->type() == ElementType::REST && c->durationType() == TDuration::DurationType::V_MEASURE) {
+            if (c->type() == ElementType::REST && c->durationType() == DurationType::V_MEASURE) {
                 x -= c->x();
             }
         }

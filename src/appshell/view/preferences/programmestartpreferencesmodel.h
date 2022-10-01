@@ -58,8 +58,7 @@ private:
     enum PanelType {
         Unknown,
         SplashScreen,
-        Navigator,
-        Tours
+        Navigator
     };
 
     struct Panel
@@ -73,7 +72,7 @@ private:
 
     struct StartMode
     {
-        StartupSessionType sessionType = StartupSessionType::StartWithNewScore;
+        StartupModeType type = StartupModeType::StartWithNewScore;
         QString title;
         bool checked = false;
         bool canSelectScorePath = false;

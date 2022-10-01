@@ -30,6 +30,7 @@
 #include "actions/iactionsdispatcher.h"
 #include "context/iglobalcontext.h"
 #include "iappshellconfiguration.h"
+#include "dockwindow/idockwindowprovider.h"
 
 namespace mu::appshell {
 class NotationPageModel : public QObject, public async::Asyncable, public actions::Actionable
@@ -39,6 +40,7 @@ class NotationPageModel : public QObject, public async::Asyncable, public action
     INJECT(appshell, actions::IActionsDispatcher, dispatcher)
     INJECT(appshell, context::IGlobalContext, globalContext)
     INJECT(appshell, IAppShellConfiguration, configuration)
+    INJECT(appshell, dock::IDockWindowProvider, dockWindowProvider)
 
     Q_PROPERTY(bool isNavigatorVisible READ isNavigatorVisible NOTIFY isNavigatorVisibleChanged)
 
@@ -59,8 +61,8 @@ public:
     Q_INVOKABLE QString inspectorPanelName() const;
     Q_INVOKABLE QString selectionFiltersPanelName() const;
 
-    Q_INVOKABLE QString pianoPanelName() const;
     Q_INVOKABLE QString mixerPanelName() const;
+    Q_INVOKABLE QString pianoKeyboardPanelName() const;
     Q_INVOKABLE QString timelinePanelName() const;
     Q_INVOKABLE QString drumsetPanelName() const;
 
@@ -70,6 +72,8 @@ signals:
     void isNavigatorVisibleChanged();
 
 private:
+    void onNotationChanged();
+
     void toggleDock(const QString& name);
 
     void updateDrumsetPanelVisibility();

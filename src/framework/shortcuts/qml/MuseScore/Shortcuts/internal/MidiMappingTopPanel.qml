@@ -34,11 +34,11 @@ RowLayout {
 
     property NavigationPanel navigation: NavigationPanel {
         name: "MidiMappingTopPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
-        accessible.name: qsTrc("shortcuts", "Midi mapping top panel")
-        enabled: root.visible
+        accessible.name: qsTrc("shortcuts", "MIDI mapping top panel")
 
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }

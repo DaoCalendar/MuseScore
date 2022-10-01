@@ -20,17 +20,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
-#include "measure.h"
-#include "undo.h"
-#include "range.h"
-#include "spanner.h"
-
 #include "masterscore.h"
+#include "measure.h"
+#include "range.h"
+#include "score.h"
+#include "spanner.h"
+#include "undo.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   cmdJoinMeasure
 //    join measures from m1 upto (including) m2
@@ -42,8 +41,9 @@ void Score::cmdJoinMeasure(Measure* m1, Measure* m2)
         return;
     }
 
-    for (int staffIdx = 0; staffIdx < nstaves(); ++staffIdx) {
-        if (m1->isMeasureRepeatGroupWithPrevM(staffIdx) || m2->isMeasureRepeatGroupWithNextM(staffIdx)) {
+    for (size_t staffIdx = 0; staffIdx < nstaves(); ++staffIdx) {
+        if (m1->isMeasureRepeatGroupWithPrevM(static_cast<int>(staffIdx))
+            || m2->isMeasureRepeatGroupWithNextM(static_cast<int>(staffIdx))) {
             MScore::setError(MsError::CANNOT_SPLIT_MEASURE_REPEAT);
             return;
         }
@@ -91,7 +91,11 @@ void Score::cmdJoinMeasure(Measure* m1, Measure* m2)
             break;
         }
     }
-    insertMeasure(ElementType::MEASURE, next, /* createEmptyMeasures*/ true);
+
+    InsertMeasureOptions options;
+    options.createEmptyMeasures = true;
+
+    insertMeasure(ElementType::MEASURE, next, options);
     // The loop since measures are not currently linked in MuseScore
     for (Score* s : masterScore()->scoreList()) {
         Measure* ins = s->tick2measure(tick1);

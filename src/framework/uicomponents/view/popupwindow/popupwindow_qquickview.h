@@ -24,16 +24,19 @@
 
 #include <QObject>
 #include <QQuickView>
-#include "ipopupwindow.h"
 
 #include "modularity/ioc.h"
+#include "ui/iinteractiveprovider.h"
 #include "ui/imainwindow.h"
 
+#include "ipopupwindow.h"
+
 namespace mu::uicomponents {
-class PopupWindow_QQuickView : public QObject, public IPopupWindow
+class PopupWindow_QQuickView : public IPopupWindow
 {
     Q_OBJECT
 
+    INJECT(uicomponents, ui::IInteractiveProvider, interactiveProvider)
     INJECT(uicomponents, ui::IMainWindow, mainWindow)
 
 public:
@@ -44,13 +47,20 @@ public:
 
     void setContent(QQuickItem* item) override;
 
-    void show(QPoint p) override;
-    void setPosition(QPoint p) override;
-    void hide() override;
+    void show(QScreen* screen, QRect geometry, bool activateFocus) override;
+    void close() override;
+    void raise() override;
+    void setPosition(QPoint position) override;
 
     QWindow* qWindow() const override;
     bool isVisible() const override;
     QRect geometry() const override;
+
+    QWindow* parentWindow() const override;
+    void setParentWindow(QWindow* window) override;
+
+    bool resizable() const override;
+    void setResizable(bool resizable) override;
 
     void setPosition(const QPoint& position) const override;
 
@@ -59,11 +69,16 @@ public:
     void setOnHidden(const std::function<void()>& callback) override;
 
 private:
-
     bool eventFilter(QObject* watched, QEvent* event) override;
 
+    void updateSize(const QSize& newSize);
+
     QQuickView* m_view = nullptr;
+    bool m_resizable = false;
     std::function<void()> m_onHidden;
+    bool m_activeFocusOnParentOnClose = false;
+
+    QWindow* m_parentWindow = nullptr;
 };
 }
 #endif // POPUPWINDOW_QQUICKVIEW_H

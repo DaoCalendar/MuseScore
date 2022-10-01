@@ -44,10 +44,18 @@ FocusScope {
     property bool hasText: valueInput.text.length > 0
     property alias readOnly: valueInput.readOnly
 
-    property alias navigation: navCtrl
-    property alias accessible: navCtrl.accessible
+    property real textSidePadding: 12
+    property real accessoriesPadding: 4
 
-    property alias clearTextButton: clearTextButtonItem
+    readonly property alias background: background
+
+    readonly property alias mouseArea: clickableArea
+    property bool containsMouse: clickableArea.containsMouse
+
+    readonly property alias navigation: navCtrl
+    readonly property alias accessible: navCtrl.accessible
+
+    readonly property alias clearTextButton: clearTextButtonItem
 
     signal currentTextEdited(var newTextValue)
     signal textCleared()
@@ -92,6 +100,11 @@ FocusScope {
         accessible.role: MUAccessible.EditableText
         accessible.name: Boolean(valueInput.text) ? valueInput.text + " " + measureUnitsLabel.text : valueInput.placeholderText
         accessible.visualItem: root
+        accessible.text: valueInput.text
+        accessible.selectedText: valueInput.selectedText
+        accessible.selectionStart: valueInput.selectionStart
+        accessible.selectionEnd: valueInput.selectionEnd
+        accessible.cursorPosition: valueInput.cursorPosition
 
         onActiveChanged: {
             if (navCtrl.active) {
@@ -103,19 +116,19 @@ FocusScope {
     Rectangle {
         id: background
         anchors.fill: parent
-        color: ui.theme.textFieldColor
-        radius: 2
 
         NavigationFocusBorder { navigationCtrl: navCtrl }
 
+        color: ui.theme.textFieldColor
         border.color: ui.theme.strokeColor
-        border.width: ui.theme.borderWidth > 0 ? ui.theme.borderWidth : 1 //borderWidth of >0 suggests that an HC theme is active, in which case we don't want to make a change
+        border.width: Math.max(ui.theme.borderWidth, 1)
+        radius: 3
     }
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 4
-        anchors.rightMargin: 4
+        anchors.leftMargin: hintIcon.visible ? 0 : root.textSidePadding
+        anchors.rightMargin: clearTextButtonItem.visible ? 0 : root.textSidePadding
 
         spacing: 0
 
@@ -123,9 +136,10 @@ FocusScope {
             id: hintIcon
 
             Layout.fillHeight: true
-            Layout.preferredWidth: hintIcon.visible ? 30 : 0
+            Layout.preferredWidth: height
+            Layout.margins: root.accessoriesPadding
 
-            visible: Boolean(!hintIcon.isEmpty)
+            visible: !isEmpty
         }
 
         TextField {
@@ -135,9 +149,7 @@ FocusScope {
 
             Layout.alignment: Qt.AlignVCenter
             Layout.fillWidth: !measureUnitsLabel.visible
-
-            //! NOTE Disabled default Qt Accessible
-            Accessible.role: Accessible.NoRole
+            padding: 0
 
             color: ui.theme.fontPrimaryColor
             font: ui.theme.bodyFont
@@ -153,11 +165,26 @@ FocusScope {
 
             text: root.currentText === undefined ? "" : root.currentText
 
-            Keys.onShortcutOverride: {
-                event.accepted = true
+            TextInputFieldModel {
+                id: textInputFieldModel
             }
 
-            Keys.onPressed: {
+            Component.onCompleted: {
+                textInputFieldModel.init()
+            }
+
+            Keys.onShortcutOverride: function(event) {
+                if (textInputFieldModel.isShortcutAllowedOverride(event.key, event.modifiers)) {
+                    event.accepted = true
+                } else {
+                    event.accepted = false
+
+                    root.focus = false
+                    root.textEditingFinished()
+                }
+            }
+
+            Keys.onPressed: function(event) {
                 if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return
                         || event.key === Qt.Key_Escape) {
                     root.focus = false
@@ -167,6 +194,7 @@ FocusScope {
 
             onActiveFocusChanged: {
                 if (activeFocus) {
+                    navCtrl.requestActive()
                     selectAll()
                 } else {
                     deselect()
@@ -189,7 +217,7 @@ FocusScope {
             Layout.alignment: Qt.AlignVCenter
 
             color: ui.theme.fontPrimaryColor
-            visible: !root.isIndeterminate && Boolean(text)
+            visible: !root.isIndeterminate && !isEmpty
         }
 
         FlatButton {
@@ -197,12 +225,9 @@ FocusScope {
 
             Layout.fillHeight: true
             Layout.preferredWidth: height
+            Layout.margins: root.accessoriesPadding
 
-            readonly property int margin: 4
-
-            Layout.topMargin: margin
-            Layout.bottomMargin: margin
-
+            toolTipTitle: qsTrc("global", "Clear")
             icon: IconCode.CLOSE_X_ROUNDED
             visible: root.clearTextButtonVisible
 
@@ -214,6 +239,7 @@ FocusScope {
 
             onClicked: {
                 root.clear()
+                navCtrl.requestActive()
             }
         }
 
@@ -237,14 +263,14 @@ FocusScope {
     states: [
         State {
             name: "HOVERED"
-            when: clickableArea.containsMouse && !valueInput.activeFocus
-            PropertyChanges { target: background; opacity: 0.6 }
+            when: root.containsMouse && !valueInput.activeFocus
+            PropertyChanges { target: background; border.color: Utils.colorWithAlpha(ui.theme.accentColor, 0.6) }
         },
 
         State {
             name: "FOCUSED"
             when: valueInput.activeFocus
-            PropertyChanges { target: background; border.color: ui.theme.accentColor; border.width: 1; opacity: 1 }
+            PropertyChanges { target: background; border.color: ui.theme.accentColor }
         }
     ]
 
@@ -259,9 +285,11 @@ FocusScope {
 
         propagateComposedEvents: true
         hoverEnabled: true
+        cursorShape: root.readOnly ? Qt.ArrowCursor : Qt.IBeamCursor
 
-        onPressed: {
+        onPressed: function(mouse) {
             root.ensureActiveFocus()
+            navCtrl.requestActiveByInteraction()
             mouse.accepted = false
         }
     }

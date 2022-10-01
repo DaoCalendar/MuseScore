@@ -22,6 +22,8 @@
 
 #include "audiooutputhandler.h"
 
+#include "config.h"
+
 #include "log.h"
 #include "async/async.h"
 
@@ -30,8 +32,16 @@
 #include "internal/worker/audioengine.h"
 #include "audioerrors.h"
 
+#ifdef ENABLE_AUDIO_EXPORT
+#include "internal/soundtracks/soundtrackwriter.h"
+#endif
+
 using namespace mu::audio;
 using namespace mu::async;
+
+#ifdef ENABLE_AUDIO_EXPORT
+using namespace mu::audio::soundtrack;
+#endif
 
 AudioOutputHandler::AudioOutputHandler(IGetTrackSequence* getSequence)
     : m_getSequence(getSequence)
@@ -45,23 +55,22 @@ AudioOutputHandler::AudioOutputHandler(IGetTrackSequence* getSequence)
 
 Promise<AudioOutputParams> AudioOutputHandler::outputParams(const TrackSequenceId sequenceId, const TrackId trackId) const
 {
-    return Promise<AudioOutputParams>([this, sequenceId, trackId](Promise<AudioOutputParams>::Resolve resolve,
-                                                                  Promise<AudioOutputParams>::Reject reject) {
+    return Promise<AudioOutputParams>([this, sequenceId, trackId](auto resolve, auto reject) {
         ONLY_AUDIO_WORKER_THREAD;
 
         ITrackSequencePtr s = sequence(sequenceId);
 
         if (!s) {
-            reject(static_cast<int>(Err::InvalidSequenceId), "invalid sequence id");
+            return reject(static_cast<int>(Err::InvalidSequenceId), "invalid sequence id");
         }
 
         RetVal<AudioOutputParams> result = s->audioIO()->outputParams(trackId);
 
         if (!result.ret) {
-            reject(result.ret.code(), result.ret.text());
+            return reject(result.ret.code(), result.ret.text());
         }
 
-        resolve(result.val);
+        return resolve(result.val);
     }, AudioThread::ID);
 }
 
@@ -87,15 +96,14 @@ Channel<TrackSequenceId, TrackId, AudioOutputParams> AudioOutputHandler::outputP
 
 Promise<AudioOutputParams> AudioOutputHandler::masterOutputParams() const
 {
-    return Promise<AudioOutputParams>([this](Promise<AudioOutputParams>::Resolve resolve,
-                                             Promise<AudioOutputParams>::Reject reject) {
+    return Promise<AudioOutputParams>([this](auto resolve, auto reject) {
         ONLY_AUDIO_WORKER_THREAD;
 
         IF_ASSERT_FAILED(mixer()) {
-            reject(static_cast<int>(Err::Undefined), "undefined reference to a mixer");
+            return reject(static_cast<int>(Err::Undefined), "undefined reference to a mixer");
         }
 
-        resolve(mixer()->masterOutputParams());
+        return resolve(mixer()->masterOutputParams());
     }, AudioThread::ID);
 }
 
@@ -121,48 +129,87 @@ Channel<AudioOutputParams> AudioOutputHandler::masterOutputParamsChanged() const
 
 Promise<AudioResourceMetaList> AudioOutputHandler::availableOutputResources() const
 {
-    return Promise<AudioResourceMetaList>([this](Promise<AudioResourceMetaList>::Resolve resolve,
-                                                 Promise<AudioResourceMetaList>::Reject /*reject*/) {
+    return Promise<AudioResourceMetaList>([this](auto resolve, auto /*reject*/) {
         ONLY_AUDIO_WORKER_THREAD;
 
-        resolve(fxResolver()->resolveAvailableResources());
+        return resolve(fxResolver()->resolveAvailableResources());
     }, AudioThread::ID);
 }
 
 Promise<AudioSignalChanges> AudioOutputHandler::signalChanges(const TrackSequenceId sequenceId, const TrackId trackId) const
 {
-    return Promise<AudioSignalChanges>([this, sequenceId, trackId](Promise<AudioSignalChanges>::Resolve resolve,
-                                                                   Promise<AudioSignalChanges>::Reject reject) {
+    return Promise<AudioSignalChanges>([this, sequenceId, trackId](auto resolve, auto reject) {
         ONLY_AUDIO_WORKER_THREAD;
 
         ITrackSequencePtr s = sequence(sequenceId);
 
         if (!s) {
-            reject(static_cast<int>(Err::InvalidSequenceId), "invalid sequence id");
-            return;
+            return reject(static_cast<int>(Err::InvalidSequenceId), "invalid sequence id");
         }
 
         if (!s->audioIO()->isHasTrack(trackId)) {
-            reject(static_cast<int>(Err::InvalidTrackId), "no track");
-            return;
+            return reject(static_cast<int>(Err::InvalidTrackId), "no track");
         }
 
-        resolve(s->audioIO()->audioSignalChanges(trackId));
+        return resolve(s->audioIO()->audioSignalChanges(trackId));
     }, AudioThread::ID);
 }
 
 Promise<AudioSignalChanges> AudioOutputHandler::masterSignalChanges() const
 {
-    return Promise<AudioSignalChanges>([this](Promise<AudioSignalChanges>::Resolve resolve,
-                                              Promise<AudioSignalChanges>::Reject reject) {
+    return Promise<AudioSignalChanges>([this](auto resolve, auto reject) {
         ONLY_AUDIO_WORKER_THREAD;
 
         IF_ASSERT_FAILED(mixer()) {
-            reject(static_cast<int>(Err::Undefined), "undefined reference to a mixer");
+            return reject(static_cast<int>(Err::Undefined), "undefined reference to a mixer");
         }
 
-        resolve(mixer()->masterAudioSignalChanges());
+        return resolve(mixer()->masterAudioSignalChanges());
     }, AudioThread::ID);
+}
+
+Promise<bool> AudioOutputHandler::saveSoundTrack(const TrackSequenceId sequenceId, const io::path_t& destination,
+                                                 const SoundTrackFormat& format)
+{
+    return Promise<bool>([this, sequenceId, destination, format](auto resolve, auto reject) {
+        ONLY_AUDIO_WORKER_THREAD;
+
+        IF_ASSERT_FAILED(mixer()) {
+            return reject(static_cast<int>(Err::Undefined), "undefined reference to a mixer");
+        }
+
+        ITrackSequencePtr s = sequence(sequenceId);
+        if (!s) {
+            return reject(static_cast<int>(Err::InvalidSequenceId), "invalid sequence id");
+        }
+
+#ifdef ENABLE_AUDIO_EXPORT
+        s->player()->seek(0);
+        msecs_t totalDuration = s->player()->duration();
+        SoundTrackWriter writer(destination, format, totalDuration, mixer());
+
+        framework::Progress progress = saveSoundTrackProgress(sequenceId);
+        writer.progress().progressChanged.onReceive(this, [&progress](int64_t current, int64_t total, std::string title){
+            progress.progressChanged.send(current, total, title);
+        });
+
+        bool ok = writer.write();
+        s->player()->seek(0);
+
+        return resolve(ok);
+#else
+        return reject(static_cast<int>(Err::DisabledAudioExport), "audio export is disabled");
+#endif
+    }, AudioThread::ID);
+}
+
+mu::framework::Progress AudioOutputHandler::saveSoundTrackProgress(const TrackSequenceId sequenceId)
+{
+    if (!m_saveSoundTracksMap.contains(sequenceId)) {
+        m_saveSoundTracksMap.insert(sequenceId, framework::Progress());
+    }
+
+    return m_saveSoundTracksMap[sequenceId];
 }
 
 std::shared_ptr<Mixer> AudioOutputHandler::mixer() const

@@ -26,13 +26,15 @@
 #include "measurenumberbase.h"
 #include "property.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MMRestRange
 //---------------------------------------------------------
 
 class MMRestRange : public MeasureNumberBase
 {
+    OBJECT_ALLOCATOR(engraving, MMRestRange)
+
     /// Bracketing: [18-24], (18-24) or 18-24
     M_PROPERTY(MMRestRangeBracketType, bracketType, setBracketType)
 
@@ -40,16 +42,16 @@ public:
     MMRestRange(Measure* parent = nullptr);
     MMRestRange(const MMRestRange& other);
 
-    virtual MMRestRange* clone() const override { return new MMRestRange(*this); }
+    MMRestRange* clone() const override { return new MMRestRange(*this); }
 
-    virtual QVariant getProperty(Pid id) const override;
-    virtual bool setProperty(Pid id, const QVariant& val) override;
-    virtual QVariant propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid id) const override;
+    bool setProperty(Pid id, const PropertyValue& val) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
-    virtual bool readProperties(XmlReader&) override;
+    bool readProperties(XmlReader&) override;
 
-    virtual void setXmlText(const QString&) override;
+    void setXmlText(const String&) override;
 };
-} // namespace Ms
+} // namespace mu::engraving
 
 #endif

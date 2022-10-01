@@ -23,18 +23,17 @@
 #ifndef __STAFFTEXTBASE_H__
 #define __STAFFTEXTBASE_H__
 
-#include "text.h"
-#include "part.h"
+#include "textbase.h"
 #include "staff.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   ChannelActions
 //---------------------------------------------------------
 
 struct ChannelActions {
     int channel;
-    QStringList midiActionNames;
+    StringList midiActionNames;
 };
 
 //---------------------------------------------------------
@@ -43,8 +42,10 @@ struct ChannelActions {
 
 class StaffTextBase : public TextBase
 {
-    QString _channelNames[4];
-    QList<ChannelActions> _channelActions;
+    OBJECT_ALLOCATOR(engraving, StaffTextBase)
+
+    String _channelNames[4];
+    std::vector<ChannelActions> _channelActions;
     SwingParameters _swingParameters;
     bool _setAeolusStops { false };
     int aeolusStops[4]   { 0, 0, 0, 0 };
@@ -52,24 +53,24 @@ class StaffTextBase : public TextBase
     int _capo            { 0 };
 
 public:
-    StaffTextBase(const ElementType& type, Segment* parent, Tid tid, ElementFlags = ElementFlag::NOTHING);
+    StaffTextBase(const ElementType& type, Segment* parent, TextStyleType tid, ElementFlags = ElementFlag::NOTHING);
 
     virtual void write(XmlWriter& xml) const override;
     virtual void read(XmlReader&) override;
     virtual bool readProperties(XmlReader&) override;
 
     Segment* segment() const;
-    QString channelName(int voice) const { return _channelNames[voice]; }
-    void setChannelName(int v, const QString& s) { _channelNames[v] = s; }
+    String channelName(voice_idx_t voice) const { return _channelNames[voice]; }
+    void setChannelName(voice_idx_t v, const String& s) { _channelNames[v] = s; }
     void setSwingParameters(int unit, int ratio)
     {
         _swingParameters.swingUnit = unit;
         _swingParameters.swingRatio = ratio;
     }
 
-    const QList<ChannelActions>* channelActions() const { return &_channelActions; }
-    QList<ChannelActions>* channelActions() { return &_channelActions; }
-    const SwingParameters* swingParameters() const { return &_swingParameters; }
+    const std::vector<ChannelActions>& channelActions() const { return _channelActions; }
+    std::vector<ChannelActions>& channelActions() { return _channelActions; }
+    const SwingParameters& swingParameters() const { return _swingParameters; }
     void clearAeolusStops();
     void setAeolusStop(int group, int idx, bool val);
     bool getAeolusStop(int group, int idx) const;
@@ -80,5 +81,5 @@ public:
     bool swing() const { return _swing; }
     int capo() const { return _capo; }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

@@ -20,7 +20,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
@@ -31,76 +30,78 @@ import "internal"
 PreferencesPage {
     id: root
 
-    contentHeight: content.height
-
     Component.onCompleted: {
         preferencesModel.load()
     }
 
     GeneralPreferencesModel {
         id: preferencesModel
+
+        onReceivingUpdateForCurrentLanguage: function(current, total, status) {
+            languagesSection.setUpdateProgress(current, total, status)
+        }
     }
 
     Column {
-        id: content
-
         width: parent.width
         spacing: root.sectionsSpacing
 
         LanguagesSection {
+            id: languagesSection
+
             languages: preferencesModel.languages
             currentLanguageCode: preferencesModel.currentLanguageCode
+            isNeedRestart: preferencesModel.isNeedRestart
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
 
-            onLanguageSelected: {
+            onLanguageSelected: function(languageCode) {
                 preferencesModel.currentLanguageCode = languageCode
             }
 
-            onUpdateTranslationsRequested: {
-                root.hideRequested()
-                preferencesModel.openUpdateTranslationsPage()
-            }
-        }
-
-        SeparatorLine {
-            visible: telemetrySection.visible
-        }
-
-        TelemetrySection {
-            id: telemetrySection
-
-            isTelemetryAllowed: preferencesModel.isTelemetryAllowed
-
-            visible: false
-
-            navigation.section: root.navigationSection
-            navigation.order: root.navigationOrderStart + 2
-
-            onTelemetryAllowedChanged: {
-                preferencesModel.isTelemetryAllowed = allowed
+            onCheckForUpdateRequested: {
+                preferencesModel.checkUpdateForCurrentLanguage()
             }
         }
 
         SeparatorLine { }
 
+        /*
+         * TODO: https://github.com/musescore/MuseScore/issues/9807
+        KeyboardLayoutsSection {
+            keyboardLayouts: preferencesModel.keyboardLayouts
+            currentKeyboardLayout: preferencesModel.currentKeyboardLayout
+
+            navigation.section: root.navigationSection
+            navigation.order: root.navigationOrderStart + 2
+
+            onKeyboardLayoutSelected: function(keyboardLayout) {
+                preferencesModel.currentKeyboardLayout = keyboardLayout
+            }
+        }
+
+        SeparatorLine { }
+        */
+
         AutoSaveSection {
-            isAutoSave: preferencesModel.isAutoSave
-            autoSavePeriod: preferencesModel.autoSavePeriod
+            isAutoSaveEnabled: preferencesModel.isAutoSaveEnabled
+            autoSaveInterval: preferencesModel.autoSaveInterval
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 3
 
-            onAutoSaveChanged: {
-                preferencesModel.isAutoSave = autoSave
+            onAutoSaveEnabledChanged: function(enabled) {
+                preferencesModel.isAutoSaveEnabled = enabled
             }
 
-            onPeriodChanged: {
-                preferencesModel.autoSavePeriod = period
+            onIntervalChanged: function(minutes) {
+                preferencesModel.autoSaveInterval = minutes
             }
         }
 
+        /*
+         * TODO: https://github.com/musescore/MuseScore/issues/9807
         SeparatorLine { }
 
         RemoteControlSection {
@@ -110,13 +111,13 @@ PreferencesPage {
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 4
 
-            onRemoteControlChanged: {
+            onRemoteControlChanged: function(control) {
                 preferencesModel.isOSCRemoteControl = control
             }
 
-            onPortChanged: {
+            onPortChanged: function(port) {
                 preferencesModel.oscPort = port
             }
-        }
+        }*/
     }
 }

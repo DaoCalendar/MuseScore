@@ -29,6 +29,7 @@
 namespace mu::strings {
 bool replace(std::string& source, const std::string& what, const std::string& to);
 void split(const std::string& str, std::vector<std::string>& out, const std::string& delim);
+std::string join(const std::vector<std::string>& strs, const std::string& sep = ",");
 
 void ltrim(std::string& s);
 void rtrim(std::string& s);
@@ -47,6 +48,8 @@ std::string toString(const T& t)
     oss << t;
     return oss.str();
 }
+
+bool lessThanCaseInsensitive(const std::string& lhs, const std::string& rhs);
 }
 
 #endif // MU_FRAMEWORK_STRINGUTILS_H

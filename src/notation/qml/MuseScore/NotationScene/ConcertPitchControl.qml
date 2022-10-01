@@ -31,11 +31,19 @@ FlatButton {
 
     signal toggleConcertPitchRequested()
 
-    orientation: Qt.Horizontal
     transparent: true
+
+    buttonType: FlatButton.Horizontal
+    isNarrow: true
+    margins: 4
+
+    navigation.accessible.role: MUAccessible.CheckBox
+    navigation.accessible.checked: checked
 
     contentItem: Row {
         spacing: 6
+
+        width: implicitWidth + 4 // some extra right padding
 
         CheckBox {
             checked: root.checked

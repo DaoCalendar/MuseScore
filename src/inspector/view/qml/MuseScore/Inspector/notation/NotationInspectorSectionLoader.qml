@@ -54,6 +54,8 @@ import "tremolobars"
 import "mmrests"
 import "tremolos"
 import "measurerepeats"
+import "tuplets"
+import "instrumentname"
 
 Loader {
     id: root
@@ -65,7 +67,7 @@ Loader {
 
     property string viewObjectName: root.item ? root.item.objectName : ""
 
-    function focusOnFirst() {
+    function forceFocusIn() {
         root.item.focusOnFirst()
     }
 
@@ -81,7 +83,9 @@ Loader {
             case Inspector.TYPE_HOOK: return noteComp
             case Inspector.TYPE_FERMATA: return fermataComp
             case Inspector.TYPE_GLISSANDO: return glissandoComp
-            case Inspector.TYPE_VIBRATO: return vibratoCompo
+            case Inspector.TYPE_VIBRATO: return vibratoComp
+            case Inspector.TYPE_SLUR:
+            case Inspector.TYPE_TIE: return slurAndTieComp
             case Inspector.TYPE_TEMPO: return tempoComp
             case Inspector.TYPE_BARLINE: return barlineComp
             case Inspector.TYPE_SECTIONBREAK: return sectionBreakComp
@@ -99,7 +103,9 @@ Loader {
             case Inspector.TYPE_OTTAVA:
             case Inspector.TYPE_PALM_MUTE:
             case Inspector.TYPE_LET_RING:
-            case Inspector.TYPE_VOLTA: return lineComp
+            case Inspector.TYPE_VOLTA:
+            case Inspector.TYPE_GRADUAL_TEMPO_CHANGE:
+            case Inspector.TYPE_TEXT_LINE: return lineComp
             case Inspector.TYPE_STAFF_TYPE_CHANGES: return staffTypeComp
             case Inspector.TYPE_TEXT_FRAME: return textFrameComp
             case Inspector.TYPE_VERTICAL_FRAME: return verticalFrameComp
@@ -110,13 +116,14 @@ Loader {
             case Inspector.TYPE_IMAGE: return imageComp
             case Inspector.TYPE_CHORD_SYMBOL: return chordSymbolComp
             case Inspector.TYPE_BRACKET: return bracketComp
-            case Inspector.TYPE_BRACE: return braceComp
             case Inspector.TYPE_TIME_SIGNATURE: return timeSignatureComp
             case Inspector.TYPE_MMREST: return mmRestComp
             case Inspector.TYPE_BEND: return bendComp
             case Inspector.TYPE_TREMOLOBAR: return tremoloBarComp
             case Inspector.TYPE_TREMOLO: return tremoloComp
             case Inspector.TYPE_MEASURE_REPEAT: return measureRepeatComp
+            case Inspector.TYPE_TUPLET: return tupletComp
+            case Inspector.TYPE_INSTRUMENT_NAME: return instrumentNameComp
             }
 
             return null
@@ -147,8 +154,13 @@ Loader {
     }
 
     Component {
-        id: vibratoCompo
+        id: vibratoComp
         VibratoSettings { }
+    }
+
+    Component {
+        id: slurAndTieComp
+        SlurAndTieSettings { }
     }
 
     Component {
@@ -262,11 +274,6 @@ Loader {
     }
 
     Component {
-        id: braceComp
-        BraceSettings { }
-    }
-
-    Component {
         id: timeSignatureComp
         TimeSignatureSettings { }
     }
@@ -294,5 +301,15 @@ Loader {
     Component {
         id: measureRepeatComp
         MeasureRepeatSettings { }
+    }
+
+    Component {
+        id: tupletComp
+        TupletSettings {}
+    }
+
+    Component {
+        id: instrumentNameComp
+        InstrumentNameSettings {}
     }
 }

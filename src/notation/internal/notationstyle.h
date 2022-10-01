@@ -34,20 +34,24 @@ class NotationStyle : public INotationStyle
 public:
     NotationStyle(IGetScore* getScore, INotationUndoStackPtr);
 
-    QVariant styleValue(const StyleId& styleId) const override;
-    QVariant defaultStyleValue(const StyleId& styleId) const override;
-    void setStyleValue(const StyleId& styleId, const QVariant& newValue) override;
+    PropertyValue styleValue(const StyleId& styleId) const override;
+    PropertyValue defaultStyleValue(const StyleId& styleId) const override;
+    void setStyleValue(const StyleId& styleId, const PropertyValue& newValue) override;
     void resetStyleValue(const StyleId& styleId) override;
 
     bool canApplyToAllParts() const override;
     void applyToAllParts() override;
 
+    void resetAllStyleValues(const std::set<StyleId>& exceptTheseOnes = {}) override;
+
     async::Notification styleChanged() const override;
 
-    bool loadStyle(const mu::io::path&, bool allowAnyVersion) override;
-    bool saveStyle(const mu::io::path&) override;
+    bool loadStyle(const mu::io::path_t&, bool allowAnyVersion) override;
+    bool saveStyle(const mu::io::path_t&) override;
 
 private:
+    mu::engraving::Score* score() const;
+
     IGetScore* m_getScore = nullptr;
     async::Notification m_styleChanged;
     INotationUndoStackPtr m_undoStack;

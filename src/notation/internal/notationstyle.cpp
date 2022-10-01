@@ -38,23 +38,27 @@ NotationStyle::NotationStyle(IGetScore* getScore, INotationUndoStackPtr undoStac
 {
 }
 
-QVariant NotationStyle::styleValue(const StyleId& styleId) const
+PropertyValue NotationStyle::styleValue(const StyleId& styleId) const
 {
-    return m_getScore->score()->styleV(styleId);
+    return score()->styleV(styleId);
 }
 
-QVariant NotationStyle::defaultStyleValue(const StyleId& styleId) const
+PropertyValue NotationStyle::defaultStyleValue(const StyleId& styleId) const
 {
     return engraving::DefaultStyle::defaultStyle().value(styleId);
 }
 
-void NotationStyle::setStyleValue(const StyleId& styleId, const QVariant& newValue)
+void NotationStyle::setStyleValue(const StyleId& styleId, const PropertyValue& newValue)
 {
+    if (styleValue(styleId) == newValue) {
+        return;
+    }
+
     if (styleId == StyleId::concertPitch) {
-        m_getScore->score()->cmdConcertPitchChanged(newValue.toBool());
+        score()->cmdConcertPitchChanged(newValue.toBool());
     } else {
-        m_getScore->score()->undoChangeStyleVal(styleId, newValue);
-        m_getScore->score()->update();
+        score()->undoChangeStyleVal(styleId, newValue);
+        score()->update();
     }
 
     m_styleChanged.notify();
@@ -62,13 +66,13 @@ void NotationStyle::setStyleValue(const StyleId& styleId, const QVariant& newVal
 
 void NotationStyle::resetStyleValue(const StyleId& styleId)
 {
-    m_getScore->score()->resetStyles({ styleId });
+    score()->resetStyleValue(styleId);
     m_styleChanged.notify();
 }
 
 bool NotationStyle::canApplyToAllParts() const
 {
-    return m_getScore->score()->isMaster();
+    return !score()->isMaster(); // In parts only
 }
 
 void NotationStyle::applyToAllParts()
@@ -77,12 +81,43 @@ void NotationStyle::applyToAllParts()
         return;
     }
 
-    Ms::MStyle style = m_getScore->score()->style();
+    mu::engraving::MStyle style = m_getScore->score()->style();
 
-    for (Ms::Excerpt* excerpt : m_getScore->score()->masterScore()->excerpts()) {
-        excerpt->partScore()->undo(new Ms::ChangeStyle(excerpt->partScore(), style));
-        excerpt->partScore()->update();
+    for (mu::engraving::Excerpt* excerpt : score()->masterScore()->excerpts()) {
+        excerpt->excerptScore()->undo(new mu::engraving::ChangeStyle(excerpt->excerptScore(), style));
+        excerpt->excerptScore()->update();
     }
+}
+
+void NotationStyle::resetAllStyleValues(const std::set<StyleId>& exceptTheseOnes)
+{
+    static const std::set<StyleId> stylesNotToReset {
+        StyleId::pageWidth,
+        StyleId::pageHeight,
+        StyleId::pagePrintableWidth,
+        StyleId::pageEvenTopMargin,
+        StyleId::pageEvenBottomMargin,
+        StyleId::pageEvenLeftMargin,
+        StyleId::pageOddTopMargin,
+        StyleId::pageOddBottomMargin,
+        StyleId::pageOddLeftMargin,
+        StyleId::pageTwosided,
+        StyleId::spatium,
+        StyleId::concertPitch,
+        StyleId::createMultiMeasureRests
+    };
+
+    int beginIdx = int(StyleId::NOSTYLE) + 1;
+    int endIdx = int(StyleId::STYLES);
+    for (int idx = beginIdx; idx < endIdx; idx++) {
+        StyleId styleId = StyleId(idx);
+        if (stylesNotToReset.find(styleId) == stylesNotToReset.cend() && exceptTheseOnes.find(styleId) == exceptTheseOnes.cend()) {
+            score()->resetStyleValue(styleId);
+        }
+    }
+
+    score()->update();
+    m_styleChanged.notify();
 }
 
 Notification NotationStyle::styleChanged() const
@@ -90,18 +125,25 @@ Notification NotationStyle::styleChanged() const
     return m_styleChanged;
 }
 
-bool NotationStyle::loadStyle(const mu::io::path& path, bool allowAnyVersion)
+bool NotationStyle::loadStyle(const mu::io::path_t& path, bool allowAnyVersion)
 {
     m_undoStack->prepareChanges();
-    bool result = m_getScore->score()->loadStyle(path.toQString(), allowAnyVersion);
+    bool result = score()->loadStyle(path.toQString(), allowAnyVersion);
     m_undoStack->commitChanges();
+
     if (result) {
         styleChanged().notify();
     }
+
     return result;
 }
 
-bool NotationStyle::saveStyle(const mu::io::path& path)
+bool NotationStyle::saveStyle(const mu::io::path_t& path)
 {
-    return m_getScore->score()->saveStyle(path.toQString());
+    return score()->saveStyle(path.toQString());
+}
+
+mu::engraving::Score* NotationStyle::score() const
+{
+    return m_getScore->score();
 }

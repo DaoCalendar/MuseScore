@@ -24,15 +24,11 @@
 
 #include "layoutoptions.h"
 
-namespace Ms {
-class Score;
-class Measure;
-class Fraction;
-class MeasureBase;
-}
-
 namespace mu::engraving {
-class LayoutContext;
+class Measure;
+class MeasureBase;
+class Score;
+
 class LayoutContext;
 class LayoutMeasure
 {
@@ -43,10 +39,9 @@ public:
 
 private:
 
-    static void createMMRest(const LayoutOptions& options, Ms::Score* score, Ms::Measure* firstMeasure, Ms::Measure* lastMeasure,
-                             const Ms::Fraction& len);
+    static void createMMRest(const LayoutOptions& options, Score* score, Measure* firstMeasure, Measure* lastMeasure, const Fraction& len);
 
-    static int adjustMeasureNo(LayoutContext& lc, Ms::MeasureBase* m);
+    static int adjustMeasureNo(LayoutContext& lc, MeasureBase* m);
 };
 }
 

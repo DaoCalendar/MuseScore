@@ -38,11 +38,11 @@ Row {
 
     property NavigationPanel navigation: NavigationPanel {
         name: "MidiMappingBottomPanel"
+        enabled: root.enabled && root.visible
         direction: NavigationPanel.Horizontal
-        accessible.name: qsTrc("shortcuts", "Midi mapping bottom panel")
-        enabled: root.visible
+        accessible.name: qsTrc("shortcuts", "MIDI mapping bottom panel")
 
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
@@ -87,7 +87,7 @@ Row {
         navigation.column: 2
 
         onClicked: {
-            root.clearAllActions()
+            root.clearAllActionsRequested()
         }
     }
 }

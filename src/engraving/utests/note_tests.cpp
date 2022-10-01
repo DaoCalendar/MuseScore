@@ -22,32 +22,30 @@
 
 #include <gtest/gtest.h>
 
-#include "libmscore/factory.h"
-#include "libmscore/articulation.h"
-#include "libmscore/mscore.h"
-#include "libmscore/masterscore.h"
-#include "libmscore/note.h"
-#include "libmscore/chordrest.h"
 #include "libmscore/accidental.h"
+#include "libmscore/articulation.h"
+#include "libmscore/articulation.h"
 #include "libmscore/chord.h"
+#include "libmscore/chordrest.h"
+#include "libmscore/factory.h"
+#include "libmscore/masterscore.h"
 #include "libmscore/measure.h"
+#include "libmscore/mscore.h"
+#include "libmscore/note.h"
+#include "libmscore/pitchspelling.h"
 #include "libmscore/segment.h"
 #include "libmscore/tremolo.h"
-#include "libmscore/articulation.h"
-#include "libmscore/symid.h"
-#include "libmscore/key.h"
-#include "libmscore/pitchspelling.h"
 
 #include "engraving/compat/scoreaccess.h"
 #include "utils/scorerw.h"
 #include "utils/scorecomp.h"
 
-static const QString NOTE_DATA_DIR("note_data/");
-
-using namespace Ms;
+using namespace mu;
 using namespace mu::engraving;
 
-class NoteTests : public ::testing::Test
+static const String NOTE_DATA_DIR("note_data/");
+
+class Engraving_NoteTests : public ::testing::Test
 {
 };
 
@@ -56,124 +54,124 @@ class NoteTests : public ::testing::Test
 ///   read/write test of note
 //---------------------------------------------------------
 
-TEST_F(NoteTests, note)
+TEST_F(Engraving_NoteTests, note)
 {
     MasterScore* score = compat::ScoreAccess::createMasterScore();
-    Ms::Chord* chord = Factory::createChord(score->dummy()->segment());
+    Chord* chord = Factory::createChord(score->dummy()->segment());
     Note* note = Factory::createNote(chord);
     chord->add(note);
 
     // pitch
     note->setPitch(33);
     note->setTpcFromPitch();
-    Note* n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    Note* n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->pitch(), 33);
     delete n;
 
     // tpc
     note->setTpc1(22);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->tpc1(), 22);
     delete n;
 
     note->setTpc1(23);
     note->setTpc2(23);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->tpc2(), 23);
     delete n;
 
     // small
     note->setSmall(true);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_TRUE(n->isSmall());
     delete n;
 
     // mirror
-    note->setUserMirror(MScore::DirectionH::LEFT);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->userMirror(), MScore::DirectionH::LEFT);
+    note->setUserMirror(DirectionH::LEFT);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->userMirror(), DirectionH::LEFT);
     delete n;
 
-    note->setUserMirror(MScore::DirectionH::RIGHT);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->userMirror(), MScore::DirectionH::RIGHT);
+    note->setUserMirror(DirectionH::RIGHT);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->userMirror(), DirectionH::RIGHT);
     delete n;
 
-    note->setUserMirror(MScore::DirectionH::AUTO);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->userMirror(), MScore::DirectionH::AUTO);
+    note->setUserMirror(DirectionH::AUTO);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->userMirror(), DirectionH::AUTO);
     delete n;
 
     // dot position
-    note->setUserDotPosition(Direction::UP);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(int(n->userDotPosition()), int(Direction::UP));
+    note->setUserDotPosition(DirectionV::UP);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(int(n->userDotPosition()), int(DirectionV::UP));
     delete n;
 
-    note->setUserDotPosition(Direction::DOWN);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(int(n->userDotPosition()), int(Direction::DOWN));
+    note->setUserDotPosition(DirectionV::DOWN);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(int(n->userDotPosition()), int(DirectionV::DOWN));
     delete n;
 
-    note->setUserDotPosition(Direction::AUTO);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(int(n->userDotPosition()), int(Direction::AUTO));
+    note->setUserDotPosition(DirectionV::AUTO);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(int(n->userDotPosition()), int(DirectionV::AUTO));
     delete n;
     // headGroup
-    for (int i = 0; i < int(NoteHead::Group::HEAD_GROUPS); ++i) {
-        note->setHeadGroup(NoteHead::Group(i));
-        n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    for (int i = 0; i < int(NoteHeadGroup::HEAD_GROUPS); ++i) {
+        note->setHeadGroup(NoteHeadGroup(i));
+        n = toNote(ScoreRW::writeReadElement(note));
         EXPECT_EQ(int(n->headGroup()), i);
         delete n;
     }
 
     // headType
-    for (int i = 0; i < int(NoteHead::Type::HEAD_TYPES); ++i) {
-        note->setHeadType(NoteHead::Type(i));
-        n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    for (int i = 0; i < int(NoteHeadType::HEAD_TYPES); ++i) {
+        note->setHeadType(NoteHeadType(i));
+        n = toNote(ScoreRW::writeReadElement(note));
         EXPECT_EQ(int(n->headType()), i);
         delete n;
     }
 
     // velo offset
     note->setVeloOffset(71);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->veloOffset(), 71);
     delete n;
 
     // tuning
     note->setTuning(1.3);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->tuning(), 1.3);
     delete n;
 
     // fret
     note->setFret(9);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->fret(), 9);
     delete n;
 
     // string
     note->setString(3);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->string(), 3);
     delete n;
 
     // ghost
     note->setGhost(true);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_TRUE(n->ghost());
     delete n;
 
     // velo type
-    note->setVeloType(Note::ValueType::USER_VAL);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->veloType(), Note::ValueType::USER_VAL);
+    note->setVeloType(VeloType::USER_VAL);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->veloType(), VeloType::USER_VAL);
     delete n;
 
-    note->setVeloType(Note::ValueType::OFFSET_VAL);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->veloType(), Note::ValueType::OFFSET_VAL);
+    note->setVeloType(VeloType::OFFSET_VAL);
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->veloType(), VeloType::OFFSET_VAL);
     delete n;
 
     //================================================
@@ -182,125 +180,125 @@ TEST_F(NoteTests, note)
 
     // pitch
     note->setProperty(Pid::PITCH, 32);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->pitch(), 32);
     delete n;
 
     // tpc
     note->setProperty(Pid::TPC1, 21);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->tpc1(), 21);
     delete n;
 
     note->setProperty(Pid::TPC1, 22);
     note->setProperty(Pid::TPC2, 22);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->tpc2(), 22);
     delete n;
 
     // small
     note->setProperty(Pid::SMALL, false);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_TRUE(!n->isSmall());
     delete n;
 
     note->setProperty(Pid::SMALL, true);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_TRUE(n->isSmall());
     delete n;
 
     // mirror
-    note->setProperty(Pid::MIRROR_HEAD, int(MScore::DirectionH::LEFT));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->userMirror(), MScore::DirectionH::LEFT);
+    note->setProperty(Pid::MIRROR_HEAD, int(DirectionH::LEFT));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->userMirror(), DirectionH::LEFT);
     delete n;
 
-    note->setProperty(Pid::MIRROR_HEAD, int(MScore::DirectionH::RIGHT));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->userMirror(), MScore::DirectionH::RIGHT);
+    note->setProperty(Pid::MIRROR_HEAD, int(DirectionH::RIGHT));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->userMirror(), DirectionH::RIGHT);
     delete n;
 
-    note->setProperty(Pid::MIRROR_HEAD, int(MScore::DirectionH::AUTO));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->userMirror(), MScore::DirectionH::AUTO);
+    note->setProperty(Pid::MIRROR_HEAD, int(DirectionH::AUTO));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->userMirror(), DirectionH::AUTO);
     delete n;
 
     // dot position
-    note->setProperty(Pid::DOT_POSITION, QVariant::fromValue(Direction(Direction::UP)));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(int(n->userDotPosition()), int(Direction::UP));
+    note->setProperty(Pid::DOT_POSITION, PropertyValue::fromValue(DirectionV(DirectionV::UP)));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(int(n->userDotPosition()), int(DirectionV::UP));
     delete n;
 
-    note->setProperty(Pid::DOT_POSITION, QVariant::fromValue(Direction(Direction::DOWN)));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(int(n->userDotPosition()), int(Direction::DOWN));
+    note->setProperty(Pid::DOT_POSITION, PropertyValue::fromValue(DirectionV(DirectionV::DOWN)));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(int(n->userDotPosition()), int(DirectionV::DOWN));
     delete n;
 
-    note->setProperty(Pid::DOT_POSITION, QVariant::fromValue(Direction(Direction::AUTO)));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(int(n->userDotPosition()), int(Direction::AUTO));
+    note->setProperty(Pid::DOT_POSITION, PropertyValue::fromValue(DirectionV(DirectionV::AUTO)));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(int(n->userDotPosition()), int(DirectionV::AUTO));
     delete n;
 
     // headGroup
-    for (int i = 0; i < int(NoteHead::Group::HEAD_GROUPS); ++i) {
+    for (int i = 0; i < int(NoteHeadGroup::HEAD_GROUPS); ++i) {
         note->setProperty(Pid::HEAD_GROUP, i);
-        n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+        n = toNote(ScoreRW::writeReadElement(note));
         EXPECT_EQ(int(n->headGroup()), i);
         delete n;
     }
 
     // headType
-    for (int i = 0; i < int(NoteHead::Type::HEAD_TYPES); ++i) {
+    for (int i = 0; i < int(NoteHeadType::HEAD_TYPES); ++i) {
         note->setProperty(Pid::HEAD_TYPE, i);
-        n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+        n = toNote(ScoreRW::writeReadElement(note));
         EXPECT_EQ(int(n->headType()), i);
         delete n;
     }
 
     // velo offset
     note->setProperty(Pid::VELO_OFFSET, 38);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->veloOffset(), 38);
     delete n;
 
     // tuning
     note->setProperty(Pid::TUNING, 2.4);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->tuning(), 2.4);
     delete n;
 
     // fret
     note->setProperty(Pid::FRET, 7);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->fret(), 7);
     delete n;
 
     // string
     note->setProperty(Pid::STRING, 4);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_EQ(n->string(), 4);
     delete n;
 
     // ghost
     note->setProperty(Pid::GHOST, false);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_TRUE(!n->ghost());
     delete n;
 
     note->setProperty(Pid::GHOST, true);
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
+    n = toNote(ScoreRW::writeReadElement(note));
     EXPECT_TRUE(n->ghost());
     delete n;
 
     // velo type
-    note->setProperty(Pid::VELO_TYPE, int(Note::ValueType::USER_VAL));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->veloType(), Note::ValueType::USER_VAL);
+    note->setProperty(Pid::VELO_TYPE, int(VeloType::USER_VAL));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->veloType(), VeloType::USER_VAL);
     delete n;
 
-    note->setProperty(Pid::VELO_TYPE, int(Note::ValueType::OFFSET_VAL));
-    n = static_cast<Note*>(ScoreRW::writeReadElement(note));
-    EXPECT_EQ(n->veloType(), Note::ValueType::OFFSET_VAL);
+    note->setProperty(Pid::VELO_TYPE, int(VeloType::OFFSET_VAL));
+    n = toNote(ScoreRW::writeReadElement(note));
+    EXPECT_EQ(n->veloType(), VeloType::OFFSET_VAL);
     delete n;
 
     delete chord;
@@ -313,25 +311,25 @@ TEST_F(NoteTests, note)
 ///   read/write test of grace notes
 //---------------------------------------------------------
 
-TEST_F(NoteTests, grace)
+TEST_F(Engraving_NoteTests, grace)
 {
-    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + "grace.mscx");
+    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + u"grace.mscx");
     score->doLayout();
-    Ms::Chord* chord = score->firstMeasure()->findChord(Fraction(0, 1), 0);
+    Chord* chord = score->firstMeasure()->findChord(Fraction(0, 1), 0);
     Note* note = chord->upNote();
 
     // create
-    score->setGraceNote(chord, note->pitch(), NoteType::APPOGGIATURA, MScore::division / 2);
-    Ms::Chord* gc = chord->graceNotes().first();
+    score->setGraceNote(chord, note->pitch(), NoteType::APPOGGIATURA, Constants::division / 2);
+    Chord* gc = chord->graceNotes().front();
     Note* gn = gc->notes().front();
-//      Note* n = static_cast<Note*>(ScoreRW::writeReadElement(gn));
+//      Note* n = toNote(ScoreRW::writeReadElement(gn));
 //      QCOMPARE(n->noteType(), NoteType::APPOGGIATURA);
 //      delete n;
 
     // tie
     score->select(gn);
     score->cmdAddTie();
-//      n = static_cast<Note*>(ScoreRW::writeReadElement(gn));
+//      n = toNote(ScoreRW::writeReadElement(gn));
 //      QVERIFY(n->tieFor() != 0);
 //      delete n;
 
@@ -343,7 +341,7 @@ TEST_F(NoteTests, grace)
     tr->setTrack(gc->track());
     score->undoAddElement(tr);
     score->endCmd();
-//      Ms::Chord* c = static_cast<Ms::Chord*>(ScoreRW::writeReadElement(gc));
+//      Chord* c = static_cast<Chord*>(ScoreRW::writeReadElement(gc));
 //      QVERIFY(c->tremolo() != 0);
 //      delete c;
 
@@ -355,11 +353,11 @@ TEST_F(NoteTests, grace)
     ar->setTrack(gc->track());
     score->undoAddElement(ar);
     score->endCmd();
-//      c = static_cast<Ms::Chord*>(ScoreRW::writeReadElement(gc));
+//      c = static_cast<Chord*>(ScoreRW::writeReadElement(gc));
 //      QVERIFY(c->articulations().size() == 1);
 //      delete c;
 
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "grace-test.mscx", NOTE_DATA_DIR + "grace-ref.mscx"));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"grace-test.mscx", NOTE_DATA_DIR + u"grace-ref.mscx"));
 }
 
 //---------------------------------------------------------
@@ -367,13 +365,13 @@ TEST_F(NoteTests, grace)
 ///   test of note tpc values
 //---------------------------------------------------------
 
-TEST_F(NoteTests, tpc)
+TEST_F(Engraving_NoteTests, tpc)
 {
-    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + "tpc.mscx");
+    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + u"tpc.mscx");
 
     score->inputState().setTrack(0);
     score->inputState().setSegment(score->tick2segment(Fraction(0, 1), false, SegmentType::ChordRest));
-    score->inputState().setDuration(TDuration::DurationType::V_QUARTER);
+    score->inputState().setDuration(DurationType::V_QUARTER);
     score->inputState().setNoteEntryMode(true);
     int octave = 5 * 7;
     score->cmdAddPitch(octave + 1, false, false);
@@ -387,7 +385,7 @@ TEST_F(NoteTests, tpc)
 
     score->cmdConcertPitchChanged(true);
 
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "tpc-test.mscx", NOTE_DATA_DIR + "tpc-ref.mscx"));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"tpc-test.mscx", NOTE_DATA_DIR + u"tpc-ref.mscx"));
 }
 
 //---------------------------------------------------------
@@ -395,9 +393,9 @@ TEST_F(NoteTests, tpc)
 ///   test of note tpc values & transposition
 //---------------------------------------------------------
 
-TEST_F(NoteTests, tpcTranspose)
+TEST_F(Engraving_NoteTests, tpcTranspose)
 {
-    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + "tpc-transpose.mscx");
+    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + u"tpc-transpose.mscx");
 
     score->startCmd();
     Measure* m = score->firstMeasure();
@@ -415,7 +413,7 @@ TEST_F(NoteTests, tpcTranspose)
     score->cmdConcertPitchChanged(true);
     score->endCmd();
 
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "tpc-transpose-test.mscx", NOTE_DATA_DIR + "tpc-transpose-ref.mscx"));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"tpc-transpose-test.mscx", NOTE_DATA_DIR + u"tpc-transpose-ref.mscx"));
 }
 
 //---------------------------------------------------------
@@ -423,13 +421,13 @@ TEST_F(NoteTests, tpcTranspose)
 ///   more tests of note tpc values & transposition
 //---------------------------------------------------------
 
-TEST_F(NoteTests, tpcTranspose2)
+TEST_F(Engraving_NoteTests, tpcTranspose2)
 {
-    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + "tpc-transpose2.mscx");
+    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + u"tpc-transpose2.mscx");
 
     score->inputState().setTrack(0);
     score->inputState().setSegment(score->tick2segment(Fraction(0, 1), false, SegmentType::ChordRest));
-    score->inputState().setDuration(TDuration::DurationType::V_QUARTER);
+    score->inputState().setDuration(DurationType::V_QUARTER);
     score->inputState().setNoteEntryMode(true);
     int octave = 5 * 7;
     score->cmdAddPitch(octave + 3, false, false);
@@ -440,20 +438,20 @@ TEST_F(NoteTests, tpcTranspose2)
 
     printf("================\n");
 
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "tpc-transpose2-test.mscx", NOTE_DATA_DIR + "tpc-transpose2-ref.mscx"));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"tpc-transpose2-test.mscx", NOTE_DATA_DIR + u"tpc-transpose2-ref.mscx"));
 }
 
 //---------------------------------------------------------
 ///   noteLimits
 //---------------------------------------------------------
 
-TEST_F(NoteTests, noteLimits)
+TEST_F(Engraving_NoteTests, noteLimits)
 {
-    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + "empty.mscx");
+    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + u"empty.mscx");
 
     score->inputState().setTrack(0);
     score->inputState().setSegment(score->tick2segment(Fraction(0, 1), false, SegmentType::ChordRest));
-    score->inputState().setDuration(TDuration::DurationType::V_QUARTER);
+    score->inputState().setDuration(DurationType::V_QUARTER);
     score->inputState().setNoteEntryMode(true);
 
     // over 127 shouldn't crash
@@ -484,10 +482,10 @@ TEST_F(NoteTests, noteLimits)
         score->addInterval(8, nl);
         score->endCmd();
     }
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "notelimits-test.mscx", NOTE_DATA_DIR + "notelimits-ref.mscx"));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"notelimits-test.mscx", NOTE_DATA_DIR + u"notelimits-ref.mscx"));
 }
 
-TEST_F(NoteTests, tpcDegrees)
+TEST_F(Engraving_NoteTests, tpcDegrees)
 {
     EXPECT_EQ(tpc2degree(Tpc::TPC_C,   Key::C),   0);
     //QCOMPARE(tpc2degree(Tpc::TPC_E_S, Key::C),   3);
@@ -498,16 +496,16 @@ TEST_F(NoteTests, tpcDegrees)
     //QCOMPARE(tpc2degree(Tpc::TPC_B_S, Key::C_S), 7);
 }
 
-TEST_F(NoteTests, alteredUnison)
+TEST_F(Engraving_NoteTests, alteredUnison)
 {
-    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + "altered-unison.mscx");
+    MasterScore* score = ScoreRW::readScore(NOTE_DATA_DIR + u"altered-unison.mscx");
     Measure* m = score->firstMeasure();
     Chord* c = m->findChord(Fraction(0, 1), 0);
-    EXPECT_TRUE(c->downNote()->accidental() && c->downNote()->accidental()->accidentalType() == Ms::AccidentalType::FLAT);
-    EXPECT_TRUE(c->upNote()->accidental() && c->upNote()->accidental()->accidentalType() == Ms::AccidentalType::NATURAL);
+    EXPECT_TRUE(c->downNote()->accidental() && c->downNote()->accidental()->accidentalType() == AccidentalType::FLAT);
+    EXPECT_TRUE(c->upNote()->accidental() && c->upNote()->accidental()->accidentalType() == AccidentalType::NATURAL);
     c = m->findChord(Fraction(1, 4), 0);
-    EXPECT_TRUE(c->downNote()->accidental() && c->downNote()->accidental()->accidentalType() == Ms::AccidentalType::NATURAL);
-    EXPECT_TRUE(c->upNote()->accidental() && c->upNote()->accidental()->accidentalType() == Ms::AccidentalType::SHARP);
+    EXPECT_TRUE(c->downNote()->accidental() && c->downNote()->accidental()->accidentalType() == AccidentalType::NATURAL);
+    EXPECT_TRUE(c->upNote()->accidental() && c->upNote()->accidental()->accidentalType() == AccidentalType::SHARP);
 }
 
 //---------------------------------------------------------
@@ -519,22 +517,22 @@ TEST_F(NoteTests, alteredUnison)
 ///    regardless of how the breve was divided up.
 //---------------------------------------------------------
 
-TEST_F(NoteTests, LongNoteAfterShort_183746)
+TEST_F(Engraving_NoteTests, LongNoteAfterShort_183746)
 {
     Score* score = ScoreRW::readScore(NOTE_DATA_DIR + "empty.mscx");
     score->doLayout();
 
     score->inputState().setTrack(0);
     score->inputState().setSegment(score->tick2segment(Fraction(0, 1), false, SegmentType::ChordRest));
-    score->inputState().setDuration(TDuration::DurationType::V_128TH);
+    score->inputState().setDuration(DurationType::V_128TH);
     score->inputState().setNoteEntryMode(true);
 
-    score->cmdEnterRest(TDuration::DurationType::V_128TH);
+    score->cmdEnterRest(DurationType::V_128TH);
 
-    score->inputState().setDuration(TDuration::DurationType::V_BREVE);
+    score->inputState().setDuration(DurationType::V_BREVE);
     score->cmdAddPitch(47, 0, 0);
 
-    Segment* s = score->tick2segment(TDuration(TDuration::DurationType::V_128TH).ticks());
+    Segment* s = score->tick2segment(TDuration(DurationType::V_128TH).ticks());
     EXPECT_TRUE(s && s->segmentType() == SegmentType::ChordRest);
     EXPECT_TRUE(s->tick() == Fraction(1, 128));
 
@@ -547,6 +545,6 @@ TEST_F(NoteTests, LongNoteAfterShort_183746)
     for (Note* n : nl) {
         totalTicks += n->chord()->durationTypeTicks();
     }
-    Fraction breveTicks = TDuration(TDuration::DurationType::V_BREVE).ticks();
+    Fraction breveTicks = TDuration(DurationType::V_BREVE).ticks();
     EXPECT_TRUE(totalTicks == breveTicks);   // total duration same as a breve
 }

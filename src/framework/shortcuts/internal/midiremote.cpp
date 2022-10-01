@@ -21,8 +21,8 @@
  */
 #include "midiremote.h"
 
-#include "global/xmlreader.h"
-#include "global/xmlwriter.h"
+#include "global/deprecated/xmlreader.h"
+#include "global/deprecated/xmlwriter.h"
 
 #include "multiinstances/resourcelockguard.h"
 
@@ -40,8 +40,16 @@ constexpr std::string_view MAPPING_EVENT_VALUE_TAG("EventValue");
 
 static const std::string REALTIME_ADVANCE_ACTION_NAME("realtime-advance");
 
-void MidiRemote::load()
+static const std::string MIDI_MAPPING_RESOURCE_NAME("MIDI_MAPPING");
+
+void MidiRemote::init()
 {
+    multiInstancesProvider()->resourceChanged().onReceive(this, [this](const std::string& resourceName) {
+        if (resourceName == MIDI_MAPPING_RESOURCE_NAME) {
+            readMidiMappings();
+        }
+    });
+
     readMidiMappings();
 }
 
@@ -60,9 +68,24 @@ mu::Ret MidiRemote::setMidiMappings(const MidiMappingList& midiMappings)
 
     if (ok) {
         m_midiMappings = midiMappings;
+        m_midiMappingsChanged.notify();
     }
 
     return ok;
+}
+
+void MidiRemote::resetMidiMappings()
+{
+    mi::WriteResourceLockGuard resource_guard(multiInstancesProvider(), MIDI_MAPPING_RESOURCE_NAME);
+    fileSystem()->remove(configuration()->midiMappingUserAppDataPath());
+
+    m_midiMappings = {};
+    m_midiMappingsChanged.notify();
+}
+
+mu::async::Notification MidiRemote::midiMappingsChanged() const
+{
+    return m_midiMappingsChanged;
 }
 
 void MidiRemote::setIsSettingMode(bool arg)
@@ -84,7 +107,7 @@ void MidiRemote::setCurrentActionEvent(const Event& ev)
 mu::Ret MidiRemote::process(const Event& ev)
 {
     if (needIgnoreEvent(ev)) {
-        return make_ret(Ret::Code::Ok);
+        return Ret(Ret::Code::Undefined);
     }
 
     RemoteEvent event = remoteEventFromMidiEvent(ev);
@@ -101,9 +124,9 @@ mu::Ret MidiRemote::process(const Event& ev)
 
 void MidiRemote::readMidiMappings()
 {
-    mi::ResourceLockGuard resource_guard(multiInstancesProvider(), "MIDIMAPPING");
+    mi::ReadResourceLockGuard resource_guard(multiInstancesProvider(), MIDI_MAPPING_RESOURCE_NAME);
 
-    io::path midiMappingsPath = configuration()->midiMappingUserAppDataPath();
+    io::path_t midiMappingsPath = configuration()->midiMappingUserAppDataPath();
     XmlReader reader(midiMappingsPath);
 
     reader.readNextStartElement();
@@ -153,9 +176,9 @@ bool MidiRemote::writeMidiMappings(const MidiMappingList& midiMappings) const
 {
     TRACEFUNC;
 
-    mi::ResourceLockGuard resource_guard(multiInstancesProvider(), "MIDIMAPPING");
+    mi::WriteResourceLockGuard resource_guard(multiInstancesProvider(), MIDI_MAPPING_RESOURCE_NAME);
 
-    io::path midiMappingsPath = configuration()->midiMappingUserAppDataPath();
+    io::path_t midiMappingsPath = configuration()->midiMappingUserAppDataPath();
     XmlWriter writer(midiMappingsPath);
 
     writer.writeStartDocument();
@@ -186,21 +209,21 @@ bool MidiRemote::needIgnoreEvent(const Event& event) const
         return true;
     }
 
-    static const QList<Event::Opcode> releaseOps {
-        Event::Opcode::NoteOff
-    };
-
-    bool release = releaseOps.contains(event.opcode());
+    bool release = event.opcode() == Event::Opcode::NoteOff;
     if (release) {
         bool advanceToNextNoteOnKeyRelease = configuration()->advanceToNextNoteOnKeyRelease();
+        if (!advanceToNextNoteOnKeyRelease) {
+            return true;
+        }
+
         RemoteEvent remoteEvent = remoteEventFromMidiEvent(event);
-        bool isRealtimeAdvance = this->remoteEvent(REALTIME_ADVANCE_ACTION_NAME) == remoteEvent;
-        if (!advanceToNextNoteOnKeyRelease || !isRealtimeAdvance) {
+        RemoteEvent realtimeEvent = this->remoteEvent(REALTIME_ADVANCE_ACTION_NAME);
+        if (!realtimeEvent.isValid() || remoteEvent != realtimeEvent) {
             return true;
         }
     }
 
-    return false;
+    return event.opcode() != Event::Opcode::NoteOn;
 }
 
 RemoteEvent MidiRemote::remoteEvent(const std::string& action) const

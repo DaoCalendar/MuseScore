@@ -20,31 +20,35 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "bsymbol.h"
+
 #include <cmath>
 
-#include "io/xml.h"
+#include "containers.h"
+#include "rw/xml.h"
 
-#include "score.h"
-#include "image.h"
-#include "staff.h"
-#include "segment.h"
-#include "page.h"
-#include "system.h"
-#include "measure.h"
 #include "factory.h"
+#include "measure.h"
+#include "page.h"
+#include "score.h"
+#include "segment.h"
+#include "staff.h"
+#include "system.h"
+
+#include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   BSymbol
 //---------------------------------------------------------
 
-BSymbol::BSymbol(const Ms::ElementType& type, Ms::EngravingItem* parent, ElementFlags f)
+BSymbol::BSymbol(const ElementType& type, EngravingItem* parent, ElementFlags f)
     : EngravingItem(type, parent, f)
 {
-    _align = Align::LEFT | Align::BASELINE;
+    _align = { AlignH::LEFT, AlignV::BASELINE };
 }
 
 BSymbol::BSymbol(const BSymbol& s)
@@ -54,7 +58,7 @@ BSymbol::BSymbol(const BSymbol& s)
     for (EngravingItem* e : s._leafs) {
         EngravingItem* ee = e->clone();
         ee->setParent(this);
-        _leafs.append(ee);
+        _leafs.push_back(ee);
     }
 }
 
@@ -76,7 +80,7 @@ void BSymbol::writeProperties(XmlWriter& xml) const
 
 bool BSymbol::readProperties(XmlReader& e)
 {
-    const QStringRef& tag = e.name();
+    const AsciiStringView tag = e.name();
 
     if (EngravingItem::readProperties(e)) {
         return true;
@@ -109,10 +113,23 @@ void BSymbol::add(EngravingItem* e)
     if (e->isSymbol() || e->isImage()) {
         e->setParent(this);
         e->setTrack(track());
-        _leafs.append(e);
+        _leafs.push_back(e);
         toBSymbol(e)->setZ(z() - 1);        // draw on top of parent
+        e->added();
     } else {
-        qDebug("BSymbol::add: unsupported type %s", e->name());
+        LOGD("BSymbol::add: unsupported type %s", e->typeName());
+    }
+}
+
+//---------------------------------------------------------
+//   scanElements
+//---------------------------------------------------------
+
+void BSymbol::scanElements(void* data, void (* func)(void*, EngravingItem*), bool all)
+{
+    func(data, this);
+    for (EngravingItem* e : _leafs) {
+        e->scanElements(data, func, all);
     }
 }
 
@@ -123,11 +140,13 @@ void BSymbol::add(EngravingItem* e)
 void BSymbol::remove(EngravingItem* e)
 {
     if (e->isSymbol() || e->isImage()) {
-        if (!_leafs.removeOne(e)) {
-            qDebug("BSymbol::remove: element <%s> not found", e->name());
+        if (mu::remove(_leafs, e)) {
+            e->removed();
+        } else {
+            LOGD("BSymbol::remove: element <%s> not found", e->typeName());
         }
     } else {
-        qDebug("BSymbol::remove: unsupported type %s", e->name());
+        LOGD("BSymbol::remove: unsupported type %s", e->typeName());
     }
 }
 
@@ -168,11 +187,11 @@ void BSymbol::layout()
     if (staff()) {
         setMag(staff()->staffMag(tick()));
     }
-    if (!parent()) {
+    if (!explicitParent()) {
         setOffset(.0, .0);
         setPos(.0, .0);
     }
-    for (EngravingItem* e : qAsConst(_leafs)) {
+    for (EngravingItem* e : _leafs) {
         e->layout();
     }
 }
@@ -184,21 +203,21 @@ void BSymbol::layout()
 mu::RectF BSymbol::drag(EditData& ed)
 {
     RectF r(canvasBoundingRect());
-    foreach (const EngravingItem* e, _leafs) {
+    for (const EngravingItem* e : _leafs) {
         r.unite(e->canvasBoundingRect());
     }
 
-    qreal x = ed.delta.x();
-    qreal y = ed.delta.y();
+    double x = ed.delta.x();
+    double y = ed.delta.y();
 
-    qreal _spatium = spatium();
+    double _spatium = spatium();
     if (ed.hRaster) {
-        qreal hRaster = _spatium / MScore::hRaster();
+        double hRaster = _spatium / MScore::hRaster();
         int n = lrint(x / hRaster);
         x = hRaster * n;
     }
     if (ed.vRaster) {
-        qreal vRaster = _spatium / MScore::vRaster();
+        double vRaster = _spatium / MScore::vRaster();
         int n = lrint(y / vRaster);
         y = vRaster * n;
     }
@@ -206,7 +225,7 @@ mu::RectF BSymbol::drag(EditData& ed)
     setOffset(PointF(x, y));
 
     r.unite(canvasBoundingRect());
-    foreach (const EngravingItem* e, _leafs) {
+    for (const EngravingItem* e : _leafs) {
         r.unite(e->canvasBoundingRect());
     }
     return r;
@@ -216,7 +235,7 @@ mu::RectF BSymbol::drag(EditData& ed)
 //   dragAnchorLines
 //---------------------------------------------------------
 
-QVector<mu::LineF> BSymbol::dragAnchorLines() const
+std::vector<mu::LineF> BSymbol::dragAnchorLines() const
 {
     return genericDragAnchorLines();
 }
@@ -227,7 +246,7 @@ QVector<mu::LineF> BSymbol::dragAnchorLines() const
 
 mu::PointF BSymbol::pagePos() const
 {
-    if (parent() && (parent()->type() == ElementType::SEGMENT)) {
+    if (explicitParent() && (explicitParent()->type() == ElementType::SEGMENT)) {
         mu::PointF p(pos());
         System* system = segment()->measure()->system();
         if (system) {
@@ -246,13 +265,13 @@ mu::PointF BSymbol::pagePos() const
 
 mu::PointF BSymbol::canvasPos() const
 {
-    if (parent() && (parent()->type() == ElementType::SEGMENT)) {
+    if (explicitParent() && (explicitParent()->type() == ElementType::SEGMENT)) {
         mu::PointF p(pos());
-        Segment* s = toSegment(parent());
+        Segment* s = toSegment(explicitParent());
 
         System* system = s->measure()->system();
         if (system) {
-            int si = staffIdx();
+            staff_idx_t si = staffIdx();
             p.ry() += system->staff(si)->y() + system->y();
             Page* page = system->page();
             if (page) {

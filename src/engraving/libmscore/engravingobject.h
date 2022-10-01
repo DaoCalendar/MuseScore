@@ -23,148 +23,167 @@
 #ifndef MU_ENGRAVING_OBJECT_H
 #define MU_ENGRAVING_OBJECT_H
 
-#include "types.h"
-#include "infrastructure/draw/geometry.h"
+#include "global/allocator.h"
+#include "types/string.h"
+
+#include "draw/types/geometry.h"
+
 #include "style/styledef.h"
-#include "style/textstyle.h"
-#include "style/style.h"
+
+#include "types/propertyvalue.h"
+#include "types/types.h"
 
 #include "modularity/ioc.h"
 #include "diagnostics/iengravingelementsprovider.h"
+
+namespace mu {
+class TranslatableString;
+}
 
 namespace mu::diagnostics {
 class EngravingElementsProvider;
 }
 
-namespace Ms {
-class EngravingObject;
-class MasterScore;
-class XmlWriter;
-class XmlReader;
-class ConnectorInfoReader;
-class Measure;
-class Staff;
-class Part;
-class Score;
-class MuseScoreView;
-class Segment;
-class EngravingItem;
-class BarLine;
+namespace mu::engraving {
+class Accidental;
+class ActionIcon;
+class Ambitus;
+class Arpeggio;
 class Articulation;
-class Marker;
-class Clef;
-class KeySig;
-class TimeSig;
-class TempoText;
-class Breath;
+class BSymbol;
+class BagpipeEmbellishment;
+class BarLine;
+class Beam;
+class Bend;
 class Box;
-class HBox;
-class VBox;
-class TBox;
-class FBox;
+class Bracket;
+class BracketItem;
+class Breath;
+class Chord;
+class ChordLine;
 class ChordRest;
-class Slur;
-class Tie;
+class Clef;
+class ConnectorInfoReader;
+class DurationElement;
+class Dynamic;
+class EngravingItem;
+class EngravingObject;
+class FBox;
+class FSymbol;
+class Fermata;
+class FiguredBass;
+class Fingering;
+class FretDiagram;
 class Glissando;
 class GlissandoSegment;
-class SystemDivider;
-class RehearsalMark;
+class GraceNotesGroup;
+class GradualTempoChange;
+class GradualTempoChangeSegment;
+class HBox;
+class Hairpin;
+class HairpinSegment;
+class HarmonicMark;
+class HarmonicMarkSegment;
 class Harmony;
-class Volta;
+class Hook;
+class Image;
+class InstrumentChange;
+class InstrumentName;
 class Jump;
-class StaffText;
-class Ottava;
-class Note;
-class Chord;
-class Rest;
-class MMRest;
+class KeySig;
+class Lasso;
 class LayoutBreak;
-class Tremolo;
-class System;
-class Sticking;
+class LedgerLine;
+class LetRing;
+class LetRingSegment;
+class LineSegment;
 class Lyrics;
 class LyricsLine;
 class LyricsLineSegment;
-class Stem;
-class SlurSegment;
-class TieSegment;
-class OttavaSegment;
-class Beam;
-class Hook;
-class StemSlash;
-class Spacer;
-class StaffLines;
-class Ambitus;
-class Bracket;
-class InstrumentChange;
-class Text;
-class TextBase;
-class Hairpin;
-class HairpinSegment;
-class Bend;
-class TremoloBar;
-class MeasureRepeat;
-class Tuplet;
-class NoteDot;
-class Dynamic;
-class InstrumentName;
-class DurationElement;
-class Accidental;
-class TextLine;
-class TextLineSegment;
-class Pedal;
-class PedalSegment;
-class LedgerLine;
-class ActionIcon;
-class VoltaSegment;
-class NoteLine;
-class Trill;
-class TrillSegment;
-class Symbol;
-class FSymbol;
-class Fingering;
-class NoteHead;
-class FiguredBass;
-class StaffState;
-class Arpeggio;
-class Image;
-class ChordLine;
-class SlurTieSegment;
-class FretDiagram;
-class StaffTypeChange;
+class MMRest;
+class MMRestRange;
+class Marker;
+class MasterScore;
+class Measure;
 class MeasureBase;
+class MeasureNumber;
+class MeasureRepeat;
+class MStyle;
+class Note;
+class NoteDot;
+class NoteHead;
+class NoteLine;
+class Ottava;
+class OttavaSegment;
 class Page;
-class SystemText;
-class BracketItem;
-class Spanner;
-class SpannerSegment;
-class Lasso;
-class BagpipeEmbellishment;
-class LineSegment;
-class BSymbol;
-class TextLineBase;
-class TextLineBaseSegment;
-class Fermata;
-
-class LetRing;
-class LetRingSegment;
-class Vibrato;
-class VibratoSegment;
 class PalmMute;
 class PalmMuteSegment;
-class MeasureNumber;
-class MMRestRange;
-
+class Part;
+class Pedal;
+class PedalSegment;
+class PlayTechAnnotation;
+class Rasgueado;
+class RasgueadoSegment;
+class RehearsalMark;
+class Rest;
+class Score;
+class Segment;
+class Slur;
+class SlurSegment;
+class SlurTieSegment;
+class Spacer;
+class Spanner;
+class SpannerSegment;
+class Staff;
+class StaffLines;
+class StaffState;
+class StaffText;
 class StaffTextBase;
+class StaffTypeChange;
+class Stem;
+class StemSlash;
+class Sticking;
+class StretchedBend;
+class Symbol;
+class System;
+class SystemDivider;
+class SystemText;
+class TBox;
+class TempoText;
+class Text;
+class TextBase;
+class TextLine;
+class TextLineBase;
+class TextLineBaseSegment;
+class TextLineSegment;
+class Tie;
+class TieSegment;
+class TimeSig;
+class Tremolo;
+class TremoloBar;
+class Trill;
+class TrillSegment;
+class TripletFeel;
+class Tuplet;
+class VBox;
+class Vibrato;
+class VibratoSegment;
+class Volta;
+class VoltaSegment;
+class WhammyBar;
+class WhammyBarSegment;
+
+class XmlReader;
+class XmlWriter;
+
+class LinkedObjects;
 
 enum class Pid : int;
 enum class PropertyFlags : char;
 
-class LinkedObjects;
-class EngravingObject;
-
 class EngravingObjectList : public std::list<EngravingObject*>
 {
+    OBJECT_ALLOCATOR(engraving, EngravingObjectList)
 public:
 
     EngravingObject* at(size_t i) const;
@@ -177,14 +196,15 @@ class EngravingObject
     ElementType m_type = ElementType::INVALID;
     EngravingObject* m_parent = nullptr;
     bool m_isParentExplicitlySet = false;
-    bool m_isDummy = false;
     EngravingObjectList m_children;
 
-    Score* _score = nullptr;
+    Score* m_score = nullptr;
 
     static ElementStyle const emptyStyle;
 
     void doSetParent(EngravingObject* p);
+    void doSetScore(Score* sc);
+    void moveToDummy();
 
 protected:
     const ElementStyle* _elementStyle {& emptyStyle };
@@ -206,78 +226,39 @@ public:
 
     inline ElementType type() const { return m_type; }
     inline bool isType(ElementType t) const { return t == m_type; }
-    const char* name() const;
-    virtual QString userName() const;
+    const char* typeName() const;
+    virtual TranslatableString typeUserName() const;
+    virtual String translatedTypeUserName() const;
 
-    //! NOTE Before, element tree is made to be done like this
-    //! class ScoreElement
-    //! {
-    //!     Score* _score;
-    //!     ScoreElement(Score* score)...
-    //! }
-    //!
-    //! class EngravingItem : public ScoreElement
-    //! {
-    //!    EngravingItem* _parent;
-    //!    EngravingItem(Score* s) : ScoreElement(s)...
-    //!
-    //!    EngravingItem* parent() const { return _parent; }
-    //!    void setElement(EngravingItem* e) { _parent = e; }
-    //! }
-    //! accordingly:
-    //! * All elements have a ref to score which they are located.
-    //! * The base element (ScoreElement) itself has no parent property
-    //! * The parent of an element could be set or could not be set, so in general, it is impossible to build a tree of elements
-    //! (to solve this problem, a `treeParent` method was added that tries to determine the parent)
-    //! * There was also logic for some elements that if a parent is set, then an element in the tree,
-    //! if not set, then no, but for other elements, it does not matter.
-    //!
-    //! Now the element tree is:
-    //! class ScoreElement
-    //! {
-    //!     ScoreElement* m_parent;
-    //!     ScoreElement(ScoreElement* parent)...
-    //! }
-    //! accordingly:
-    //! * No more score property (score is searched for in the parent tree)
-    //! * All objects must belong to someone
-    //!
-    //! For compatibility purposes, it has been done so that the new structure has the old behavior.
-    EngravingObject* parent(bool isIncludeDummy = false) const;
-    void setParent(EngravingObject* p, bool isExplicitly = true);
-    void moveToDummy();
-    void setIsDummy(bool arg);
-    bool isDummy() const;
+    EngravingObject* parent() const;
+    void setParent(EngravingObject* p);
+    EngravingObject* explicitParent() const;
+    void resetExplicitParent();
 
     const EngravingObjectList& children() const { return m_children; }
 
     // Score Tree functions for scan function
     friend class mu::diagnostics::EngravingElementsProvider;
     virtual EngravingObject* scanParent() const { return m_parent; }
-    virtual EngravingObject* scanChild(int n) const { Q_UNUSED(n); return nullptr; }
-    virtual int scanChildCount() const { return 0; }
+    virtual EngravingObjectList scanChildren() const { return {}; }
     virtual void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true);
 
     // context
     virtual void setScore(Score* s);
-    Score* score(bool required = true) const;
+    Score* score() const;
     MasterScore* masterScore() const;
     bool onSameScore(const EngravingObject* other) const;
     const MStyle* style() const;
-    QString mscoreVersion() const;
 
-    virtual QVariant getProperty(Pid) const = 0;
-    virtual bool setProperty(Pid, const QVariant&) = 0;
-    virtual QVariant propertyDefault(Pid) const;
+    virtual PropertyValue getProperty(Pid) const = 0;
+    virtual bool setProperty(Pid, const PropertyValue&) = 0;
+    virtual PropertyValue propertyDefault(Pid) const;
     virtual void resetProperty(Pid id);
-    QVariant propertyDefault(Pid pid, Tid tid) const;
+    PropertyValue propertyDefault(Pid pid, TextStyleType tid) const;
     virtual bool sizeIsSpatiumDependent() const { return true; }
     virtual bool offsetIsSpatiumDependent() const { return true; }
 
     virtual void reset();                       // reset all properties & position to default
-
-    virtual Pid propertyId(const QStringRef& xmlName) const;
-    virtual QString propertyUserValue(Pid) const;
 
     virtual void initElementStyle(const ElementStyle*);
     virtual const ElementStyle* styledProperties() const { return _elementStyle; }
@@ -285,28 +266,28 @@ public:
     virtual PropertyFlags* propertyFlagsList() const { return _propertyFlagsList; }
     virtual PropertyFlags propertyFlags(Pid) const;
     bool isStyled(Pid pid) const;
-    QVariant styleValue(Pid, Sid) const;
+    PropertyValue styleValue(Pid, Sid) const;
 
     void setPropertyFlags(Pid, PropertyFlags);
 
     virtual Sid getPropertyStyle(Pid) const;
-    bool readProperty(const QStringRef&, XmlReader&, Pid);
+    bool readProperty(const mu::AsciiStringView&, XmlReader&, Pid);
     void readProperty(XmlReader&, Pid);
-    bool readStyledProperty(XmlReader& e, const QStringRef& tag);
+    bool readStyledProperty(XmlReader& e, const mu::AsciiStringView& tag);
 
     virtual void readAddConnector(ConnectorInfoReader* info, bool pasteMode);
 
     virtual void styleChanged();
 
-    virtual void undoChangeProperty(Pid id, const QVariant&, PropertyFlags ps);
-    void undoChangeProperty(Pid id, const QVariant&);
+    virtual void undoChangeProperty(Pid id, const PropertyValue&, PropertyFlags ps);
+    void undoChangeProperty(Pid id, const PropertyValue&);
     void undoResetProperty(Pid id);
 
     void undoPushProperty(Pid);
     void writeProperty(XmlWriter& xml, Pid id) const;
     void writeStyledProperties(XmlWriter&) const;
 
-    QList<EngravingObject*> linkList() const;
+    std::list<EngravingObject*> linkList() const;
 
     void linkTo(EngravingObject*);
     void unlink();
@@ -352,6 +333,7 @@ public:
     CONVERT(GlissandoSegment,     GLISSANDO_SEGMENT)
     CONVERT(SystemDivider, SYSTEM_DIVIDER)
     CONVERT(RehearsalMark, REHEARSAL_MARK)
+    CONVERT(TripletFeel, TRIPLET_FEEL)
     CONVERT(Harmony,       HARMONY)
     CONVERT(Volta,         VOLTA)
     CONVERT(Jump,          JUMP)
@@ -376,6 +358,7 @@ public:
     CONVERT(Hairpin,       HAIRPIN)
     CONVERT(HairpinSegment, HAIRPIN_SEGMENT)
     CONVERT(Bend,          BEND)
+    CONVERT(StretchedBend, STRETCHED_BEND)
     CONVERT(TremoloBar,    TREMOLOBAR)
     CONVERT(MeasureRepeat, MEASURE_REPEAT)
     CONVERT(Tuplet,        TUPLET)
@@ -396,9 +379,17 @@ public:
     CONVERT(TrillSegment,  TRILL_SEGMENT)
     CONVERT(LetRing,       LET_RING)
     CONVERT(LetRingSegment, LET_RING_SEGMENT)
+    CONVERT(GradualTempoChange, GRADUAL_TEMPO_CHANGE)
+    CONVERT(GradualTempoChangeSegment, GRADUAL_TEMPO_CHANGE_SEGMENT)
     CONVERT(Vibrato,       VIBRATO)
     CONVERT(PalmMute,      PALM_MUTE)
     CONVERT(PalmMuteSegment, PALM_MUTE_SEGMENT)
+    CONVERT(WhammyBar,      WHAMMY_BAR)
+    CONVERT(WhammyBarSegment, WHAMMY_BAR_SEGMENT)
+    CONVERT(Rasgueado,      RASGUEADO)
+    CONVERT(RasgueadoSegment, RASGUEADO_SEGMENT)
+    CONVERT(HarmonicMark,      HARMONIC_MARK)
+    CONVERT(HarmonicMarkSegment, HARMONIC_MARK_SEGMENT)
     CONVERT(VibratoSegment,  VIBRATO_SEGMENT)
     CONVERT(Symbol,        SYMBOL)
     CONVERT(FSymbol,       FSYMBOL)
@@ -418,6 +409,7 @@ public:
     CONVERT(MMRestRange,   MMREST_RANGE)
     CONVERT(StaffText,     STAFF_TEXT)
     CONVERT(SystemText,    SYSTEM_TEXT)
+    CONVERT(PlayTechAnnotation, PLAYTECH_ANNOTATION)
     CONVERT(BracketItem,   BRACKET_ITEM)
     CONVERT(Score,         SCORE)
     CONVERT(Staff,         STAFF)
@@ -425,6 +417,7 @@ public:
     CONVERT(BagpipeEmbellishment, BAGPIPE_EMBELLISHMENT)
     CONVERT(Lasso,         LASSO)
     CONVERT(Sticking,      STICKING)
+    CONVERT(GraceNotesGroup, GRACE_NOTES_GROUP)
 #undef CONVERT
 
     virtual bool isEngravingItem() const { return false; }   // overridden in element.h
@@ -441,9 +434,13 @@ public:
     {
         return isHairpinSegment()
                || isLetRingSegment()
+               || isGradualTempoChangeSegment()
                || isTextLineSegment()
                || isOttavaSegment()
                || isPalmMuteSegment()
+               || isWhammyBarSegment()
+               || isRasgueadoSegment()
+               || isHarmonicMarkSegment()
                || isPedalSegment()
                || isVoltaSegment()
         ;
@@ -469,9 +466,13 @@ public:
     {
         return isHairpin()
                || isLetRing()
+               || isGradualTempoChange()
                || isNoteLine()
                || isOttava()
                || isPalmMute()
+               || isWhammyBar()
+               || isRasgueado()
+               || isHarmonicMark()
                || isPedal()
                || isTextLine()
                || isVolta()
@@ -496,7 +497,7 @@ public:
 
     bool isStaffTextBase() const
     {
-        return isStaffText() || isSystemText();
+        return isStaffText() || isSystemText() || isTripletFeel() || isPlayTechAnnotation();
     }
 };
 
@@ -510,127 +511,127 @@ public:
 
 static inline ChordRest* toChordRest(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
-             || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT);
+    assert(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
+           || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT);
     return (ChordRest*)e;
 }
 
 static inline const ChordRest* toChordRest(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
-             || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT);
+    assert(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
+           || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT);
     return (const ChordRest*)e;
 }
 
 static inline DurationElement* toDurationElement(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
-             || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT
-             || e->type() == ElementType::TUPLET);
+    assert(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
+           || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT
+           || e->type() == ElementType::TUPLET);
     return (DurationElement*)e;
 }
 
 static inline const DurationElement* toDurationElement(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
-             || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT
-             || e->type() == ElementType::TUPLET);
+    assert(e == 0 || e->type() == ElementType::CHORD || e->type() == ElementType::REST
+           || e->type() == ElementType::MMREST || e->type() == ElementType::MEASURE_REPEAT
+           || e->type() == ElementType::TUPLET);
     return (const DurationElement*)e;
 }
 
 static inline Rest* toRest(EngravingObject* e)
 {
-    Q_ASSERT(!e || e->isRestFamily());
+    assert(!e || e->isRestFamily());
     return (Rest*)e;
 }
 
 static inline const Rest* toRest(const EngravingObject* e)
 {
-    Q_ASSERT(!e || e->isRestFamily());
+    assert(!e || e->isRestFamily());
     return (const Rest*)e;
 }
 
 static inline SlurTieSegment* toSlurTieSegment(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->type() == ElementType::SLUR_SEGMENT || e->type() == ElementType::TIE_SEGMENT);
+    assert(e == 0 || e->type() == ElementType::SLUR_SEGMENT || e->type() == ElementType::TIE_SEGMENT);
     return (SlurTieSegment*)e;
 }
 
 static inline const SlurTieSegment* toSlurTieSegment(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->type() == ElementType::SLUR_SEGMENT || e->type() == ElementType::TIE_SEGMENT);
+    assert(e == 0 || e->type() == ElementType::SLUR_SEGMENT || e->type() == ElementType::TIE_SEGMENT);
     return (const SlurTieSegment*)e;
 }
 
 static inline const MeasureBase* toMeasureBase(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isMeasure() || e->isVBox() || e->isHBox() || e->isTBox() || e->isFBox());
+    assert(e == 0 || e->isMeasure() || e->isVBox() || e->isHBox() || e->isTBox() || e->isFBox());
     return (const MeasureBase*)e;
 }
 
 static inline MeasureBase* toMeasureBase(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isMeasureBase());
+    assert(e == 0 || e->isMeasureBase());
     return (MeasureBase*)e;
 }
 
 static inline Box* toBox(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isBox());
+    assert(e == 0 || e->isBox());
     return (Box*)e;
 }
 
 static inline SpannerSegment* toSpannerSegment(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isSpannerSegment());
+    assert(e == 0 || e->isSpannerSegment());
     return (SpannerSegment*)e;
 }
 
 static inline const SpannerSegment* toSpannerSegment(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isSpannerSegment());
+    assert(e == 0 || e->isSpannerSegment());
     return (const SpannerSegment*)e;
 }
 
 static inline BSymbol* toBSymbol(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isBSymbol());
+    assert(e == 0 || e->isBSymbol());
     return (BSymbol*)e;
 }
 
 static inline TextLineBase* toTextLineBase(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isTextLineBase());
+    assert(e == 0 || e->isTextLineBase());
     return (TextLineBase*)e;
 }
 
 static inline TextBase* toTextBase(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isTextBase());
+    assert(e == 0 || e->isTextBase());
     return (TextBase*)e;
 }
 
 static inline const TextBase* toTextBase(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isTextBase());
+    assert(e == 0 || e->isTextBase());
     return (const TextBase*)e;
 }
 
 static inline StaffTextBase* toStaffTextBase(EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isStaffTextBase());
+    assert(e == 0 || e->isStaffTextBase());
     return (StaffTextBase*)e;
 }
 
 static inline const StaffTextBase* toStaffTextBase(const EngravingObject* e)
 {
-    Q_ASSERT(e == 0 || e->isStaffTextBase());
+    assert(e == 0 || e->isStaffTextBase());
     return (const StaffTextBase*)e;
 }
 
 #define CONVERT(a)  \
-    static inline a* to##a(EngravingObject * e) { Q_ASSERT(e == 0 || e->is##a()); return (a*)e; } \
-    static inline const a* to##a(const EngravingObject * e) { Q_ASSERT(e == 0 || e->is##a()); return (const a*)e; }
+    static inline a* to##a(EngravingObject * e) { assert(e == 0 || e->is##a()); return (a*)e; } \
+    static inline const a* to##a(const EngravingObject * e) { assert(e == 0 || e->is##a()); return (const a*)e; }
 
 CONVERT(EngravingItem)
 CONVERT(Note)
@@ -656,10 +657,12 @@ CONVERT(Glissando)
 CONVERT(GlissandoSegment)
 CONVERT(SystemDivider)
 CONVERT(RehearsalMark)
+CONVERT(TripletFeel)
 CONVERT(Harmony)
 CONVERT(Volta)
 CONVERT(Jump)
 CONVERT(StaffText)
+CONVERT(PlayTechAnnotation)
 CONVERT(Ottava)
 CONVERT(LayoutBreak)
 CONVERT(Segment)
@@ -685,6 +688,7 @@ CONVERT(MMRestRange)
 CONVERT(Hairpin)
 CONVERT(HairpinSegment)
 CONVERT(Bend)
+CONVERT(StretchedBend)
 CONVERT(TremoloBar)
 CONVERT(MeasureRepeat)
 CONVERT(MMRest)
@@ -706,10 +710,18 @@ CONVERT(Trill)
 CONVERT(TrillSegment)
 CONVERT(LetRing)
 CONVERT(LetRingSegment)
+CONVERT(GradualTempoChange)
+CONVERT(GradualTempoChangeSegment)
 CONVERT(Vibrato)
 CONVERT(VibratoSegment)
 CONVERT(PalmMute)
 CONVERT(PalmMuteSegment)
+CONVERT(WhammyBar)
+CONVERT(WhammyBarSegment)
+CONVERT(Rasgueado)
+CONVERT(RasgueadoSegment)
+CONVERT(HarmonicMark)
+CONVERT(HarmonicMarkSegment)
 CONVERT(Symbol)
 CONVERT(FSymbol)
 CONVERT(Fingering)
@@ -730,6 +742,7 @@ CONVERT(Part)
 CONVERT(Lasso)
 CONVERT(BagpipeEmbellishment)
 CONVERT(Sticking)
+CONVERT(GraceNotesGroup)
 #undef CONVERT
 }
 

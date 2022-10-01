@@ -26,7 +26,7 @@
 using namespace mu::notation;
 
 namespace mu::palette {
-class DrumsetPaletteAdapter : public ui::IDisplayableWidget
+class DrumsetPaletteAdapter : public uicomponents::IDisplayableWidget
 {
 public:
     DrumsetPaletteAdapter()
@@ -52,6 +52,11 @@ public:
     async::Channel<QString> pitchNameChanged() const
     {
         return m_drumsetPaletteWidget->pitchNameChanged();
+    }
+
+    DrumsetPalette* drumsetPalette() const
+    {
+        return m_drumsetPaletteWidget;
     }
 
 private:
@@ -90,31 +95,77 @@ void DrumsetPanelView::componentComplete()
 {
     WidgetView::componentComplete();
 
-    auto drumsetPalette = std::make_shared<DrumsetPaletteAdapter>();
+    m_adapter = std::make_shared<DrumsetPaletteAdapter>();
 
-    auto updateView = [this, drumsetPalette]() {
-        drumsetPalette->updateDrumset();
+    initDrumsetPalette();
+    globalContext()->currentNotationChanged().onNotify(this, [this]() {
+        initDrumsetPalette();
+    });
+
+    updateColors();
+    notationConfiguration()->foregroundChanged().onNotify(this, [this]() {
+        updateColors();
+    });
+
+    m_adapter->pitchNameChanged().onReceive(this, [this](const QString& pitchName) {
+        setPitchName(pitchName);
+    });
+
+    setWidget(m_adapter);
+}
+
+void DrumsetPanelView::initDrumsetPalette()
+{
+    auto updateView = [this]() {
+        m_adapter->updateDrumset();
         update();
     };
 
-    globalContext()->currentNotationChanged().onNotify(this, [this, drumsetPalette, updateView]() {
-        INotationPtr notation = globalContext()->currentNotation();
-        drumsetPalette->setNotation(notation);
+    INotationPtr notation = globalContext()->currentNotation();
+    m_adapter->setNotation(notation);
+
+    updateView();
+
+    if (!notation) {
+        return;
+    }
+
+    notation->interaction()->noteInput()->stateChanged().onNotify(this, [updateView]() {
         updateView();
-
-        if (!notation) {
-            return;
-        }
-
-        notation->interaction()->noteInput()->stateChanged().onNotify(this, [updateView]() {
-            updateView();
-        });
     });
+}
 
-    drumsetPalette->pitchNameChanged().onReceive(this, [this](const QString& pitchName) {
-        m_pitchName = pitchName;
-        emit pitchNameChanged();
-    });
+void DrumsetPanelView::updateColors()
+{
+    TRACEFUNC;
 
-    setWidget(drumsetPalette);
+    const DrumsetPalette* palette = m_adapter->drumsetPalette();
+    PaletteWidget* widget = palette->paletteWidget();
+
+    PaletteWidget::PaintOptions options = widget->paintOptions();
+    options.backgroundColor = notationConfiguration()->foregroundColor();
+    options.selectionColor = engravingConfiguration()->selectionColor();
+
+    if (engravingConfiguration()->scoreInversionEnabled()) {
+        options.linesColor = engravingConfiguration()->scoreInversionColor();
+    } else {
+        options.linesColor = engravingConfiguration()->defaultColor();
+    }
+
+    options.useElementColors = true;
+    options.colorsInverionsEnabled = true;
+
+    widget->setPaintOptions(options);
+
+    update();
+}
+
+void DrumsetPanelView::setPitchName(const QString& name)
+{
+    if (m_pitchName == name) {
+        return;
+    }
+
+    m_pitchName = name;
+    emit pitchNameChanged();
 }

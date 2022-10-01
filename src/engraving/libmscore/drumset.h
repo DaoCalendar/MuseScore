@@ -24,23 +24,20 @@
 #define __DRUMSET_H__
 
 #include "mscore.h"
-#include "tremolo.h"
-#include "note.h"
-#include "symid.h"
+#include "pitchspelling.h"
+#include "types/types.h"
 
-namespace Ms {
+namespace mu::engraving {
+class Articulation;
+class Tremolo;
+
+class XmlReader;
 class XmlWriter;
 
 struct DrumInstrumentVariant {
-    int pitch;
-    QString articulationName;
-    TremoloType tremolo;
-    DrumInstrumentVariant()
-    {
-        pitch = INVALID_PITCH;
-        tremolo = TremoloType::INVALID_TREMOLO;
-        articulationName = "";
-    }
+    int pitch = INVALID_PITCH;
+    TremoloType tremolo = TremoloType::INVALID_TREMOLO;
+    String articulationName;
 };
 
 //---------------------------------------------------------
@@ -48,24 +45,25 @@ struct DrumInstrumentVariant {
 //---------------------------------------------------------
 
 struct DrumInstrument {
-    QString name;
+    String name;
 
     // if notehead = HEAD_CUSTOM, custom, use noteheads
-    NoteHead::Group notehead = NoteHead::Group::HEAD_INVALID;   ///< notehead symbol set
-    SymId noteheads[int(NoteHead::Type::HEAD_TYPES)]
+    NoteHeadGroup notehead = NoteHeadGroup::HEAD_INVALID;   ///< notehead symbol set
+    SymId noteheads[int(NoteHeadType::HEAD_TYPES)]
         = { SymId::noteheadWhole, SymId::noteheadHalf, SymId::noteheadBlack, SymId::noteheadDoubleWhole };
 
     int line = 0;               ///< place notehead onto this line
-    Direction stemDirection = Direction::AUTO;
+    DirectionV stemDirection = DirectionV::AUTO;
     int voice = 0;
     char shortcut = '\0';      ///< accelerator key (CDEFGAB)
-    QList<DrumInstrumentVariant> variants;
+    std::list<DrumInstrumentVariant> variants;
 
     DrumInstrument() {}
-    DrumInstrument(const char* s, NoteHead::Group nh, int l, Direction d,
+    DrumInstrument(const char* s, NoteHeadGroup nh, int l, DirectionV d,
                    int v = 0, char sc = 0)
-        : name(s), notehead(nh), line(l), stemDirection(d), voice(v), shortcut(sc) {}
-    void addVariant(DrumInstrumentVariant v) { variants.append(v); }
+        : name(String::fromUtf8(s)), notehead(nh), line(l), stemDirection(d), voice(v), shortcut(sc) {}
+
+    void addVariant(DrumInstrumentVariant v) { variants.push_back(v); }
 };
 
 static const int DRUM_INSTRUMENTS = 128;
@@ -81,15 +79,16 @@ class Drumset
     DrumInstrument _drum[DRUM_INSTRUMENTS];
 
 public:
-    bool isValid(int pitch) const { return !_drum[pitch].name.isEmpty(); }
-    NoteHead::Group noteHead(int pitch) const { return _drum[pitch].notehead; }
-    SymId noteHeads(int pitch, NoteHead::Type t) const { return _drum[pitch].noteheads[int(t)]; }
+    bool isValid(int pitch) const { return !_drum[pitch].name.empty(); }
+    NoteHeadGroup noteHead(int pitch) const { return _drum[pitch].notehead; }
+    SymId noteHeads(int pitch, NoteHeadType t) const { return _drum[pitch].noteheads[int(t)]; }
     int line(int pitch) const { return _drum[pitch].line; }
     int voice(int pitch) const { return _drum[pitch].voice; }
-    Direction stemDirection(int pitch) const { return _drum[pitch].stemDirection; }
-    const QString& name(int pitch) const { return _drum[pitch].name; }
+    DirectionV stemDirection(int pitch) const { return _drum[pitch].stemDirection; }
+    const String& name(int pitch) const { return _drum[pitch].name; }
+    String translatedName(int pitch) const;
     int shortcut(int pitch) const { return _drum[pitch].shortcut; }
-    QList<DrumInstrumentVariant> variants(int pitch) const { return _drum[pitch].variants; }
+    std::list<DrumInstrumentVariant> variants(int pitch) const { return _drum[pitch].variants; }
 
     void save(XmlWriter&) const;
     void load(XmlReader&);
@@ -99,11 +98,10 @@ public:
     int prevPitch(int) const;
     DrumInstrument& drum(int i) { return _drum[i]; }
     const DrumInstrument& drum(int i) const { return _drum[i]; }
-    DrumInstrumentVariant findVariant(int pitch, const QVector<Articulation*> articulations, Tremolo* tremolo) const;
-    int pitch(int element, int variation, const QString& name) const;
+    DrumInstrumentVariant findVariant(int pitch, const std::vector<Articulation*> articulations, Tremolo* tremolo) const;
 };
 
 extern Drumset* smDrumset;
 extern void initDrumset();
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

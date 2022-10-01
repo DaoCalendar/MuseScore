@@ -25,8 +25,8 @@ import MuseScore.Ui 1.0
 FocusScope {
     id: root
 
-    default property alias content: contentItemContaner.data
-    property alias contentItem: contentItemContaner
+    default property alias content: contentItemContainer.data
+    property alias contentItem: contentItemContainer
     property alias background: focusRectItem
     property alias focusBorder: focusBorderItem
 
@@ -34,7 +34,7 @@ FocusScope {
 
     property alias navigation: navCtrl
 
-    signal navigationActived()
+    signal navigationActivated()
     signal navigationTriggered()
 
     function ensureActiveFocus() {
@@ -43,15 +43,23 @@ FocusScope {
         }
     }
 
+    //! NOTE ListView can destroy delegates, but not delete objects,
+    // they remain in memory (this is done for optimization, for reusing delegate objects).
+    // In this case, navigation controls also remain in memory and in the navigation tree.
+    // But they should at least be turned off.
+    property bool completed: false
+    Component.onCompleted: root.completed = true
+    Component.onDestruction: root.completed = false
+
     NavigationControl {
         id: navCtrl
         name: root.objectName
-        enabled: root.enabled && root.visible
+        enabled: root.enabled && root.visible && root.completed
 
         onActiveChanged: {
             if (navCtrl.active) {
                 root.ensureActiveFocus()
-                root.navigationActived()
+                root.navigationActivated()
             }
         }
 
@@ -63,6 +71,9 @@ FocusScope {
     Rectangle {
         id: focusRectItem
         anchors.fill: parent
+
+        color: ui.theme.backgroundPrimaryColor
+        opacity: 1
 
         NavigationFocusBorder {
             id: focusBorderItem
@@ -83,7 +94,7 @@ FocusScope {
     }
 
     Item {
-        id: contentItemContaner
+        id: contentItemContainer
         objectName: "FocusableControlContent"
         anchors.fill: focusRectItem
     }

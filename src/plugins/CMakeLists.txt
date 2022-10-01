@@ -35,12 +35,16 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/pluginsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/pluginview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/pluginview.h
-    ${CMAKE_CURRENT_LIST_DIR}/view/dev/pluginstestmodel.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/view/dev/pluginstestmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsconfiguration.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsservice.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsservice.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsuiactions.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsuiactions.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsactioncontroller.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/pluginsactioncontroller.h
+
+    ${CMAKE_CURRENT_LIST_DIR}/api/apitypes.h
     ${CMAKE_CURRENT_LIST_DIR}/api/cursor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/api/cursor.h
     ${CMAKE_CURRENT_LIST_DIR}/api/elements.cpp
@@ -56,10 +60,10 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/api/part.h
     ${CMAKE_CURRENT_LIST_DIR}/api/playevent.cpp
     ${CMAKE_CURRENT_LIST_DIR}/api/playevent.h
-    ${CMAKE_CURRENT_LIST_DIR}/api/qmlpluginapi.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/api/qmlpluginapi.h
     ${CMAKE_CURRENT_LIST_DIR}/api/qmlplugin.cpp
     ${CMAKE_CURRENT_LIST_DIR}/api/qmlplugin.h
+    ${CMAKE_CURRENT_LIST_DIR}/api/qmlpluginapi.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/api/qmlpluginapi.h
     ${CMAKE_CURRENT_LIST_DIR}/api/score.cpp
     ${CMAKE_CURRENT_LIST_DIR}/api/score.h
     ${CMAKE_CURRENT_LIST_DIR}/api/scoreelement.cpp
@@ -75,6 +79,7 @@ set(MODULE_SRC
     )
 
 set(MODULE_LINK
+    uicomponents
     engraving
     )
 

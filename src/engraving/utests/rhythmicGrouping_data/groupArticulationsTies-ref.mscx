@@ -23,7 +23,7 @@
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle">Title</metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -85,13 +85,13 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
           <Beam>
-            <l1>19</l1>
-            <l2>20</l2>
+            <l1>38</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -259,13 +259,13 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
           <Beam>
-            <l1>18</l1>
-            <l2>19</l2>
+            <l1>32</l1>
+            <l2>34</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>

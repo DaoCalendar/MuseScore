@@ -23,37 +23,37 @@
 
 #include "style/styledef.h"
 
-#include "libmscore/system.h"
-#include "libmscore/segment.h"
-#include "libmscore/score.h"
 #include "libmscore/chordrest.h"
 #include "libmscore/lyrics.h"
+#include "libmscore/measure.h"
+#include "libmscore/score.h"
+#include "libmscore/segment.h"
+#include "libmscore/system.h"
 
 using namespace mu;
 using namespace mu::engraving;
-using namespace Ms;
 
 //---------------------------------------------------------
 //   findLyricsMaxY
 //---------------------------------------------------------
 
-static qreal findLyricsMaxY(const MStyle& style, Segment& s, int staffIdx)
+static double findLyricsMaxY(const MStyle& style, Segment& s, staff_idx_t staffIdx)
 {
-    qreal yMax = 0.0;
+    double yMax = 0.0;
     if (!s.isChordRestType()) {
         return yMax;
     }
 
-    qreal lyricsMinTopDistance = style.styleP(Sid::lyricsMinTopDistance);
+    double lyricsMinTopDistance = style.styleMM(Sid::lyricsMinTopDistance);
 
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = s.cr(staffIdx * VOICES + voice);
         if (cr && !cr->lyrics().empty()) {
             SkylineLine sk(true);
 
             for (Lyrics* l : cr->lyrics()) {
                 if (l->autoplace() && l->placeBelow()) {
-                    qreal yOff = l->offset().y();
+                    double yOff = l->offset().y();
                     PointF offset = l->pos() + cr->pos() + s.pos() + s.measure()->pos();
                     RectF r = l->bbox().translated(offset);
                     r.translate(0.0, -yOff);
@@ -63,9 +63,9 @@ static qreal findLyricsMaxY(const MStyle& style, Segment& s, int staffIdx)
             SysStaff* ss = s.measure()->system()->staff(staffIdx);
             for (Lyrics* l : cr->lyrics()) {
                 if (l->autoplace() && l->placeBelow()) {
-                    qreal y = ss->skyline().south().minDistance(sk);
+                    double y = ss->skyline().south().minDistance(sk);
                     if (y > -lyricsMinTopDistance) {
-                        yMax = qMax(yMax, y + lyricsMinTopDistance);
+                        yMax = std::max(yMax, y + lyricsMinTopDistance);
                     }
                 }
             }
@@ -78,21 +78,21 @@ static qreal findLyricsMaxY(const MStyle& style, Segment& s, int staffIdx)
 //   findLyricsMinY
 //---------------------------------------------------------
 
-static qreal findLyricsMinY(const MStyle& style, Segment& s, int staffIdx)
+static double findLyricsMinY(const MStyle& style, Segment& s, staff_idx_t staffIdx)
 {
-    qreal yMin = 0.0;
+    double yMin = 0.0;
     if (!s.isChordRestType()) {
         return yMin;
     }
-    qreal lyricsMinTopDistance = style.styleP(Sid::lyricsMinTopDistance);
-    for (int voice = 0; voice < VOICES; ++voice) {
+    double lyricsMinTopDistance = style.styleMM(Sid::lyricsMinTopDistance);
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = s.cr(staffIdx * VOICES + voice);
         if (cr && !cr->lyrics().empty()) {
             SkylineLine sk(false);
 
             for (Lyrics* l : cr->lyrics()) {
                 if (l->autoplace() && l->placeAbove()) {
-                    qreal yOff = l->offset().y();
+                    double yOff = l->offset().y();
                     RectF r = l->bbox().translated(l->pos() + cr->pos() + s.pos() + s.measure()->pos());
                     r.translate(0.0, -yOff);
                     sk.add(r.x(), r.bottom(), r.width());
@@ -101,9 +101,9 @@ static qreal findLyricsMinY(const MStyle& style, Segment& s, int staffIdx)
             SysStaff* ss = s.measure()->system()->staff(staffIdx);
             for (Lyrics* l : cr->lyrics()) {
                 if (l->autoplace() && l->placeAbove()) {
-                    qreal y = sk.minDistance(ss->skyline().north());
+                    double y = sk.minDistance(ss->skyline().north());
                     if (y > -lyricsMinTopDistance) {
-                        yMin = qMin(yMin, -y - lyricsMinTopDistance);
+                        yMin = std::min(yMin, -y - lyricsMinTopDistance);
                     }
                 }
             }
@@ -112,20 +112,20 @@ static qreal findLyricsMinY(const MStyle& style, Segment& s, int staffIdx)
     return yMin;
 }
 
-static qreal findLyricsMaxY(const MStyle& style, Measure* m, int staffIdx)
+static double findLyricsMaxY(const MStyle& style, Measure* m, staff_idx_t staffIdx)
 {
-    qreal yMax = 0.0;
+    double yMax = 0.0;
     for (Segment& s : m->segments()) {
-        yMax = qMax(yMax, findLyricsMaxY(style, s, staffIdx));
+        yMax = std::max(yMax, findLyricsMaxY(style, s, staffIdx));
     }
     return yMax;
 }
 
-static qreal findLyricsMinY(const MStyle& style, Measure* m, int staffIdx)
+static double findLyricsMinY(const MStyle& style, Measure* m, staff_idx_t staffIdx)
 {
-    qreal yMin = 0.0;
+    double yMin = 0.0;
     for (Segment& s : m->segments()) {
-        yMin = qMin(yMin, findLyricsMinY(style, s, staffIdx));
+        yMin = std::min(yMin, findLyricsMinY(style, s, staffIdx));
     }
     return yMin;
 }
@@ -134,19 +134,19 @@ static qreal findLyricsMinY(const MStyle& style, Measure* m, int staffIdx)
 //   applyLyricsMax
 //---------------------------------------------------------
 
-static void applyLyricsMax(const MStyle& style, Segment& s, int staffIdx, qreal yMax)
+static void applyLyricsMax(const MStyle& style, Segment& s, staff_idx_t staffIdx, double yMax)
 {
     if (!s.isChordRestType()) {
         return;
     }
     Skyline& sk = s.measure()->system()->staff(staffIdx)->skyline();
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = s.cr(staffIdx * VOICES + voice);
         if (cr && !cr->lyrics().empty()) {
-            qreal lyricsMinBottomDistance = style.styleP(Sid::lyricsMinBottomDistance);
+            double lyricsMinBottomDistance = style.styleMM(Sid::lyricsMinBottomDistance);
             for (Lyrics* l : cr->lyrics()) {
                 if (l->autoplace() && l->placeBelow()) {
-                    l->rypos() += yMax - l->propertyDefault(Pid::OFFSET).value<PointF>().y();
+                    l->movePosY(yMax - l->propertyDefault(Pid::OFFSET).value<PointF>().y());
                     if (l->addToSkyline()) {
                         PointF offset = l->pos() + cr->pos() + s.pos() + s.measure()->pos();
                         sk.add(l->bbox().translated(offset).adjusted(0.0, 0.0, 0.0, lyricsMinBottomDistance));
@@ -157,7 +157,7 @@ static void applyLyricsMax(const MStyle& style, Segment& s, int staffIdx, qreal 
     }
 }
 
-static void applyLyricsMax(const MStyle& style, Measure* m, int staffIdx, qreal yMax)
+static void applyLyricsMax(const MStyle& style, Measure* m, staff_idx_t staffIdx, double yMax)
 {
     for (Segment& s : m->segments()) {
         applyLyricsMax(style, s, staffIdx, yMax);
@@ -168,12 +168,12 @@ static void applyLyricsMax(const MStyle& style, Measure* m, int staffIdx, qreal 
 //   applyLyricsMin
 //---------------------------------------------------------
 
-static void applyLyricsMin(ChordRest* cr, int staffIdx, qreal yMin)
+static void applyLyricsMin(ChordRest* cr, staff_idx_t staffIdx, double yMin)
 {
     Skyline& sk = cr->measure()->system()->staff(staffIdx)->skyline();
     for (Lyrics* l : cr->lyrics()) {
         if (l->autoplace() && l->placeAbove()) {
-            l->rypos() += yMin - l->propertyDefault(Pid::OFFSET).value<PointF>().y();
+            l->movePosY(yMin - l->propertyDefault(Pid::OFFSET).value<PointF>().y());
             if (l->addToSkyline()) {
                 PointF offset = l->pos() + cr->pos() + cr->segment()->pos() + cr->segment()->measure()->pos();
                 sk.add(l->bbox().translated(offset));
@@ -182,11 +182,11 @@ static void applyLyricsMin(ChordRest* cr, int staffIdx, qreal yMin)
     }
 }
 
-static void applyLyricsMin(Measure* m, int staffIdx, qreal yMin)
+static void applyLyricsMin(Measure* m, staff_idx_t staffIdx, double yMin)
 {
     for (Segment& s : m->segments()) {
         if (s.isChordRestType()) {
-            for (int voice = 0; voice < VOICES; ++voice) {
+            for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
                 ChordRest* cr = s.cr(staffIdx * VOICES + voice);
                 if (cr) {
                     applyLyricsMin(cr, staffIdx, yMin);
@@ -205,15 +205,16 @@ static void applyLyricsMin(Measure* m, int staffIdx, qreal yMin)
 
 void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score, System* system)
 {
-    std::vector<int> visibleStaves;
-    for (int staffIdx = system->firstVisibleStaff(); staffIdx < score->nstaves(); staffIdx = system->nextVisibleStaff(staffIdx)) {
+    std::vector<staff_idx_t> visibleStaves;
+    for (staff_idx_t staffIdx = system->firstVisibleStaff(); staffIdx < score->nstaves();
+         staffIdx = system->nextVisibleStaff(staffIdx)) {
         visibleStaves.push_back(staffIdx);
     }
 
     //int nAbove[nstaves()];
-    std::vector<int> VnAbove(score->nstaves());
+    std::vector<staff_idx_t> VnAbove(score->nstaves());
 
-    for (int staffIdx : visibleStaves) {
+    for (staff_idx_t staffIdx : visibleStaves) {
         VnAbove[staffIdx] = 0;
         for (MeasureBase* mb : system->measures()) {
             if (!mb->isMeasure()) {
@@ -222,14 +223,14 @@ void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score
             Measure* m = toMeasure(mb);
             for (Segment& s : m->segments()) {
                 if (s.isChordRestType()) {
-                    for (int voice = 0; voice < VOICES; ++voice) {
+                    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
                         ChordRest* cr = s.cr(staffIdx * VOICES + voice);
                         if (cr) {
-                            int nA = 0;
+                            staff_idx_t nA = 0;
                             for (Lyrics* l : cr->lyrics()) {
                                 // user adjusted offset can possibly change placement
                                 if (l->offsetChanged() != OffsetChange::NONE) {
-                                    Placement p = l->placement();
+                                    PlacementV p = l->placement();
                                     l->rebaseOffset();
                                     if (l->placement() != p) {
                                         l->undoResetProperty(Pid::AUTOPLACE);
@@ -242,7 +243,7 @@ void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score
                                     ++nA;
                                 }
                             }
-                            VnAbove[staffIdx] = qMax(VnAbove[staffIdx], nA);
+                            VnAbove[staffIdx] = std::max(VnAbove[staffIdx], nA);
                         }
                     }
                 }
@@ -250,7 +251,7 @@ void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score
         }
     }
 
-    for (int staffIdx : visibleStaves) {
+    for (staff_idx_t staffIdx : visibleStaves) {
         for (MeasureBase* mb : system->measures()) {
             if (!mb->isMeasure()) {
                 continue;
@@ -258,11 +259,11 @@ void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score
             Measure* m = toMeasure(mb);
             for (Segment& s : m->segments()) {
                 if (s.isChordRestType()) {
-                    for (int voice = 0; voice < VOICES; ++voice) {
+                    for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
                         ChordRest* cr = s.cr(staffIdx * VOICES + voice);
                         if (cr) {
                             for (Lyrics* l : cr->lyrics()) {
-                                l->layout2(VnAbove[staffIdx]);
+                                l->layout2(static_cast<int>(VnAbove[staffIdx]));
                             }
                         }
                     }
@@ -278,22 +279,22 @@ void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score
                 continue;
             }
             Measure* m = toMeasure(mb);
-            for (int staffIdx : visibleStaves) {
-                qreal yMax = findLyricsMaxY(score->style(), m, staffIdx);
+            for (staff_idx_t staffIdx : visibleStaves) {
+                double yMax = findLyricsMaxY(score->style(), m, staffIdx);
                 applyLyricsMax(score->style(), m, staffIdx, yMax);
             }
         }
         break;
     case VerticalAlignRange::SYSTEM:
-        for (int staffIdx : visibleStaves) {
-            qreal yMax = 0.0;
-            qreal yMin = 0.0;
+        for (staff_idx_t staffIdx : visibleStaves) {
+            double yMax = 0.0;
+            double yMin = 0.0;
             for (MeasureBase* mb : system->measures()) {
                 if (!mb->isMeasure()) {
                     continue;
                 }
-                yMax = qMax<qreal>(yMax, findLyricsMaxY(score->style(), toMeasure(mb), staffIdx));
-                yMin = qMin(yMin, findLyricsMinY(score->style(), toMeasure(mb), staffIdx));
+                yMax = std::max<double>(yMax, findLyricsMaxY(score->style(), toMeasure(mb), staffIdx));
+                yMin = std::min(yMin, findLyricsMinY(score->style(), toMeasure(mb), staffIdx));
             }
             for (MeasureBase* mb : system->measures()) {
                 if (!mb->isMeasure()) {
@@ -310,9 +311,9 @@ void LayoutLyrics::layoutLyrics(const LayoutOptions& options, const Score* score
                 continue;
             }
             Measure* m = toMeasure(mb);
-            for (int staffIdx : visibleStaves) {
+            for (staff_idx_t staffIdx : visibleStaves) {
                 for (Segment& s : m->segments()) {
-                    qreal yMax = findLyricsMaxY(score->style(), s, staffIdx);
+                    double yMax = findLyricsMaxY(score->style(), s, staffIdx);
                     applyLyricsMax(score->style(), s, staffIdx, yMax);
                 }
             }

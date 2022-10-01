@@ -26,12 +26,12 @@ import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Project 1.0
 
-import "internal"
+import "internal/NewScore"
 
 StyledDialogView {
     id: root
 
-    title: qsTrc("project", "New Score")
+    title: qsTrc("project", "New score")
 
     contentHeight: 600
     contentWidth: 1024
@@ -39,169 +39,163 @@ StyledDialogView {
 
     objectName: "NewScoreDialog"
 
+    function onDone() {
+        var result = {}
+
+        var instrumentsAndTemplatePageResult = chooseInstrumentsAndTemplatePage.result()
+        for (var key in instrumentsAndTemplatePageResult) {
+            result[key] = instrumentsAndTemplatePageResult[key]
+        }
+
+        var scoreInfoPageResult = scoreInfoPage.result()
+        for (key in scoreInfoPageResult) {
+            result[key] = scoreInfoPageResult[key]
+        }
+
+        if (newScoreModel.createScore(result)) {
+            root.activateParentOnClose = false
+            root.accept()
+        }
+    }
+
+    onOpened: {
+        chooseInstrumentsAndTemplatePage.focusOnSelected()
+    }
+
     NewScoreModel {
         id: newScoreModel
     }
 
-    ColumnLayout {
-        id: content
-
+    Item {
+        id: popupsAnchorItem
         anchors.fill: parent
+        anchors.margins: 8
+    }
+
+    StackLayout {
+        id: pagesStack
+
+        anchors.top: parent.top
+        anchors.topMargin: 12
+        anchors.left: parent.left
         anchors.leftMargin: 12
+        anchors.right: parent.right
         anchors.rightMargin: 12
-        anchors.topMargin: 16
-        anchors.bottomMargin: 16
+        anchors.bottom: footer.top
+        anchors.bottomMargin: 20
 
-        spacing: 40
+        ChooseInstrumentsAndTemplatesPage {
+            id: chooseInstrumentsAndTemplatePage
 
-        StackLayout {
-            id: pagesStack
+            navigationSection: root.navigationSection
 
-            Layout.fillHeight: true
-            Layout.fillWidth: true
-
-            ChooseInstrumentsAndTemplatesPage {
-                id: chooseInstrumentsAndTemplatePage
-
-                navigationSection: root.navigationSection
-
-                Component.onCompleted: {
-                    preferredScoreCreationMode = newScoreModel.preferredScoreCreationMode()
-                }
+            Component.onCompleted: {
+                preferredScoreCreationMode = newScoreModel.preferredScoreCreationMode()
             }
 
-            ScoreInfoPage {
-                id: scoreInfoPage
-
-                navigationSection: root.navigationSection
-                popupsAnchorItem: content
-            }
-
-            onCurrentIndexChanged: {
-                switch(currentIndex) {
-                case 0:
-                    chooseInstrumentsAndTemplatePage.focusOnSelected()
-                    break
-                case 1:
-                    scoreInfoPage.focusOnFirst()
-                    break
-                }
+            onDone: {
+                root.onDone()
             }
         }
 
-        RowLayout {
-            id: footer
+        ScoreInfoPage {
+            id: scoreInfoPage
 
-            spacing: 12
+            navigationSection: root.navigationSection
+            popupsAnchorItem: popupsAnchorItem
+        }
+    }
 
-            readonly property int buttonHeight: 30
-            readonly property int buttonWidth: 132
+    RowLayout {
+        id: footer
 
-            NavigationPanel {
-                id: navBottomPanel
+        anchors.left: parent.left
+        anchors.leftMargin: 24
+        anchors.right: parent.right
+        anchors.rightMargin: 16
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 16
 
-                name: "BottomPanel"
-                section: root.navigationSection
-                order: 100
-                direction: NavigationPanel.Horizontal
+        spacing: 12
+
+        NavigationPanel {
+            id: navBottomPanel
+
+            name: "BottomPanel"
+            section: root.navigationSection
+            order: 100
+            direction: NavigationPanel.Horizontal
+        }
+
+        StyledTextLabel {
+            id: descriptionLabel
+            text: pagesStack.currentIndex === 0
+                  ? chooseInstrumentsAndTemplatePage.description
+                  : ""
+
+            Layout.fillWidth: true
+            Layout.maximumHeight: doneButton.height
+
+            font: ui.theme.bodyFont
+            opacity: 0.7
+            horizontalAlignment: Text.AlignLeft
+            wrapMode: Text.Wrap
+        }
+
+        FlatButton {
+            navigation.name: "Cancel"
+            navigation.panel: navBottomPanel
+            navigation.column: 1
+
+            text: qsTrc("global", "Cancel")
+
+            onClicked: {
+                root.reject()
             }
+        }
 
-            StyledTextLabel {
-                id: descriptionLabel
-                text: pagesStack.currentIndex === 0
-                      ? chooseInstrumentsAndTemplatePage.description
-                      : ""
+        FlatButton {
+            navigation.name: "Back"
+            navigation.panel: navBottomPanel
+            navigation.column: 2
 
-                height: footer.buttonHeight
-                Layout.fillWidth: true
-                Layout.leftMargin: 12
+            visible: pagesStack.currentIndex > 0
 
-                font: ui.theme.bodyFont
-                opacity: 0.7
-                horizontalAlignment: Text.AlignLeft
-                wrapMode: Text.Wrap
+            text: qsTrc("global", "Back")
+
+            onClicked: {
+                pagesStack.currentIndex--
             }
+        }
 
-            FlatButton {
-                height: footer.buttonHeight
-                width: footer.buttonWidth
+        FlatButton {
+            navigation.name: "Next"
+            navigation.panel: navBottomPanel
+            navigation.column: 3
 
-                navigation.name: "Cancel"
-                navigation.panel: navBottomPanel
-                navigation.column: 1
+            visible: pagesStack.currentIndex < pagesStack.count - 1
+            enabled: chooseInstrumentsAndTemplatePage.hasSelection
 
-                text: qsTrc("global", "Cancel")
+            text: qsTrc("global", "Next")
 
-                onClicked: {
-                    root.reject()
-                }
+            onClicked: {
+                pagesStack.currentIndex++
             }
+        }
 
-            FlatButton {
-                height: footer.buttonHeight
-                width: footer.buttonWidth
+        FlatButton {
+            id: doneButton
 
-                navigation.name: "Back"
-                navigation.panel: navBottomPanel
-                navigation.column: 2
+            navigation.name: "Done"
+            navigation.panel: navBottomPanel
+            navigation.column: 4
 
-                visible: pagesStack.currentIndex > 0
+            enabled: chooseInstrumentsAndTemplatePage.hasSelection
 
-                text: qsTrc("project", "Back")
+            text: qsTrc("global", "Done")
 
-                onClicked: {
-                    pagesStack.currentIndex--
-                }
-            }
-
-            FlatButton {
-                height: footer.buttonHeight
-                width: footer.buttonWidth
-
-                navigation.name: "Next"
-                navigation.panel: navBottomPanel
-                navigation.column: 3
-
-                visible: pagesStack.currentIndex < pagesStack.count - 1
-                enabled: chooseInstrumentsAndTemplatePage.hasSelection
-
-                text: qsTrc("project", "Next")
-
-                onClicked: {
-                    pagesStack.currentIndex++
-                }
-            }
-
-            FlatButton {
-                height: footer.buttonHeight
-                width: footer.buttonWidth
-
-                navigation.name: "Done"
-                navigation.panel: navBottomPanel
-                navigation.column: 4
-
-                enabled: chooseInstrumentsAndTemplatePage.hasSelection
-
-                text: qsTrc("project", "Done")
-
-                onClicked: {
-                    var result = {}
-
-                    var instrumentsAndTemplatePageResult = chooseInstrumentsAndTemplatePage.result()
-                    for (var key in instrumentsAndTemplatePageResult) {
-                        result[key] = instrumentsAndTemplatePageResult[key]
-                    }
-
-                    var scoreInfoPageResult = scoreInfoPage.result()
-                    for (key in scoreInfoPageResult) {
-                        result[key] = scoreInfoPageResult[key]
-                    }
-
-                    if (newScoreModel.createScore(result)) {
-                        root.isDoActiveParentOnClose = false
-                        root.accept()
-                    }
-                }
+            onClicked: {
+                root.onDone()
             }
         }
     }

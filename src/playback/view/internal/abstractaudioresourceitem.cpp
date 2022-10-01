@@ -3,6 +3,8 @@
 #include <QList>
 #include <QTimer>
 
+#include "stringutils.h"
+
 using namespace mu::playback;
 
 //!Note Some resources like VST plugins are not able to work in a couple of msecs
@@ -14,11 +16,32 @@ AbstractAudioResourceItem::AbstractAudioResourceItem(QObject* parent)
 {
 }
 
+AbstractAudioResourceItem::~AbstractAudioResourceItem()
+{
+    if (m_editorUri.isValid()) {
+        emit nativeEditorViewCloseRequested();
+    }
+}
+
 void AbstractAudioResourceItem::requestToLaunchNativeEditorView()
 {
     if (hasNativeEditorSupport()) {
-        QTimer::singleShot(EXPLICIT_DELAY_MSECS, this, &AbstractAudioResourceItem::nativeEditorViewLaunchRequested);
+        doRequestToLaunchNativeEditorView();
     }
+}
+
+void AbstractAudioResourceItem::updateNativeEditorView()
+{
+    if (hasNativeEditorSupport()) {
+        doRequestToLaunchNativeEditorView();
+    } else if (m_editorUri.isValid()) {
+        emit nativeEditorViewCloseRequested();
+    }
+}
+
+void AbstractAudioResourceItem::doRequestToLaunchNativeEditorView()
+{
+    QTimer::singleShot(EXPLICIT_DELAY_MSECS, this, &AbstractAudioResourceItem::nativeEditorViewLaunchRequested);
 }
 
 QString AbstractAudioResourceItem::title() const
@@ -29,6 +52,11 @@ QString AbstractAudioResourceItem::title() const
 bool AbstractAudioResourceItem::isBlank() const
 {
     return true;
+}
+
+bool AbstractAudioResourceItem::isActive() const
+{
+    return false;
 }
 
 QVariantMap AbstractAudioResourceItem::buildMenuItem(const QString& itemId,
@@ -53,7 +81,24 @@ QVariantMap AbstractAudioResourceItem::buildSeparator() const
     return result;
 }
 
+void AbstractAudioResourceItem::sortResourcesList(audio::AudioResourceMetaList& list)
+{
+    std::sort(list.begin(), list.end(), [](const audio::AudioResourceMeta& m1, const audio::AudioResourceMeta& m2) {
+        return strings::lessThanCaseInsensitive(m1.id, m2.id);
+    });
+}
+
 bool AbstractAudioResourceItem::hasNativeEditorSupport() const
 {
     return false;
+}
+
+const mu::UriQuery& AbstractAudioResourceItem::editorUri() const
+{
+    return m_editorUri;
+}
+
+void AbstractAudioResourceItem::setEditorUri(const UriQuery& uri)
+{
+    m_editorUri = uri;
 }

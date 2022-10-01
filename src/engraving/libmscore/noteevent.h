@@ -23,9 +23,12 @@
 #ifndef __NOTEEVENT_H__
 #define __NOTEEVENT_H__
 
-#include <QList>
+#include <vector>
+#include <algorithm>
 
-namespace Ms {
+#include "global/allocator.h"
+
+namespace mu::engraving {
 class XmlWriter;
 class XmlReader;
 
@@ -64,8 +67,9 @@ public:
 //   NoteEventList
 //---------------------------------------------------------
 
-class NoteEventList : public QList<NoteEvent>
+class NoteEventList : public std::vector<NoteEvent>
 {
+    OBJECT_ALLOCATOR(engraving, NoteEventList)
 public:
     NoteEventList();
 
@@ -76,5 +80,5 @@ public:
         })->offtime();
     }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

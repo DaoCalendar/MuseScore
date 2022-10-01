@@ -162,8 +162,8 @@ void TestParts::createParts(MasterScore* score)
     //
     // create first part
     //
-    QList<Part*> parts;
-    parts.append(score->parts().at(0));
+    std::vector<Part*> parts;
+    parts.push_back(score->parts().at(0));
     Score* nscore = new Score(score);
 
     Excerpt* ex = new Excerpt(score);
@@ -209,19 +209,19 @@ void TestParts::voicesExcerpt()
     //
     // create first part
     //
-    QList<Part*> parts;
-    QMultiMap<int, int> trackList;
-    parts.append(score->parts().at(0));
+    std::vector<Part*> parts;
+    std::multimap<int, int> trackList;
+    parts.push_back(score->parts().at(0));
     Score* nscore = new Score(score);
 
-    trackList.insert(1, 0);
-    trackList.insert(2, 1);
-    trackList.insert(4, 4);
+    trackList.insert({ 1, 0 });
+    trackList.insert({ 2, 1 });
+    trackList.insert({ 4, 4 });
 
     Excerpt* ex = new Excerpt(score);
     ex->setPartScore(nscore);
     nscore->setExcerpt(ex);
-    score->excerpts().append(ex);
+    score->excerpts().push_back(ex);
     ex->setTitle(parts.front()->longName());
     ex->setParts(parts);
     ex->setTracks(trackList);
@@ -234,16 +234,16 @@ void TestParts::voicesExcerpt()
     // create second part
     //
     parts.clear();
-    parts.append(score->parts().at(1));
+    parts.push_back(score->parts().at(1));
     nscore = new Score(score);
 
     trackList.clear();
-    trackList.insert(11, 0);
+    trackList.insert({ 11, 0 });
 
     ex = new Excerpt(score);
     ex->setPartScore(nscore);
     nscore->setExcerpt(ex);
-    score->excerpts().append(ex);
+    score->excerpts().push_back(ex);
     ex->setTitle(parts.front()->longName());
     ex->setParts(parts);
     ex->setTracks(trackList);
@@ -258,12 +258,12 @@ void TestParts::voicesExcerpt()
     nscore = new Score(score);
 
     trackList.clear();
-    trackList.insert(8, 0);
+    trackList.insert({ 8, 0 });
 
     ex = new Excerpt(score);
     ex->setPartScore(nscore);
     nscore->setExcerpt(ex);
-    score->excerpts().append(ex);
+    score->excerpts().push_back(ex);
     ex->setTitle(parts.front()->longName());
     ex->setParts(parts);
     ex->setTracks(trackList);

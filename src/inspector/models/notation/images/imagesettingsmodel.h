@@ -39,11 +39,6 @@ class ImageSettingsModel : public AbstractInspectorModel
 public:
     explicit ImageSettingsModel(QObject* parent, IElementRepositoryService* repository);
 
-    void createProperties() override;
-    void requestElements() override;
-    void loadProperties() override;
-    void resetProperties() override;
-
     PropertyItem* shouldScaleToFrameSize() const;
     PropertyItem* height() const;
     PropertyItem* width() const;
@@ -52,6 +47,15 @@ public:
     PropertyItem* isImageFramed() const;
 
 private:
+    void createProperties() override;
+    void requestElements() override;
+    void loadProperties() override;
+    void resetProperties() override;
+
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
+
+    void loadProperties(const mu::engraving::PropertyIdSet& propertyIdSet);
     void updateFrameScalingAvailability();
 
     PropertyItem* m_shouldScaleToFrameSize = nullptr;

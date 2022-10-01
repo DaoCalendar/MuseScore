@@ -22,128 +22,142 @@
 #include "autobotapi.h"
 
 #include <QTimer>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QDir>
 #include <QDateTime>
 
 #include "async/async.h"
+#include "io/fileinfo.h"
 
 #include "log.h"
 
 using namespace mu::api;
+using namespace mu::autobot;
 
 AutobotApi::AutobotApi(IApiEngine* e)
     : ApiObject(e)
 {
 }
 
-bool AutobotApi::openProject(const QString& name)
-{
-    io::path dir = autobotConfiguration()->testingFilesDirPath();
-    io::path filePath = dir + "/" + name;
-    Ret ret = projectFilesController()->openProject(filePath);
-    return ret;
-}
-
-void AutobotApi::saveProject(const QString& name)
-{
-    io::path dir = autobotConfiguration()->savingFilesPath();
-    if (!QFileInfo::exists(dir.toQString())) {
-        QDir().mkpath(dir.toQString());
-    }
-
-    io::path filePath = dir + "/" + QDateTime::currentDateTime().toString(Qt::ISODate) + "_" + name;
-    projectFilesController()->saveProject(filePath);
-}
-
 void AutobotApi::setInterval(int msec)
 {
-    m_intervalMsec = msec;
+    autobot()->setDefaultIntervalMsec(msec);
 }
 
 void AutobotApi::runTestCase(const QJSValue& testCase)
 {
-    m_abort = false;
-    m_testCase.testCase = testCase;
-    m_testCase.steps = testCase.property("steps");
-    m_testCase.stepsCount = m_testCase.steps.property("length").toInt();
-    m_testCase.currentStepIdx = -1;
-
-    nextStep();
-
-    if (m_testCase.currentStepIdx < m_testCase.stepsCount) {
-        m_testCase.loop.exec();
-    }
+    TestCase ts(testCase);
+    autobot()->runTestCase(ts);
 }
 
-void AutobotApi::nextStep()
+bool AutobotApi::pause(bool immediately)
 {
-    if (m_abort) {
-        m_testCase.loop.quit();
-        return;
-    }
+    if (immediately) {
+        using namespace mu::framework;
+        IInteractive::Result res = interactive()->question("Pause", "Continue?",
+                                                           { IInteractive::Button::Continue, IInteractive::Button::Abort });
 
-    m_testCase.currentStepIdx += 1;
-
-    if (m_testCase.currentStepIdx >= m_testCase.stepsCount) {
-        return;
-    }
-
-    QTimer::singleShot(m_intervalMsec, [this]() {
-        QJSValue step = m_testCase.steps.property(m_testCase.currentStepIdx);
-        QJSValue func = step.property("func");
-
-        func.call();
-
-        nextStep();
-
-        m_testCase.finishedCount += 1;
-        if (m_testCase.finishedCount == m_testCase.stepsCount) {
-            m_testCase.loop.quit();
+        if (res.standardButton() == IInteractive::Button::Abort) {
+            abort();
+            return false;
         }
-    });
+
+        return true;
+    }
+
+    autobot()->pause();
+    return true;
 }
 
-void AutobotApi::abort()
-{
-    m_abort = true;
-}
-
-bool AutobotApi::pause()
+bool AutobotApi::confirm(const QString& msg)
 {
     using namespace mu::framework;
-    IInteractive::Result res = interactive()->question("Pause", "Continue?",
-                                                       { IInteractive::Button::Continue, IInteractive::Button::Abort });
+    int pauseBtn = int(IInteractive::Button::CustomButton) + 1;
+    IInteractive::Result res = interactive()->question("Confirm", msg.toStdString(), {
+        interactive()->buttonData(IInteractive::Button::Continue),
+        IInteractive::ButtonData(pauseBtn, "Pause"),
+        interactive()->buttonData(IInteractive::Button::Abort)
+    });
 
     if (res.standardButton() == IInteractive::Button::Abort) {
         abort();
         return false;
     }
 
+    if (res.button() == pauseBtn) {
+        pause();
+        return false;
+    }
+
     return true;
 }
 
-void AutobotApi::sleep(int msec) const
+void AutobotApi::abort()
 {
-    if (msec < 0) {
-        msec = m_intervalMsec;
-    }
-
-    QEventLoop loop;
-    QTimer timer;
-    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
-    timer.start(msec);
-    loop.exec();
+    autobot()->abort();
 }
 
-void AutobotApi::waitPopup() const
+void AutobotApi::error(const QString& msg)
 {
-    //! NOTE We could do it smartly, check a current popup actually opened, but or just sleep some time
-    sleep(500);
+    autobot()->fatal(msg);
+}
+
+void AutobotApi::fatal(const QString& msg)
+{
+    autobot()->fatal(msg);
+}
+
+bool AutobotApi::openProject(const QString& name)
+{
+    TRACEFUNC;
+    io::paths_t dirs = autobotConfiguration()->testingFilesDirPaths();
+
+    io::path_t filePath;
+    for (const io::path_t& dir : dirs) {
+        filePath = dir + "/" + name;
+        if (io::FileInfo::exists(filePath)) {
+            break;
+        }
+    }
+
+    Ret ret = projectFilesController()->openProject(filePath);
+    return ret;
+}
+
+void AutobotApi::saveProject(const QString& name)
+{
+    TRACEFUNC;
+    io::path_t dir = autobotConfiguration()->savingFilesPath();
+    if (!QFileInfo::exists(dir.toQString())) {
+        QDir().mkpath(dir.toQString());
+    }
+
+    io::path_t filePath = dir + "/" + QDateTime::currentDateTime().toString("yyMMddhhmmss") + "_" + name;
+    projectFilesController()->saveProject(filePath);
+}
+
+void AutobotApi::sleep(int msec)
+{
+    if (msec < 0) {
+        msec = autobot()->intervalMsec();
+    }
+
+    autobot()->sleep(msec);
+}
+
+void AutobotApi::waitPopup()
+{
+    //! NOTE We could do it smartly, check a current popup actually opened,
+    //! but or just sleep some time
+    sleep(2000);
 }
 
 void AutobotApi::seeChanges(int msec)
 {
+    if (msec < 0) {
+        msec = autobot()->intervalMsec() / 2;
+    }
     sleep(msec);
 }
 
@@ -160,4 +174,23 @@ int AutobotApi::randomInt(int min, int max) const
     srand(time(nullptr)); // Seed the time
     int val = rand() % (max - min + 1) + min;
     return val;
+}
+
+int AutobotApi::fileSize(const QString& pathStr) const
+{
+    RetVal<uint64_t> size = fileSystem()->fileSize(io::path_t(pathStr));
+    if (!size.ret) {
+        LOGD() << "filed get file size, err: " << size.ret.toString();
+    }
+    return size.val;
+}
+
+QString AutobotApi::selectedFilePath() const
+{
+    return autobot()->autobotInteractive()->selectedFilePath().toQString();
+}
+
+void AutobotApi::showMainWindowOnFront()
+{
+    mainWindow()->requestShowOnFront();
 }

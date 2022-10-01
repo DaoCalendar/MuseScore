@@ -23,14 +23,16 @@
 
 #include "libmscore/hairpin.h"
 
-#include "dataformatter.h"
-#include "translation.h"
+#include "types/commontypes.h"
 #include "types/hairpintypes.h"
 
+#include "translation.h"
+
 using namespace mu::inspector;
+using namespace mu::engraving;
 
 HairpinSettingsModel::HairpinSettingsModel(QObject* parent, IElementRepositoryService* repository)
-    : LineSettingsModel(parent, repository)
+    : TextLineSettingsModel(parent, repository)
 {
     setModelType(InspectorModelType::TYPE_HAIRPIN);
     setTitle(qtrc("inspector", "Hairpin"));
@@ -49,51 +51,82 @@ PropertyItem* HairpinSettingsModel::height() const
     return m_height;
 }
 
-PropertyItem* HairpinSettingsModel::continiousHeight() const
+PropertyItem* HairpinSettingsModel::continuousHeight() const
 {
-    return m_continiousHeight;
+    return m_continuousHeight;
 }
 
 void HairpinSettingsModel::createProperties()
 {
-    LineSettingsModel::createProperties();
+    TextLineSettingsModel::createProperties();
 
-    m_isNienteCircleVisible = buildPropertyItem(Ms::Pid::HAIRPIN_CIRCLEDTIP);
-    m_height = buildPropertyItem(Ms::Pid::HAIRPIN_HEIGHT);
-    m_continiousHeight = buildPropertyItem(Ms::Pid::HAIRPIN_CONT_HEIGHT);
+    m_isNienteCircleVisible = buildPropertyItem(mu::engraving::Pid::HAIRPIN_CIRCLEDTIP);
+    m_height = buildPropertyItem(mu::engraving::Pid::HAIRPIN_HEIGHT);
+    m_continuousHeight = buildPropertyItem(mu::engraving::Pid::HAIRPIN_CONT_HEIGHT);
+
+    isLineVisible()->setIsVisible(false);
+    allowDiagonal()->setIsVisible(true);
+    placement()->setIsVisible(true);
 }
 
 void HairpinSettingsModel::loadProperties()
 {
-    auto formatDoubleFunc = [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
+    TextLineSettingsModel::loadProperties();
+
+    const static PropertyIdSet propertyIdSet {
+        Pid::HAIRPIN_CIRCLEDTIP,
+        Pid::HAIRPIN_HEIGHT,
+        Pid::HAIRPIN_CONT_HEIGHT,
     };
 
-    LineSettingsModel::loadProperties();
-
-    loadPropertyItem(m_isNienteCircleVisible);
-    loadPropertyItem(m_height, formatDoubleFunc);
-    loadPropertyItem(m_continiousHeight, formatDoubleFunc);
+    loadProperties(propertyIdSet);
 }
 
 void HairpinSettingsModel::resetProperties()
 {
-    LineSettingsModel::resetProperties();
+    TextLineSettingsModel::resetProperties();
 
     m_isNienteCircleVisible->resetToDefault();
     m_height->resetToDefault();
-    m_continiousHeight->resetToDefault();
+    m_continuousHeight->resetToDefault();
 }
 
 void HairpinSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::HAIRPIN, [](const Ms::EngravingItem* element) -> bool {
-        const Ms::Hairpin* hairpin = Ms::toHairpin(element);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::HAIRPIN, [](const mu::engraving::EngravingItem* element) -> bool {
+        const mu::engraving::Hairpin* hairpin = mu::engraving::toHairpin(
+            element);
 
         if (!hairpin) {
             return false;
         }
 
-        return hairpin->hairpinType() == Ms::HairpinType::CRESC_HAIRPIN || hairpin->hairpinType() == Ms::HairpinType::DECRESC_HAIRPIN;
+        return hairpin->hairpinType() == mu::engraving::HairpinType::CRESC_HAIRPIN || hairpin->hairpinType() == mu::engraving::HairpinType::DECRESC_HAIRPIN;
     });
+}
+
+void HairpinSettingsModel::onNotationChanged(const PropertyIdSet& changedPropertyIdSet, const StyleIdSet& changedStyleIdSet)
+{
+    TextLineSettingsModel::onNotationChanged(changedPropertyIdSet, changedStyleIdSet);
+    loadProperties(changedPropertyIdSet);
+}
+
+bool HairpinSettingsModel::isTextVisible(TextType) const
+{
+    return true;
+}
+
+void HairpinSettingsModel::loadProperties(const PropertyIdSet& propertyIdSet)
+{
+    if (mu::contains(propertyIdSet, Pid::HAIRPIN_CIRCLEDTIP)) {
+        loadPropertyItem(m_isNienteCircleVisible);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::HAIRPIN_HEIGHT)) {
+        loadPropertyItem(m_height, formatDoubleFunc);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::HAIRPIN_CONT_HEIGHT)) {
+        loadPropertyItem(m_continuousHeight, formatDoubleFunc);
+    }
 }

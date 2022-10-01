@@ -27,13 +27,14 @@
 #include "models/abstractinspectormodel.h"
 #include "models/inspectorlistmodel.h"
 #include "models/inspectormodelcreator.h"
+#include "models/measures/measuressettingsmodel.h"
 #include "models/notation/notes/noteheads/noteheadgroupsmodel.h"
 #include "models/inspectorpopupcontroller.h"
 
 #include "view/widgets/fretcanvas.h"
 #include "view/widgets/gridcanvas.h"
 
-#include "types/stemtypes.h"
+#include "types/directiontypes.h"
 #include "types/noteheadtypes.h"
 #include "types/beamtypes.h"
 #include "types/hairpintypes.h"
@@ -50,7 +51,6 @@
 #include "types/articulationtypes.h"
 #include "types/ambitustypes.h"
 #include "types/chordsymboltypes.h"
-#include "types/scoreappearancetypes.h"
 #include "types/bendtypes.h"
 #include "types/tremolobartypes.h"
 #include "types/tremolotypes.h"
@@ -85,6 +85,7 @@ void InspectorModule::registerUiTypes()
     qmlRegisterUncreatableType<AbstractInspectorModel>("MuseScore.Inspector", 1, 0, "Inspector", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<PropertyItem>("MuseScore.Inspector", 1, 0, "PropertyItem", "Not creatable from QML");
 
+    qmlRegisterUncreatableType<MeasuresSettingsModel>("MuseScore.Inspector", 1, 0, "MeasuresSettingsModel", "Not creatable from QML");
     qmlRegisterType<NoteheadGroupsModel>("MuseScore.Inspector", 1, 0, "NoteheadGroupsModel");
 
     qmlRegisterUncreatableType<DirectionTypes>("MuseScore.Inspector", 1, 0, "DirectionTypes", "Not creatable as it is an enum type");
@@ -106,7 +107,6 @@ void InspectorModule::registerUiTypes()
     qmlRegisterUncreatableType<AmbitusTypes>("MuseScore.Inspector", 1, 0, "AmbitusTypes", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<ChordSymbolTypes>("MuseScore.Inspector", 1, 0, "ChordSymbolTypes", "Not creatable as it is an enum type");
     qmlRegisterType<FretCanvas>("MuseScore.Inspector", 1, 0, "FretCanvas");
-    qmlRegisterUncreatableType<ScoreAppearanceTypes>("MuseScore.Inspector", 1, 0, "ScoreAppearanceTypes", "Not creatable...");
     qmlRegisterType<GridCanvas>("MuseScore.Inspector", 1, 0, "GridCanvas");
     qmlRegisterUncreatableType<BendTypes>("MuseScore.Inspector", 1, 0, "BendTypes", "Not creatable as it is an enum type");
     qmlRegisterUncreatableType<TremoloBarTypes>("MuseScore.Inspector", 1, 0, "TremoloBarTypes", "Not creatable as it is an enum type");

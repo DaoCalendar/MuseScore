@@ -26,7 +26,7 @@
 
 using namespace mu::project;
 
-void WindowsRecentFilesController::addRecentFile(const io::path& path)
+void WindowsRecentFilesController::addRecentFile(const io::path_t& path)
 {
     std::wstring pathString = path.toStdWString();
     SHAddToRecentDocs(SHARD_PATHW, pathString.c_str());
@@ -34,7 +34,4 @@ void WindowsRecentFilesController::addRecentFile(const io::path& path)
 
 void WindowsRecentFilesController::clearRecentFiles()
 {
-    // The "docs" seem to say that this should clear the recent files list
-    // But in practice it's not sure if that's the case
-    SHAddToRecentDocs(0, NULL);
 }

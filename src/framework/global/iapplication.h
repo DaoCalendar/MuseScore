@@ -24,6 +24,10 @@
 
 #include "modularity/imoduleexport.h"
 
+class QObject;
+class QEvent;
+class QWindow;
+
 namespace mu::framework {
 class IApplication : MODULE_EXPORT_INTERFACE
 {
@@ -39,6 +43,12 @@ public:
     virtual void setRunMode(const RunMode& mode) = 0;
     virtual RunMode runMode() const = 0;
     virtual bool noGui() const = 0;
+
+    virtual QWindow* focusWindow() const = 0;
+
+    virtual bool notify(QObject* object, QEvent* event) = 0;
+
+    virtual void restart() = 0;
 };
 }
 

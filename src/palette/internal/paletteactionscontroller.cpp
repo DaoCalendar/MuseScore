@@ -25,7 +25,7 @@
 using namespace mu::palette;
 using namespace mu::ui;
 
-static const mu::UriQuery MASTER_PALETTE_URI("musescore://palette/masterpalette?sync=false");
+static const mu::UriQuery MASTER_PALETTE_URI("musescore://palette/masterpalette?sync=false&modal=false");
 static const mu::UriQuery SPECIAL_CHARACTERS_URI("musescore://palette/specialcharacters?sync=false");
 static const mu::UriQuery TIME_SIGNATURE_PROPERTIES_URI("musescore://palette/timesignatureproperties");
 static const mu::UriQuery EDIT_DRUMSET_URI("musescore://palette/editdrumset");
@@ -33,7 +33,7 @@ static const mu::UriQuery EDIT_DRUMSET_URI("musescore://palette/editdrumset");
 void PaletteActionsController::init()
 {
     dispatcher()->reg(this, "masterpalette", this, &PaletteActionsController::toggleMasterPalette);
-    dispatcher()->reg(this, "show-keys", this, &PaletteActionsController::openSpecialCharactersDialog);
+    dispatcher()->reg(this, "show-keys", this, &PaletteActionsController::toggleSpecialCharactersDialog);
     dispatcher()->reg(this, "time-signature-properties", this, &PaletteActionsController::openTimeSignaturePropertiesDialog);
     dispatcher()->reg(this, "edit-drumset", this, &PaletteActionsController::openEditDrumsetDialog);
 
@@ -75,9 +75,16 @@ void PaletteActionsController::toggleMasterPalette(const actions::ActionData& ar
     }
 }
 
-void PaletteActionsController::openSpecialCharactersDialog()
+void PaletteActionsController::toggleSpecialCharactersDialog()
 {
-    interactive()->open(SPECIAL_CHARACTERS_URI);
+    if (interactive()->isOpened(SPECIAL_CHARACTERS_URI.uri()).val) {
+        interactive()->close(SPECIAL_CHARACTERS_URI.uri());
+    } else {
+        auto notation = globalContext()->currentNotation();
+        if (notation && notation->interaction()->isTextEditingStarted()) {
+            interactive()->open(SPECIAL_CHARACTERS_URI);
+        }
+    }
 }
 
 void PaletteActionsController::openTimeSignaturePropertiesDialog()

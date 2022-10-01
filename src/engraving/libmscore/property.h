@@ -23,10 +23,11 @@
 #ifndef __PROPERTY_H__
 #define __PROPERTY_H__
 
-#include <QVariant>
-#include <QString>
+#include "types/string.h"
 
-namespace Ms {
+#include "types/propertyvalue.h"
+
+namespace mu::engraving {
 class XmlReader;
 
 //------------------------------------------------------------------------
@@ -80,7 +81,7 @@ enum class Pid {
     SMALL,
     SHOW_COURTESY,
     KEYSIG_MODE,
-    LINE_TYPE,
+    SLUR_STYLE_TYPE,
     PITCH,
 
     TPC1,
@@ -99,8 +100,8 @@ enum class Pid {
     NO_STEM,
     SLUR_DIRECTION,
     LEADING_SPACE,
-    DISTRIBUTE,
     MIRROR_HEAD,
+    HEAD_HAS_PARENTHESES,
     DOT_POSITION,
     TUNING,
     PAUSE,
@@ -114,6 +115,7 @@ enum class Pid {
     FRET,
     STRING,
     GHOST,
+    DEAD,
     PLAY,
     TIMESIG_NOMINAL,
 
@@ -210,12 +212,10 @@ enum class Pid {
     GLISS_EASEIN,
     GLISS_EASEOUT,
     DIAGONAL,
-    GROUPS,
+    GROUP_NODES,
     LINE_STYLE,
     LINE_WIDTH,
     LINE_WIDTH_SPATIUM,
-    LASSO_POS,
-    LASSO_SIZE,
     TIME_STRETCH,
     ORNAMENT_STYLE,
 
@@ -251,8 +251,8 @@ enum class Pid {
     MAG,
     USE_DRUMSET,
     DURATION,
-    DURATION_TYPE,
-    ROLE,
+    DURATION_TYPE_WITH_DOTS,
+    ACCIDENTAL_ROLE,
     TRACK,
 
     FRET_STRINGS,
@@ -303,7 +303,7 @@ enum class Pid {
     BRACKET_COLUMN,
     INAME_LAYOUT_POSITION,
 //200
-    SUB_STYLE,
+    TEXT_STYLE,
 
     FONT_FACE,
     FONT_SIZE,
@@ -388,68 +388,24 @@ enum class Pid {
     PATH,   // for ChordLine to make its shape changes undoable
 
     PREFER_SHARP_FLAT,
+    PLAY_TECH_TYPE,
+    TEMPO_CHANGE_TYPE,
+    TEMPO_EASING_METHOD,
+    TEMPO_CHANGE_FACTOR,
 
     END
 };
 
-enum class P_TYPE : char {
-    BOOL,
-    INT,
-    REAL,
-    SPATIUM,
-    SP_REAL,            // real (point) value saved in (score) spatium units
-    FRACTION,
-    POINT,
-    POINT_SP,           // point units, value saved in (score) spatium units
-    POINT_MM,
-    POINT_SP_MM,        // point units, value saved as mm or spatium depending on EngravingItem->sizeIsSpatiumDependent()
-    SIZE,
-    SIZE_MM,
-    STRING,
-    SCALE,
-    COLOR,
-    DIRECTION,        // enum class Direction
-    DIRECTION_H,      // enum class MScore::DirectionH
-    ORNAMENT_STYLE,   // enum class MScore::OrnamentStyle
-    TDURATION,
-    LAYOUT_BREAK,
-    VALUE_TYPE,
-    BEAM_MODE,
-    PLACEMENT,        // ABOVE or BELOW
-    HPLACEMENT,       // LEFT, CENTER or RIGHT
-    TEXT_PLACE,
-    TEMPO,
-    GROUPS,
-    SYMID,
-    INT_LIST,
-    GLISS_STYLE,
-    BARLINE_TYPE,
-    HEAD_TYPE,          // enum class Notehead::Type
-    HEAD_GROUP,         // enum class Notehead::Group
-    ZERO_INT,           // displayed with offset +1
-    FONT,
-    SUB_STYLE,
-    ALIGN,
-    CHANGE_METHOD,      // enum class VeloChangeMethod (for single note dynamics)
-    CHANGE_SPEED,       // enum class Dynamic::Speed
-    CLEF_TYPE,          // enum class ClefType
-    DYNAMIC_TYPE,       // enum class Dynamic::Type
-    KEYMODE,            // enum class KeyMode
-    ORIENTATION,        // enum class Orientation
+using PropertyIdSet = std::unordered_set<Pid>;
 
-    PATH,               // mu::PainterPath
-    HEAD_SCHEME,        // enum class NoteHead::Scheme
-};
-
-extern QVariant readProperty(Pid type, XmlReader& e);
-extern QVariant propertyFromString(Pid type, QString value);
-extern QString propertyToString(Pid, QVariant value, bool mscx);
+extern PropertyValue readProperty(Pid type, XmlReader& e);
+extern PropertyValue propertyFromString(P_TYPE type, String value);
+extern String propertyToString(Pid, const PropertyValue& value, bool mscx);
 extern P_TYPE propertyType(Pid);
 extern const char* propertyName(Pid);
 extern bool propertyLink(Pid id);
-extern Pid propertyId(const QString& name);
-extern Pid propertyId(const QStringRef& name);
-extern QString propertyUserName(Pid);
-}     // namespace Ms
+extern Pid propertyId(const AsciiStringView& name);
+extern String propertyUserName(Pid);
+} // namespace mu::engraving
 
 #endif

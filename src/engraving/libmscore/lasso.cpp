@@ -21,12 +21,15 @@
  */
 
 #include "lasso.h"
+
+#include "draw/types/brush.h"
+
 #include "score.h"
-#include "draw/brush.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Lasso
 //---------------------------------------------------------
@@ -47,7 +50,7 @@ void Lasso::draw(mu::draw::Painter* painter) const
     using namespace mu::draw;
     painter->setBrush(Brush(engravingConfiguration()->lassoColor()));
     // always 2 pixel width
-    qreal w = 2.0 / painter->worldTransform().m11();
+    double w = 2.0 / painter->worldTransform().m11() * engravingConfiguration()->guiScaling();
     painter->setPen(Pen(engravingConfiguration()->selectionColor(), w));
     painter->drawRect(bbox());
 }
@@ -114,45 +117,5 @@ std::vector<mu::PointF> Lasso::gripsPositions(const EditData&) const
         PointF(box.x() + box.width() * .5, box.bottom()),
         PointF(box.left(), box.y() + box.height() * .5)
     };
-}
-
-//---------------------------------------------------------
-//   setProperty
-//---------------------------------------------------------
-
-bool Lasso::setProperty(Pid propertyId, const QVariant& v)
-{
-    switch (propertyId) {
-    case Pid::LASSO_POS:
-        bbox().moveTo(PointF::fromVariant(v));
-        break;
-    case Pid::LASSO_SIZE:
-        bbox().setSize(SizeF::fromVariant(v));
-        break;
-    default:
-        if (!EngravingItem::setProperty(propertyId, v)) {
-            return false;
-        }
-        break;
-    }
-    score()->setUpdateAll();
-    return true;
-}
-
-//---------------------------------------------------------
-//   getProperty
-//---------------------------------------------------------
-
-QVariant Lasso::getProperty(Pid propertyId) const
-{
-    switch (propertyId) {
-    case Pid::LASSO_POS:
-        return QVariant::fromValue(bbox().topLeft());
-    case Pid::LASSO_SIZE:
-        return QVariant::fromValue(bbox().size());
-    default:
-        break;
-    }
-    return EngravingItem::getProperty(propertyId);
 }
 }

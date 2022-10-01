@@ -26,9 +26,8 @@
 #include <unordered_map>
 
 #include "async/asyncable.h"
-#include "async/channel.h"
 #include "modularity/ioc.h"
-#include "system/ifilesystem.h"
+#include "audio/isoundfontrepository.h"
 
 #include "isynthresolver.h"
 #include "fluidsynth.h"
@@ -36,21 +35,21 @@
 namespace mu::audio::synth {
 class FluidResolver : public ISynthResolver::IResolver, public async::Asyncable
 {
-    INJECT(audio, system::IFileSystem, fileSystem)
+    INJECT(audio, ISoundFontRepository, soundFontRepository)
 public:
-    explicit FluidResolver(const io::paths& soundFontDirs, async::Channel<io::paths> sfDirsChanges);
+    explicit FluidResolver();
 
     ISynthesizerPtr resolveSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const override;
+    bool hasCompatibleResources(const audio::PlaybackSetupData& setup) const override;
+
     audio::AudioResourceMetaList resolveResources() const override;
 
     void refresh() override;
 
 private:
     FluidSynthPtr createSynth(const audio::AudioResourceId& resourceId) const;
-    void updateCaches(const std::string& fileExtension);
 
-    io::paths m_soundFontDirs;
-    std::unordered_map<AudioResourceId, io::path> m_resourcesCache;
+    std::unordered_map<AudioResourceId, io::path_t> m_resourcesCache;
 };
 }
 

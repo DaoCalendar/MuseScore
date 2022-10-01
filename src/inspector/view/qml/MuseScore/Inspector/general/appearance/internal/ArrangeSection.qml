@@ -31,8 +31,10 @@ Column {
     property int navigationRowStart: 0
     property int navigationRowEnd: forwardsButton.navigation.row
 
-    signal pushBackRequested()
-    signal pushFrontRequested()
+    signal pushBackwardsRequested()
+    signal pushForwardsRequested()
+    signal pushToBackRequested()
+    signal pushToFrontRequested()
 
     height: implicitHeight
     width: parent.width
@@ -45,7 +47,9 @@ Column {
         spacing: 8
 
         StyledTextLabel {
+            width: parent.width
             text: qsTrc("inspector", "Arrange")
+            horizontalAlignment: Text.AlignLeft
         }
 
         Item {
@@ -64,7 +68,7 @@ Column {
                 text: qsTrc("inspector", "Backwards")
 
                 onClicked: {
-                    root.pushBackRequested()
+                    root.pushBackwardsRequested()
                 }
             }
 
@@ -81,7 +85,46 @@ Column {
                 text: qsTrc("inspector", "Forwards")
 
                 onClicked: {
-                    root.pushFrontRequested()
+                    root.pushForwardsRequested()
+                }
+            }
+        }
+
+        Item {
+            height: childrenRect.height
+            width: parent.width
+
+            FlatButton {
+                id: toBackButton
+                anchors.left: parent.left
+                anchors.right: parent.horizontalCenter
+                anchors.rightMargin: 4
+
+                navigation.name: "To Back"
+                navigation.panel: root.navigationPanel
+                navigation.row: root.navigationRowStart + 1
+
+                text: qsTrc("inspector", "To back")
+
+                onClicked: {
+                    root.pushToBackRequested()
+                }
+            }
+
+            FlatButton {
+                id: toFrontButton
+                anchors.left: parent.horizontalCenter
+                anchors.leftMargin: 4
+                anchors.right: parent.right
+
+                navigation.name: "To Front"
+                navigation.panel: root.navigationPanel
+                navigation.row: root.navigationRowStart + 2
+
+                text: qsTrc("inspector", "To front")
+
+                onClicked: {
+                    root.pushToFrontRequested()
                 }
             }
         }

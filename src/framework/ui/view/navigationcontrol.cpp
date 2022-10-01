@@ -89,19 +89,28 @@ void NavigationControl::onEvent(EventPtr e)
     AbstractNavigation::onEvent(e);
 }
 
+QWindow* NavigationControl::window() const
+{
+    return AbstractNavigation::window();
+}
+
 void NavigationControl::trigger()
 {
     emit triggered();
 }
 
-mu::async::Channel<INavigationControl*> NavigationControl::activeRequested() const
+void NavigationControl::requestActive(bool enableHighlight)
 {
-    return m_forceActiveRequested;
+    if (m_panel) {
+        m_panel->requestActive(this, enableHighlight);
+    }
 }
 
-void NavigationControl::requestActive()
+void NavigationControl::requestActiveByInteraction(bool enableHighlight)
 {
-    m_forceActiveRequested.send(this);
+    if (m_panel) {
+        m_panel->requestActive(this, enableHighlight, INavigation::ActivationType::ByMouse);
+    }
 }
 
 void NavigationControl::setPanel(NavigationPanel* panel)

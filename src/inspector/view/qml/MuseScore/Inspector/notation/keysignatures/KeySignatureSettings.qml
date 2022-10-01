@@ -43,23 +43,22 @@ Column {
         showCourtesyKeySignature.navigation.requestActive()
     }
 
-    CheckBox {
+    CheckBoxPropertyView {
         id: showCourtesyKeySignature
-        isIndeterminate: root.model ? root.model.hasToShowCourtesy.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.hasToShowCourtesy.value : false
         text: qsTrc("inspector", "Show courtesy key signature on previous system")
+        propertyItem: root.model ? root.model.hasToShowCourtesy : null
 
         navigation.name: "ShowCourtesyKeySignature"
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRowStart + 1
-
-        onClicked: { root.model.hasToShowCourtesy.value = !checked }
     }
 
     DropdownPropertyView {
+        //: Musical mode (major, minor, dorian, phrygian, lydian, etc.)
         titleText: qsTrc("inspector", "Mode")
         propertyItem: root.model ? root.model.mode : null
 
+        navigationName: "Mode"
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart + 2
 
@@ -72,6 +71,7 @@ Column {
             { text: qsTrc("inspector", "Phrygian"), value: KeySignatureTypes.MODE_PHRYGIAN },
             { text: qsTrc("inspector", "Lydian"), value: KeySignatureTypes.MODE_LYDIAN },
             { text: qsTrc("inspector", "Mixolydian"), value: KeySignatureTypes.MODE_MIXOLYDIAN },
+            { text: qsTrc("inspector", "Aeolian"), value: KeySignatureTypes.MODE_AEOLIAN },
             { text: qsTrc("inspector", "Ionian"), value: KeySignatureTypes.MODE_IONIAN },
             { text: qsTrc("inspector", "Locrian"), value: KeySignatureTypes.MODE_LOCRIAN }
         ]

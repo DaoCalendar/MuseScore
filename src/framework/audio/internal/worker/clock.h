@@ -43,6 +43,7 @@ public:
     void resume() override;
     void seek(const msecs_t msecs) override;
 
+    msecs_t timeDuration() const override;
     void setTimeDuration(const msecs_t duration) override;
     Ret setTimeLoop(const msecs_t fromMsec, const msecs_t toMsec) override;
     void resetTimeLoop() override;
@@ -54,6 +55,7 @@ public:
     async::Channel<PlaybackStatus> statusChanged() const override;
 
 private:
+    void setCurrentTime(msecs_t time);
 
     ValCh<PlaybackStatus> m_status;
     msecs_t m_currentTime = 0;
@@ -61,7 +63,7 @@ private:
     msecs_t m_timeLoopStart = 0;
     msecs_t m_timeLoopEnd = 0;
 
-    async::Channel<msecs_t> m_timeChanged;
+    async::Channel<msecs_t> m_timeChangedInMilliSecs;
     async::Notification m_seekOccurred;
 };
 }

@@ -29,22 +29,20 @@ FocusScope {
     id: root
 
     property alias text: label.text
+    property string accessibleText: text
     property bool isVisible: true
 
     property alias navigation: eyeButton.navigation
 
     signal visibleToggled()
 
-    height: 30
-    width: content.implicitWidth
+    implicitHeight: contentRow.implicitHeight
+    implicitWidth: contentRow.implicitWidth
 
-    opacity: root.enabled ? 1.0 : 0.7
+    opacity: root.enabled ? 1.0 : ui.theme.itemOpacityDisabled
 
     RowLayout {
-        id: content
-
-        anchors.fill: parent
-
+        id: contentRow
         spacing: 2
 
         FlatButton {
@@ -53,11 +51,20 @@ FocusScope {
             Layout.alignment: Qt.AlignVCenter
             Layout.preferredWidth: width
 
+            // Make mouse area fill the whole area to get desired hover effect
+            readonly property rect mouseAreaRect: contentRow.mapToItem(this, 0, 0, contentRow.width, contentRow.height)
+
+            mouseArea.anchors.fill: null
+            mouseArea.x: mouseAreaRect.x
+            mouseArea.y: mouseAreaRect.y
+            mouseArea.width: mouseAreaRect.width
+            mouseArea.height: mouseAreaRect.height
+
             icon: root.isVisible ? IconCode.VISIBILITY_ON : IconCode.VISIBILITY_OFF
             transparent: true
 
-            navigation.accessible.name: label.text + " " + qsTrc("uicomponents", "visibility") + " "
-                                        + (root.isVisible ? qsTrc("uicomponents", "on") : qsTrc("uicomponents", "off"))
+            accessible.name: (root.accessibleText ? root.accessibleText + ", " : "")
+                             + (root.isVisible ? qsTrc("ui", "Visible") : qsTrc("ui", "Hidden"))
 
             onClicked: {
                 root.visibleToggled()
@@ -66,26 +73,16 @@ FocusScope {
 
         StyledTextLabel {
             id: label
+            visible: !isEmpty
 
-            Layout.alignment: Qt.AlignVCenter
-            Layout.fillWidth: true
+            readonly property real availableWidth: root.width - contentRow.spacing - eyeButton.width
+
+            Layout.preferredWidth: availableWidth > 0 ? Math.min(availableWidth, label.implicitWidth) : label.implicitWidth
+            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
 
             horizontalAlignment: Text.AlignLeft
             wrapMode: Text.WordWrap
             maximumLineCount: 2
-
-            visible: Boolean(text)
-        }
-    }
-
-    MouseArea {
-        id: clickableArea
-
-        anchors.fill: content
-        anchors.margins: -4
-
-        onClicked: {
-            root.visibleToggled()
         }
     }
 }

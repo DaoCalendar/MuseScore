@@ -19,8 +19,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 import QtQuick 2.15
+
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Audio 1.0
@@ -31,10 +31,12 @@ MixerPanelSection {
     headerTitle: qsTrc("playback", "Pan")
 
     Item {
-        id: contentWrapper
+        id: content
 
         height: contentRow.implicitHeight
-        width: root.delegateDefaultWidth
+        width: root.channelItemWidth
+
+        property string accessibleName: (Boolean(root.needReadChannelName) ? channelItem.title + " " : "") + root.headerTitle
 
         Row {
             id: contentRow
@@ -46,10 +48,28 @@ MixerPanelSection {
             KnobControl {
                 id: balanceKnob
 
-                value: item.balance
+                value: channelItem.balance
+                stepSize: 1
 
-                onMoved: {
-                    item.balance = value
+                navigation.panel: channelItem.panel
+                navigation.row: root.navigationRowStart
+                navigation.accessible.name: content.accessibleName
+                navigation.onActiveChanged: {
+                    if (navigation.active) {
+                        root.navigateControlIndexChanged({row: navigation.row, column: navigation.column})
+                    }
+                }
+
+                onNewValueRequested: function(newValue) {
+                    channelItem.balance = newValue
+                }
+
+                onIncreaseRequested: {
+                    channelItem.balance += stepSize
+                }
+
+                onDecreaseRequested: {
+                    channelItem.balance -= stepSize
                 }
             }
 
@@ -58,10 +78,21 @@ MixerPanelSection {
 
                 anchors.verticalCenter: balanceKnob.verticalCenter
 
-                textHorizontalAlignment: Qt.AlignHCenter
-
                 height: 24
                 width: 36
+
+                textHorizontalAlignment: Qt.AlignHCenter
+                textSidePadding: 0
+                background.radius: 2
+
+                navigation.panel: channelItem.panel
+                navigation.row: root.navigationRowStart + 1
+                navigation.accessible.name: content.accessibleName + " " + currentText
+                navigation.onActiveChanged: {
+                    if (navigation.active) {
+                        root.navigateControlIndexChanged({row: navigation.row, column: navigation.column})
+                    }
+                }
 
                 validator: IntInputValidator {
                     id: intInputValidator
@@ -69,11 +100,11 @@ MixerPanelSection {
                     bottom: -100
                 }
 
-                currentText: item.balance
+                currentText: channelItem.balance
 
-                onCurrentTextEdited: {
-                    if (item.balance !== Number(newTextValue)) {
-                        item.balance = Number(newTextValue)
+                onCurrentTextEdited: function(newTextValue) {
+                    if (channelItem.balance !== Number(newTextValue)) {
+                        channelItem.balance = Number(newTextValue)
                     }
                 }
             }

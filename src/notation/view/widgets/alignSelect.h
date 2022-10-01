@@ -23,7 +23,7 @@
 #define MU_NOTATION_ALIGNSELECT_H
 
 #include "ui_align_select.h"
-#include "libmscore/types.h"
+#include "engraving/types/types.h"
 
 namespace mu::notation {
 class AlignSelect : public QWidget, public Ui::AlignSelect
@@ -32,11 +32,11 @@ class AlignSelect : public QWidget, public Ui::AlignSelect
 
 public:
     AlignSelect(QWidget* parent);
-    Ms::Align align() const;
-    void setAlign(Ms::Align);
+    mu::engraving::Align align() const;
+    void setAlign(mu::engraving::Align);
 
 signals:
-    void alignChanged(Ms::Align);
+    void alignChanged(mu::engraving::Align);
 
 private:
     QButtonGroup* g1;

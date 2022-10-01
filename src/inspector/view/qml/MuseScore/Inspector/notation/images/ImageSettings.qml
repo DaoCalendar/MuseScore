@@ -58,7 +58,7 @@ Column {
             propertyItem: root.model ? root.model.height : null
 
             icon: IconCode.VERTICAL
-            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("inspector", "sp") : qsTrc("inspector", "mm")
+            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("global", "sp") : qsTrc("global", "mm")
 
             navigationPanel: root.navigationPanel
             navigationRowStart: root.navigationRowStart + 1
@@ -97,39 +97,31 @@ Column {
 
             icon: IconCode.HORIZONTAL
             iconMode: IncrementalPropertyControl.Right
-            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("inspector", "sp") : qsTrc("inspector", "mm")
+            measureUnitsSymbol: staffSpaceUnitsCheckbox.checked ? qsTrc("global", "sp") : qsTrc("global", "mm")
 
             navigationPanel: root.navigationPanel
             navigationRowStart: lockButton.navigation.row + 1
         }
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
-    CheckBox {
-        enabled: root.model ? root.model.shouldScaleToFrameSize.isEnabled : false
-        isIndeterminate: root.model ? root.model.shouldScaleToFrameSize.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.shouldScaleToFrameSize.value : false
+    CheckBoxPropertyView {
         text: qsTrc("inspector", "Scale to frame size")
+        propertyItem: root.model ? root.model.shouldScaleToFrameSize : null
 
         navigation.name: "ScaleToFrameSizeCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: imageWidthSection.navigationRowEnd + 1
-
-        onClicked: { root.model.shouldScaleToFrameSize.value = !checked }
     }
 
-    CheckBox {
+    CheckBoxPropertyView {
         id: staffSpaceUnitsCheckbox
-
-        isIndeterminate: root.model ? root.model.isSizeInSpatiums.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.isSizeInSpatiums.value : false
         text: qsTrc("inspector", "Use staff space units")
+        propertyItem: root.model ? root.model.isSizeInSpatiums : null
 
         navigation.name: "UseStaffSpaceUnitsCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: imageWidthSection.navigationRowEnd + 2
-
-        onClicked: { root.model.isSizeInSpatiums.value = !checked }
     }
 }

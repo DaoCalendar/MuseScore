@@ -24,11 +24,7 @@ import QtQuick 2.15
 
 import MuseScore.NotationScene 1.0
 
-Rectangle {
-    id: root
-
-    color: ui.theme.backgroundPrimaryColor
-
+Item {
     TimelineView {
         anchors.fill: parent
     }

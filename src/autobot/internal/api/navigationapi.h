@@ -23,6 +23,7 @@
 #define MU_API_NAVIGATIONAPI_H
 
 #include <QString>
+#include <QJSValue>
 
 #include "apiobject.h"
 #include "modularity/ioc.h"
@@ -48,13 +49,15 @@ public:
     Q_INVOKABLE void up();
     Q_INVOKABLE void down();
     Q_INVOKABLE void escape();
-    Q_INVOKABLE bool goToControl(const QString& section, const QString& panel, const QString& contol);
+    Q_INVOKABLE bool goToControl(const QString& section, const QString& panel, const QJSValue& controlNameOrIndex);
     Q_INVOKABLE void trigger();
-    Q_INVOKABLE bool triggerControl(const QString& section, const QString& panel, const QString& contol);
+    Q_INVOKABLE bool triggerControl(const QString& section, const QString& panel, const QJSValue& controlNameOrIndex);
 
     Q_INVOKABLE QString activeSection() const;
     Q_INVOKABLE QString activePanel() const;
     Q_INVOKABLE QString activeControl() const;
+
+    Q_INVOKABLE void dump() const;
 };
 }
 

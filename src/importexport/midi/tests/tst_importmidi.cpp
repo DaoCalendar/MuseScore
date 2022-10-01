@@ -438,7 +438,7 @@ private slots:
 
 void TestImportMidi::initTestCase()
 {
-    initMTest(QString(iex_midiimport_tests_DATA_ROOT));
+    setRootDir(QString(iex_midiimport_tests_DATA_ROOT));
 }
 
 //---------------------------------------------------------
@@ -457,8 +457,8 @@ void TestImportMidi::mf(const char* name) const
 
 QString TestImportMidi::midiFilePath(const QString& fileName) const
 {
-    const QString nameWithExtention = fileName + ".mid";
-    return QString(QString(iex_midiimport_tests_DATA_ROOT) + "/" + MIDIIMPORT_DIR + nameWithExtention);
+    const QString nameWithExtension = fileName + ".mid";
+    return QString(QString(iex_midiimport_tests_DATA_ROOT) + "/" + MIDIIMPORT_DIR + nameWithExtension);
 }
 
 QString TestImportMidi::midiFilePath(const char* fileName) const

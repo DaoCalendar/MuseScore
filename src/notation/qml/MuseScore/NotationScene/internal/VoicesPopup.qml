@@ -19,19 +19,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.9
-import QtQuick.Controls 2.2
+import QtQuick 2.15
+import QtQuick.Controls 2.15
 
 import MuseScore.UiComponents 1.0
 
-StyledPopup {
+StyledPopupView {
     id: root
 
     property var voicesVisibility: [] // array of bool
     signal voiceVisibilityChangeRequested(var voiceIndex, var voiceVisible)
 
-    height: contentColumn.implicitHeight + bottomPadding + topPadding
-    width: contentColumn.implicitWidth + leftPadding + rightPadding
+    contentHeight: contentColumn.childrenRect.height
+    contentWidth: contentColumn.childrenRect.width
 
     Column {
         id: contentColumn
@@ -52,7 +52,7 @@ StyledPopup {
 
             delegate: CheckBox {
                 checked: modelData
-                text: qsTrc("notation", "Voice ") + (model.index + 1)
+                text: qsTrc("notation", "Voice %1").arg(model.index + 1)
 
                 onClicked: {
                     checked = !checked

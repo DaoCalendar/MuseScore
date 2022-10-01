@@ -24,34 +24,17 @@ import QtQuick.Controls 2.15
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
+import MuseScore.AppShell 1.0
 
 Item {
     id: root
 
-    width: radioButtonList.contentWidth
-    height: radioButtonList.contentHeight
+    width: radioButtonList.width
+    height: radioButtonList.height
 
-    property alias navigation: navCtrl
+    property alias navigation: navPanel
 
     property string currentUri: "musescore://home"
-    property var items: [
-        {
-            title: qsTrc("appshell", "Home"),
-            uri: "musescore://home"
-        },
-        {
-            title: qsTrc("appshell", "Score"),
-            uri: "musescore://notation"
-        },
-        {
-            title: qsTrc("appshell", "Publish"),
-            uri: "musescore://publish"
-        },
-        {
-            title: qsTrc("appshell", "DevTools"),
-            uri: "musescore://devtools"
-        }
-    ]
 
     signal selected(string uri)
 
@@ -59,20 +42,38 @@ Item {
         root.selected(uri)
     }
 
+    function focusOnFirst() {
+        var btn = radioButtonList.itemAtIndex(0)
+        if (btn) {
+            btn.navigation.requestActive()
+        }
+    }
+
+    MainToolBarModel {
+        id: toolBarModel
+    }
+
+    Component.onCompleted: {
+        toolBarModel.load()
+    }
+
     NavigationPanel {
-        id: navCtrl
+        id: navPanel
         name: "MainToolBar"
         enabled: root.enabled && root.visible
-        accessible.name: qsTrc("appshell", "Main tool bar") + " " + navCtrl.directionInfo
+        accessible.name: qsTrc("appshell", "Main toolbar") + " " + navPanel.directionInfo
     }
 
     RadioButtonGroup {
         id: radioButtonList
         spacing: 0
 
-        model: root.items
+        model: toolBarModel
 
-        delegate: GradientTabButton {
+        width: contentItem.childrenRect.width
+        height: contentItem.childrenRect.height
+
+        delegate: PageTabButton {
             id: radioButtonDelegate
 
             ButtonGroup.group: radioButtonList.radioButtonGroup
@@ -80,15 +81,17 @@ Item {
             spacing: 0
             leftPadding: 12
 
-            navigation.name: modelData["title"]
-            navigation.panel: navCtrl
+            normalStateFont: model.isTitleBold ? ui.theme.largeBodyBoldFont : ui.theme.largeBodyFont
+
+            navigation.name: model.title
+            navigation.panel: navPanel
             navigation.order: model.index
 
-            checked: modelData["uri"] === root.currentUri
-            title: modelData["title"]
+            checked: model.uri === root.currentUri
+            title: model.title
 
             onToggled: {
-                root.selected(modelData["uri"])
+                root.selected(model.uri)
             }
         }
     }

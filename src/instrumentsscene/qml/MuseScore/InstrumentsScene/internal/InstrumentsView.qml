@@ -33,6 +33,8 @@ Item {
     property var instrumentsModel
     property alias navigation: navPanel
 
+    property alias searching: searchField.hasText
+
     signal addSelectedInstrumentsToScoreRequested()
 
     function clearSearch() {
@@ -43,23 +45,21 @@ Item {
         instrumentsView.positionViewAtIndex(instrumentIndex, ListView.Beginning)
     }
 
-    QtObject {
-        id: prv
-
-        property var currentItemNavigationIndex: []
-    }
-
     NavigationPanel {
         id: navPanel
         name: "InstrumentsView"
         direction: NavigationPanel.Vertical
-        enabled: root.visible
+        enabled: root.enabled && root.visible
 
-        onNavigationEvent: {
+        onNavigationEvent: function(event) {
             if (event.type === NavigationEvent.AboutActive) {
-                event.setData("controlIndex", prv.currentItemNavigationIndex)
-                //! NOTE If we changed family, then control with saved index maybe not
-                event.setData("controlOptional", true)
+                for (var i = 0; i < instrumentsView.count; ++i) {
+                    var item = instrumentsView.itemAtIndex(i)
+                    if (item.isSelected) {
+                        event.setData("controlIndex", [item.navigation.row, item.navigation.column])
+                        return
+                    }
+                }
             }
         }
     }
@@ -86,18 +86,12 @@ Item {
         navigation.panel: navPanel
         navigation.row: 1
 
-        onFocusChanged: {
-            if (activeFocus) {
-                prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-            }
-        }
-
         onSearchTextChanged: {
             root.instrumentsModel.setSearchText(searchText)
         }
     }
 
-    ListView {
+    StyledListView {
         id: instrumentsView
 
         anchors.top: searchField.bottom
@@ -105,15 +99,6 @@ Item {
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-
-        boundsBehavior: ListView.StopAtBounds
-        clip: true
-
-        ScrollBar.vertical: StyledScrollBar {
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.right: parent.right
-        }
 
         model: root.instrumentsModel
 
@@ -124,11 +109,6 @@ Item {
             navigation.panel: navPanel
             navigation.row: 2 + model.index
             navigation.accessible.name: itemTitleLabel.text
-
-            onNavigationActived: {
-                prv.currentItemNavigationIndex = [navigation.row, navigation.column]
-                root.instrumentsModel.selectInstrument(model.index)
-            }
 
             onNavigationTriggered: {
                 root.addSelectedInstrumentsToScoreRequested()
@@ -159,7 +139,7 @@ Item {
 
             property var itemModel: model
 
-            Dropdown {
+            StyledDropdown {
                 id: traitsBox
 
                 anchors.right: parent.right
@@ -177,8 +157,8 @@ Item {
                 model: item.itemModel.traits
                 currentIndex: item.itemModel.currentTraitIndex
 
-                onActivated: {
-                    item.itemModel.currentTraitIndex = currentIndex
+                onActivated: function(index, value) {
+                    item.itemModel.currentTraitIndex = index
                 }
             }
         }

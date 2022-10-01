@@ -32,7 +32,7 @@
 #include <set>
 #include <cassert>
 #include "async/channel.h"
-#include "retval.h"
+#include "types/retval.h"
 #include "midievent.h"
 
 namespace mu::midi {
@@ -41,19 +41,24 @@ using program_t = int32_t;
 using bank_t = int32_t;
 using tick_t = uint32_t;
 using tempo_t = uint32_t;
+using velocity_t = uint16_t;
+using note_idx_t = uint8_t;
 using TempoMap = std::map<tick_t, tempo_t>;
 using Events = std::map<tick_t, std::vector<Event> >;
 
+static constexpr int EXPRESSION_CONTROLLER = 11;
+
 struct Program {
-    channel_t channel = 0;
-    program_t program = 0;
+    Program(bank_t b, program_t p)
+        : bank(b), program(p) {}
+
     bank_t bank = 0;
+    program_t program = 0;
 
     bool operator==(const Program& other) const
     {
-        return channel == other.channel
-               && program == other.program
-               && bank == other.bank;
+        return bank == other.bank
+               && program == other.program;
     }
 };
 using Programs = std::vector<midi::Program>;
@@ -107,6 +112,8 @@ struct MidiData {
     }
 };
 
+static constexpr char NONE_DEVICE_ID[] = "-1";
+
 using MidiDeviceID = std::string;
 struct MidiDevice {
     MidiDeviceID id;
@@ -119,6 +126,30 @@ struct MidiDevice {
 };
 
 using MidiDeviceList = std::vector<MidiDevice>;
+
+inline MidiDeviceID makeUniqueDeviceId(int index, int arg1, int arg2)
+{
+    return std::to_string(index) + ":" + std::to_string(arg1) + ":" + std::to_string(arg2);
+}
+
+inline std::vector<int> splitDeviceId(const MidiDeviceID& deviceId)
+{
+    std::vector<int> result;
+
+    std::size_t current, previous = 0;
+    std::string delim = ":";
+    current = deviceId.find(delim);
+    std::size_t delimLen = delim.length();
+
+    while (current != std::string::npos) {
+        result.push_back(std::stoi(deviceId.substr(previous, current - previous)));
+        previous = current + delimLen;
+        current = deviceId.find(delim, previous);
+    }
+    result.push_back(std::stoi(deviceId.substr(previous, current - previous)));
+
+    return result;
+}
 }
 
 #endif // MU_MIDI_MIDITYPES_H

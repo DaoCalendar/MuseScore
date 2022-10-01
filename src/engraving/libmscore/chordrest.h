@@ -24,13 +24,11 @@
 #define __CHORDREST_H__
 
 #include <functional>
-#include "symbol.h"
-#include "duration.h"
-#include "beam.h"
-#include "shape.h"
-#include "measure.h"
 
-namespace Ms {
+#include "durationelement.h"
+#include "types/types.h"
+
+namespace mu::engraving {
 enum class CrossMeasure : signed char {
     UNKNOWN = -1,
     NONE = 0,
@@ -38,25 +36,24 @@ enum class CrossMeasure : signed char {
     SECOND
 };
 
-class Score;
-class Measure;
-class Tuplet;
-class Segment;
-class Slur;
 class Articulation;
 class Lyrics;
+class Measure;
+class Score;
+class Segment;
+class Slur;
 class TabDurationSymbol;
-class Spanner;
 enum class SegmentType;
 
 //-------------------------------------------------------------------
 //   ChordRest
 //    Virtual base class. Chords and rests can be part of a beam
-//
 //-------------------------------------------------------------------
 
 class ChordRest : public DurationElement
 {
+    OBJECT_ALLOCATOR(engraving, ChordRest)
+
     ElementList _el;
     TDuration _durationType;
     int _staffMove;           // -1, 0, +1, used for crossbeaming
@@ -68,8 +65,9 @@ protected:
     TabDurationSymbol* _tabDur;           // stores a duration symbol in tablature staves
 
     Beam* _beam;
-    Beam::Mode _beamMode;
+    BeamMode _beamMode;
     bool _up;                             // actual stem direction
+    bool _usesAutoUp;
     bool m_isSmall;
     bool _melismaEnd;
 
@@ -85,47 +83,48 @@ public:
 
     // Score Tree functions
     virtual EngravingObject* scanParent() const override;
-    virtual EngravingObject* scanChild(int idx) const override;
-    virtual int scanChildCount() const override;
+    virtual EngravingObjectList scanChildren() const override;
+    virtual void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
 
     virtual EngravingItem* drop(EditData&) override;
     virtual void undoUnlink() override;
 
-    virtual Segment* segment() const { return (Segment*)parent(); }
+    virtual Segment* segment() const { return (Segment*)explicitParent(); }
 
     virtual void writeProperties(XmlWriter& xml) const override;
     virtual bool readProperties(XmlReader&) override;
     virtual void readAddConnector(ConnectorInfoReader* info, bool pasteMode) override;
 
-    void setBeamMode(Beam::Mode m) { _beamMode = m; }
-    void undoSetBeamMode(Beam::Mode m);
-    Beam::Mode beamMode() const { return _beamMode; }
+    void setBeamMode(BeamMode m) { _beamMode = m; }
+    void undoSetBeamMode(BeamMode m);
+    BeamMode beamMode() const { return _beamMode; }
 
     void setBeam(Beam* b);
-    virtual Beam* beam() const final { return !(measure() && measure()->stemless(staffIdx())) ? _beam : nullptr; }
+    virtual Beam* beam() const final;
     int beams() const { return _durationType.hooks(); }
-    virtual qreal upPos()   const = 0;
-    virtual qreal downPos() const = 0;
+    virtual double upPos()   const = 0;
+    virtual double downPos() const = 0;
 
     int line(bool up) const { return up ? upLine() : downLine(); }
     int line() const { return _up ? upLine() : downLine(); }
     virtual int upLine() const = 0;
     virtual int downLine() const = 0;
     virtual mu::PointF stemPos() const = 0;
-    virtual qreal stemPosX() const = 0;
+    virtual double stemPosX() const = 0;
     virtual mu::PointF stemPosBeam() const = 0;
-    virtual qreal rightEdge() const = 0;
+    virtual double rightEdge() const = 0;
 
-    bool up() const { return _up; }
     void setUp(bool val) { _up = val; }
+    bool up() const { return _up; }
+    bool usesAutoUp() const { return _usesAutoUp; }
 
     bool isSmall() const { return m_isSmall; }
-    void setSmall(bool val);
+    void setSmall(bool val) { m_isSmall = val; }
     void undoSetSmall(bool val);
 
     int staffMove() const { return _staffMove; }
     void setStaffMove(int val) { _staffMove = val; }
-    virtual int vStaffIdx() const override { return staffIdx() + _staffMove; }
+    staff_idx_t vStaffIdx() const override { return staffIdx() + _staffMove; }
 
     const TDuration durationType() const
     {
@@ -134,8 +133,7 @@ public:
     }
 
     const TDuration actualDurationType() const { return _durationType; }
-    void setDurationType(TDuration::DurationType t);
-    void setDurationType(const QString& s);
+    void setDurationType(DurationType t);
     void setDurationType(const Fraction& ticks);
     void setDurationType(TDuration v);
     void setDots(int n) { _durationType.setDots(n); }
@@ -146,19 +144,19 @@ public:
     }
 
     int actualDots() const { return _durationType.dots(); }
-    Fraction durationTypeTicks()
+    Fraction durationTypeTicks() const
     {
         return _crossMeasure == CrossMeasure::FIRST ? _crossMeasureTDur.ticks() : _durationType.ticks();
     }
 
-    QString durationUserName() const;
+    String durationUserName() const;
 
-    virtual void setTrack(int val) override;
+    void setTrack(track_idx_t val) override;
 
     const std::vector<Lyrics*>& lyrics() const { return _lyrics; }
     std::vector<Lyrics*>& lyrics() { return _lyrics; }
-    Lyrics* lyrics(int verse, Placement) const;
-    int lastVerse(Placement) const;
+    Lyrics* lyrics(int verse, PlacementV) const;
+    int lastVerse(PlacementV) const;
     bool isMelismaEnd() const;
     void setMelismaEnd(bool v);
 
@@ -180,10 +178,10 @@ public:
     TDuration crossMeasureDurationType() const { return _crossMeasureTDur; }
     void setCrossMeasureDurationType(TDuration v) { _crossMeasureTDur = v; }
 
-    virtual void localSpatiumChanged(qreal oldValue, qreal newValue) override;
-    virtual QVariant getProperty(Pid propertyId) const override;
-    virtual bool setProperty(Pid propertyId, const QVariant&) override;
-    virtual QVariant propertyDefault(Pid) const override;
+    void localSpatiumChanged(double oldValue, double newValue) override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
     bool isGrace() const;
     bool isGraceBefore() const;
     bool isGraceAfter() const;
@@ -191,7 +189,7 @@ public:
     void writeBeam(XmlWriter& xml) const;
     Segment* nextSegmentAfterCR(SegmentType types) const;
 
-    virtual void setScore(Score* s) override;
+    void setScore(Score* s) override;
     EngravingItem* nextArticulationOrLyric(EngravingItem* e);
     EngravingItem* prevArticulationOrLyric(EngravingItem* e);
     virtual EngravingItem* nextElement() override;
@@ -199,16 +197,16 @@ public:
     EngravingItem* lastElementBeforeSegment();
     virtual EngravingItem* nextSegmentElement() override;
     virtual EngravingItem* prevSegmentElement() override;
-    virtual QString accessibleExtraInfo() const override;
+    virtual String accessibleExtraInfo() const override;
     virtual Shape shape() const override;
-    virtual void computeUp() { _up = true; }
+    virtual void computeUp() { _usesAutoUp = false; _up = true; }
 
-    bool isFullMeasureRest() const { return _durationType == TDuration::DurationType::V_MEASURE; }
+    bool isFullMeasureRest() const { return _durationType == DurationType::V_MEASURE; }
     virtual void removeMarkings(bool keepTremolo = false);
 
     bool isBefore(const ChordRest*) const;
 
     void undoAddAnnotation(EngravingItem*);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

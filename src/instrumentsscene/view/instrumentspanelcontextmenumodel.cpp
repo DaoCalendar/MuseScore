@@ -22,15 +22,16 @@
 
 #include "instrumentspanelcontextmenumodel.h"
 
-#include "log.h"
-#include "translation.h"
-
 #include "actions/actiontypes.h"
+#include "types/translatablestring.h"
+
+#include "log.h"
 
 using namespace mu::context;
 using namespace mu::instrumentsscene;
 using namespace mu::notation;
 using namespace mu::ui;
+using namespace mu::uicomponents;
 using namespace mu::actions;
 
 static const ActionCode SET_INSTRUMENTS_ORDER_CODE("set-instruments-order");
@@ -73,28 +74,55 @@ void InstrumentsPanelContextMenuModel::loadItems()
     ScoreOrder currentOrder = m_masterNotation->parts()->scoreOrder();
     m_orders = instrumentsRepository()->orders();
 
-    if (!m_orders.contains(currentOrder)) {
-        m_orders.append(currentOrder);
+    const ScoreOrder& custom = customOrder();
+    if (m_orders.empty() || !mu::contains(m_orders, custom)) {
+        m_orders.push_back(custom);
     }
+
+    if (!mu::contains(m_orders, currentOrder)) {
+        currentOrder.customized = false;
+        m_orders.push_back(currentOrder);
+    }
+
+    buildMenu();
+}
+
+void InstrumentsPanelContextMenuModel::buildMenu()
+{
+    ScoreOrder currentOrder = m_masterNotation->parts()->scoreOrder();
 
     MenuItemList orderItems;
 
+    auto createNewItem = [currentOrder, this](const ScoreOrder& order, bool customized) {
+        MenuItem* orderItem = new MenuItem(this);
+        orderItem->setId(order.id);
+
+        UiAction action;
+        action.title = order.getName();
+        action.code = SET_INSTRUMENTS_ORDER_CODE;
+        action.checkable = Checkable::Yes;
+        orderItem->setAction(action);
+
+        UiActionState state;
+        state.enabled = true;
+        state.checked = !customized && currentOrder.id == order.id;
+        orderItem->setState(state);
+
+        orderItem->setArgs(ActionData::make_arg1<QString>(order.id));
+
+        return orderItem;
+    };
+
     for (const ScoreOrder& order : m_orders) {
-        MenuItem orderItem;
+        orderItems << createNewItem(order, currentOrder.customized);
 
-        orderItem.id = order.id;
-        orderItem.title = order.name;
-        orderItem.code = SET_INSTRUMENTS_ORDER_CODE;
-        orderItem.checkable = Checkable::Yes;
-        orderItem.state.enabled = true;
-        orderItem.state.checked = currentOrder.id == order.id;
-        orderItem.args = ActionData::make_arg1<QString>(order.id);
-
-        orderItems << orderItem;
+        if (currentOrder.customized && (currentOrder.id == order.id)) {
+            orderItems << createNewItem(currentOrder, false);
+        }
     }
 
     MenuItemList items {
-        makeMenu(qtrc("instruments", "Instrument ordering"), orderItems, true /*enabled*/, ORDERING_MENU_ID)
+        makeMenu(TranslatableString("instruments", "Instrument ordering"), orderItems, ORDERING_MENU_ID)
     };
 
     setItems(items);
@@ -106,7 +134,7 @@ void InstrumentsPanelContextMenuModel::setInstrumentsOrder(const actions::Action
         return;
     }
 
-    QString newOrderId = args.arg<QString>(0);
+    String newOrderId = String::fromQString(args.arg<QString>(0));
 
     for (const ScoreOrder& order : m_orders) {
         if (order.id == newOrderId) {
@@ -122,9 +150,9 @@ void InstrumentsPanelContextMenuModel::updateOrderingMenu(const QString& newOrde
 {
     MenuItem& orderingMenu = findMenu(ORDERING_MENU_ID);
 
-    for (MenuItem& item : orderingMenu.subitems) {
-        item.state.checked = item.id == newOrderId;
+    for (MenuItem* item : orderingMenu.subitems()) {
+        UiActionState state = item->state();
+        state.checked = item->id() == newOrderId;
+        item->setState(state);
     }
-
-    emit itemChanged(orderingMenu);
 }

@@ -23,7 +23,7 @@
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle">Title</metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -79,12 +79,12 @@
         <linkedMain/>
         <Text>
           <linkedMain/>
-          <style>Title</style>
+          <style>title</style>
           <text>Title</text>
           </Text>
         <Text>
           <linkedMain/>
-          <style>Composer</style>
+          <style>composer</style>
           <text>Composer</text>
           </Text>
         </VBox>
@@ -349,7 +349,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>quarter</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -382,7 +382,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>quarter</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -396,8 +396,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-9</l1>
-            <l2>-9</l2>
+            <l1>-16</l1>
+            <l2>-16</l2>
             </Beam>
           <Chord>
             <linkedMain/>
@@ -454,7 +454,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>quarter</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -502,7 +502,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>quarter</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -525,8 +525,8 @@
             <durationType>quarter</durationType>
             </Rest>
           <Beam>
-            <l1>20</l1>
-            <l2>24</l2>
+            <l1>38</l1>
+            <l2>44</l2>
             </Beam>
           <Chord>
             <linkedMain/>
@@ -569,7 +569,7 @@
       <showFrames>1</showFrames>
       <showMargins>0</showMargins>
       <metaTag name="partName">Piano</metaTag>
-      <Part>
+      <Part id="1">
         <Staff id="1">
           <linkedTo>1</linkedTo>
           <StaffType group="pitched">
@@ -628,17 +628,17 @@
           <Text>
             <linked>
               </linked>
-            <style>Title</style>
+            <style>title</style>
             <text>Title</text>
             </Text>
           <Text>
             <linked>
               </linked>
-            <style>Composer</style>
+            <style>composer</style>
             <text>Composer</text>
             </Text>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>Piano</text>
             </Text>
           </VBox>
@@ -951,7 +951,7 @@
               <actualNotes>3</actualNotes>
               <baseNote>quarter</baseNote>
               <Number>
-                <style>Tuplet</style>
+                <style>tuplet</style>
                 <text>3</text>
                 </Number>
               </Tuplet>
@@ -990,7 +990,7 @@
               <actualNotes>3</actualNotes>
               <baseNote>quarter</baseNote>
               <Number>
-                <style>Tuplet</style>
+                <style>tuplet</style>
                 <text>3</text>
                 </Number>
               </Tuplet>
@@ -1006,8 +1006,8 @@
                 </Note>
               </Chord>
             <Beam>
-              <l1>-9</l1>
-              <l2>-9</l2>
+              <l1>-16</l1>
+              <l2>-16</l2>
               </Beam>
             <Chord>
               <linked>
@@ -1075,7 +1075,7 @@
               <actualNotes>3</actualNotes>
               <baseNote>quarter</baseNote>
               <Number>
-                <style>Tuplet</style>
+                <style>tuplet</style>
                 <text>3</text>
                 </Number>
               </Tuplet>
@@ -1132,7 +1132,7 @@
               <actualNotes>3</actualNotes>
               <baseNote>quarter</baseNote>
               <Number>
-                <style>Tuplet</style>
+                <style>tuplet</style>
                 <text>3</text>
                 </Number>
               </Tuplet>
@@ -1159,8 +1159,8 @@
               <durationType>quarter</durationType>
               </Rest>
             <Beam>
-              <l1>20</l1>
-              <l2>24</l2>
+              <l1>38</l1>
+              <l2>44</l2>
               </Beam>
             <Chord>
               <linked>

@@ -23,31 +23,39 @@
 #ifndef __FINGERING_H__
 #define __FINGERING_H__
 
-#include "text.h"
+#include "textbase.h"
 
-namespace Ms {
+#include "types/types.h"
+
+namespace mu::engraving {
+class Note;
+
 //---------------------------------------------------------
 //   @@ Fingering
 //---------------------------------------------------------
 
 class Fingering final : public TextBase
 {
+    OBJECT_ALLOCATOR(engraving, Fingering)
 public:
-    Fingering(Note* parent, Tid tid, ElementFlags ef = ElementFlag::HAS_TAG);
+    Fingering(Note* parent, TextStyleType tid, ElementFlags ef = ElementFlag::HAS_TAG);
     Fingering(Note* parent, ElementFlags ef = ElementFlag::HAS_TAG);
 
     Fingering* clone() const override { return new Fingering(*this); }
 
-    Note* note() const { return toNote(parent()); }
+    Note* note() const { return toNote(explicitParent()); }
     ElementType layoutType();
-    Placement calculatePlacement() const;
+    PlacementV calculatePlacement() const;
 
     void draw(mu::draw::Painter*) const override;
     void layout() override;
 
-    QVariant propertyDefault(Pid id) const override;
+    bool isEditAllowed(EditData&) const override;
+    bool edit(EditData&) override;
 
-    QString accessibleInfo() const override;
+    PropertyValue propertyDefault(Pid id) const override;
+
+    String accessibleInfo() const override;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

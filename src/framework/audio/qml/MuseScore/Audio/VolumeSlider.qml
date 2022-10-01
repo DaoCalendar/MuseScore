@@ -23,12 +23,16 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
+import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 
 Slider {
     id: root
 
     property real volumeLevel: 0.0
+    property real readableVolumeLevel: Math.round(root.volumeLevel * 10) / 10
+
+    property alias navigation: navCtrl
 
     signal volumeLevelMoved(var level)
 
@@ -41,6 +45,9 @@ Slider {
     stepSize: 0.1
     orientation: Qt.Vertical
     wheelEnabled: true
+
+    signal increaseRequested()
+    signal decreaseRequested()
 
     QtObject {
         id: convertor
@@ -80,7 +87,7 @@ Slider {
         id: prv
 
         readonly property real rulerLineWidth: 2
-        readonly property real rulerLineHeight: root.height - prv.handleHeight 
+        readonly property real rulerLineHeight: root.height - prv.handleHeight
 
         // value ranges
         readonly property real lowAccuracyEdge: -12
@@ -93,7 +100,7 @@ Slider {
         readonly property int fullValueRangeLength: Math.abs(root.from) + Math.abs(root.to)
 
         readonly property real unitsTextWidth: 12
-        readonly property color unitTextColor: ui.theme.fontPrimaryColor
+        readonly property color unitTextColor: Utils.colorWithAlpha(ui.theme.fontPrimaryColor, 0.8)
         readonly property string unitTextFont: {
             var pxSize = String('8px')
             var family = String('\'' + ui.theme.bodyFont.family + '\'')
@@ -118,6 +125,35 @@ Slider {
 
         readonly property real handleWidth: 16
         readonly property real handleHeight: 32
+
+        property real dragStartOffset: 0.0
+    }
+
+    NavigationControl {
+        id: navCtrl
+        name: root.objectName != "" ? root.objectName : "VolumeSlider"
+        enabled: root.enabled && root.visible
+
+        accessible.role: MUAccessible.Range
+        accessible.visualItem: root
+
+        accessible.value: root.readableVolumeLevel
+        accessible.minimumValue: root.from
+        accessible.maximumValue: root.to
+        accessible.stepSize: root.stepSize
+
+        onNavigationEvent: function(event) {
+            switch(event.type) {
+            case NavigationEvent.Left:
+                root.decreaseRequested()
+                event.accepted = true
+                break
+            case NavigationEvent.Right:
+                root.increaseRequested()
+                event.accepted = true
+                break
+            }
+        }
     }
 
     background: Canvas {
@@ -125,6 +161,10 @@ Slider {
 
         height: root.height
         width: root.width
+
+        NavigationFocusBorder {
+            navigationCtrl: navCtrl
+        }
 
         function drawRuler(ctx, originVPos, originHPos, fullStep, smallStep, strokeHeight, strokeWidth) {
             var currentStrokeVPos = 0
@@ -138,7 +178,7 @@ Slider {
                     division = prv.highAccuracyDivisionPixels
                 }
 
-                if (i == 0) {
+                if (i === 0) {
                     currentStrokeVPos = originVPos
                 } else {
                     currentStrokeVPos += division * smallStep
@@ -159,11 +199,13 @@ Slider {
                                  prv.longStrokeHeight,
                                  prv.longStrokeWidth)
 
+                    let textHPos = originHPos - prv.longStrokeWidth - prv.strokeHorizontalMargin
+
                     ctx.save()
 
                     ctx.rotate(Math.PI/2)
                     ctx.fillStyle = prv.unitTextColor
-                    ctx.fillText(textByDbValue(root.from + i), prv.unitsTextWidth + prv.unitsTextWidth/2, -currentStrokeVPos + 2)
+                    ctx.fillText(textByDbValue(root.from + i), textHPos, -currentStrokeVPos + 2)
 
                     ctx.restore()
                 }
@@ -190,7 +232,7 @@ Slider {
                 ctx.textAlign = "end"
             }
 
-            ctx.clearRect(0, 0, bgCanvas.width, bgCanvas.height)
+            ctx.clearRect(0, 0, bgCanvas.height, bgCanvas.width)
             ctx.font = prv.unitTextFont
 
             ctx.fillStyle = Utils.colorWithAlpha(ui.theme.fontPrimaryColor, 0.5)
@@ -206,39 +248,82 @@ Slider {
         }
     }
 
-    handle: Rectangle {
-        id: handleItem
-
+    handle: Item {
         x: root.width - prv.handleWidth
         y: (1 - root.position) * prv.rulerLineHeight
         implicitWidth: prv.handleWidth
         implicitHeight: prv.handleHeight
-        radius: 2
-        color: "white"
+
+        MouseArea {
+            anchors.fill: parent
+
+            onDoubleClicked: {
+                // Double click resets the volume
+                root.volumeLevelMoved(0.0)
+            }
+
+            // The MouseArea steals mouse press events from the slider.
+            // There is really no way to prevent that.
+            // (if you set mouse.accepted to false in the onPressed handler,
+            // the MouseArea won't receive doubleClick events).
+            // So we use this workaround.
+
+            preventStealing: true // Don't let a Flickable steal the mouse
+
+            onPressed: function(mouse) {
+                prv.dragStartOffset = mouse.y
+            }
+
+            onPositionChanged: function(mouse)  {
+                let mousePosInRoot = mapToItem(root, 0, mouse.y - prv.dragStartOffset).y
+                let newPosZeroToOne = 1 - mousePosInRoot / prv.rulerLineHeight
+                let newPosClamped = Math.max(0.0, Math.min(newPosZeroToOne, 1.0))
+                let localNewValue = root.valueAt(newPosClamped)
+                let logicalNewValue = convertor.volumeLevelFromLocal(localNewValue)
+                root.volumeLevelMoved(logicalNewValue)
+            }
+        }
+
+        StyledDropShadow {
+            anchors.fill: handleRect
+            source: handleRect
+            color: "#33000000"
+            radius: 4
+            verticalOffset: 2
+        }
 
         Rectangle {
+            id: handleRect
             anchors.fill: parent
             radius: 2
-
-            color: Utils.colorWithAlpha(ui.theme.popupBackgroundColor, 0.1)
-            border.color: Qt.rgba(0, 0, 0, 0.7)
-            border.width: 1
+            color: "white"
 
             Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: 3
-                anchors.rightMargin: 3
+                anchors.fill: parent
+                radius: 2
 
-                height: 1
-                radius: height / 2
-                color: "#000000"
+                color: Utils.colorWithAlpha(ui.theme.popupBackgroundColor, 0.1)
+                border.color: Qt.rgba(0, 0, 0, 0.7)
+                border.width: 1
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 3
+                    anchors.rightMargin: 3
+
+                    height: 1
+                    radius: height / 2
+                    color: "#000000"
+                }
             }
         }
     }
 
     onMoved: {
+        navigation.requestActiveByInteraction()
+
         var newLevel = convertor.volumeLevelFromLocal(value)
         root.volumeLevelMoved(newLevel)
     }

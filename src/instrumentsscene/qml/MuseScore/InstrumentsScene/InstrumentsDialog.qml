@@ -36,11 +36,25 @@ StyledDialogView {
     contentWidth: root.canSelectMultipleInstruments ? 900 : 600
     margins: 12
 
-    title: canSelectMultipleInstruments ? qsTrc("instruments", "Instruments") :
+    title: canSelectMultipleInstruments ? qsTrc("instruments", "Add or remove instruments") :
                                           qsTrc("instruments", "Select instrument")
+
+    onOpened: {
+        instrumentsPage.focusOnFirst()
+    }
+
+    function submit() {
+        var result = {}
+        result["instruments"] = instrumentsPage.instruments()
+        result["scoreOrder"] = instrumentsPage.currentOrder()
+
+        root.ret = { errcode: 0, value: result }
+        root.hide()
+    }
 
     ColumnLayout {
         anchors.fill: parent
+        spacing: 20
 
         ChooseInstrumentsPage {
             id: instrumentsPage
@@ -50,14 +64,45 @@ StyledDialogView {
 
             canSelectMultipleInstruments: root.canSelectMultipleInstruments
             currentInstrumentId: root.currentInstrumentId
+
+            navigationSection: root.navigationSection
+
+            onSubmitRequested: {
+                root.submit()
+            }
         }
 
-        Row {
-            Layout.alignment: Qt.AlignTrailing
-            spacing: 8
+        RowLayout {
+            spacing: 12
+
+            NavigationPanel {
+                id: navBottomPanel
+
+                name: "BottomPanel"
+                section: root.navigationSection
+                order: 100
+                direction: NavigationPanel.Horizontal
+            }
+
+            StyledTextLabel {
+                id: descriptionLabel
+                text: instrumentsPage.description
+
+                Layout.fillWidth: true
+                Layout.maximumHeight: okButton.height
+
+                font: ui.theme.bodyFont
+                opacity: 0.7
+                horizontalAlignment: Text.AlignLeft
+                wrapMode: Text.Wrap
+            }
 
             FlatButton {
                 text: qsTrc("global", "Cancel")
+
+                navigation.name: "Cancel"
+                navigation.panel: navBottomPanel
+                navigation.column: 1
 
                 onClicked: {
                     root.reject()
@@ -65,16 +110,16 @@ StyledDialogView {
             }
 
             FlatButton {
+                id: okButton
                 text: qsTrc("global", "OK")
                 enabled: instrumentsPage.hasSelectedInstruments
 
-                onClicked: {
-                    var result = {}
-                    result["instruments"] = instrumentsPage.instruments()
-                    result["scoreOrder"] = instrumentsPage.currentOrder()
+                navigation.name: "OK"
+                navigation.panel: navBottomPanel
+                navigation.column: 2
 
-                    root.ret = { errcode: 0, value: result }
-                    root.hide()
+                onClicked: {
+                    root.submit()
                 }
             }
         }

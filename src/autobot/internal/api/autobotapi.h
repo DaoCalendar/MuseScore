@@ -23,59 +23,57 @@
 #define MU_API_AUTOBOTAPI_H
 
 #include <QJSValue>
-#include <QEventLoop>
 
 #include "apiobject.h"
 #include "async/asyncable.h"
 
 #include "modularity/ioc.h"
 #include "project/iprojectfilescontroller.h"
+#include "autobot/iautobot.h"
 #include "autobot/iautobotconfiguration.h"
-#include "iinteractive.h"
+#include "global/iinteractive.h"
+#include "io/ifilesystem.h"
+#include "ui/imainwindow.h"
 
 namespace mu::api {
 class AutobotApi : public ApiObject, public async::Asyncable
 {
     Q_OBJECT
 
+    INJECT(api, autobot::IAutobot, autobot)
     INJECT(api, autobot::IAutobotConfiguration, autobotConfiguration)
     INJECT(api, project::IProjectFilesController, projectFilesController)
     INJECT(api, framework::IInteractive, interactive)
+    INJECT(api, io::IFileSystem, fileSystem)
+    INJECT(api, ui::IMainWindow, mainWindow)
 
 public:
     explicit AutobotApi(IApiEngine* e);
 
     Q_INVOKABLE void setInterval(int msec);
     Q_INVOKABLE void runTestCase(const QJSValue& testCase);
+    Q_INVOKABLE bool pause(bool immediately = false);
+    Q_INVOKABLE bool confirm(const QString& msg);
+    Q_INVOKABLE void abort();
+    Q_INVOKABLE void error(const QString& msg); //! TODO At the moment same as fatal, but should be not fatal error
+    Q_INVOKABLE void fatal(const QString& msg);
 
     Q_INVOKABLE bool openProject(const QString& name);
     Q_INVOKABLE void saveProject(const QString& name = QString());
 
-    Q_INVOKABLE void abort();
-    Q_INVOKABLE bool pause();
-    Q_INVOKABLE void sleep(int msec = -1) const;
-    Q_INVOKABLE void waitPopup() const;
-    Q_INVOKABLE void seeChanges(int msec = 300);
+    // Helpers
+    Q_INVOKABLE void sleep(int msec = -1);
+    Q_INVOKABLE void waitPopup();
+    Q_INVOKABLE void seeChanges(int msec = -1);
     Q_INVOKABLE void async(const QJSValue& func, const QJSValueList& args = QJSValueList());
     Q_INVOKABLE int randomInt(int min, int max) const;
+    Q_INVOKABLE int fileSize(const QString& path) const;
 
-private:
+    // Interactive
+    Q_INVOKABLE QString selectedFilePath() const;
 
-    struct TestCase
-    {
-        QJSValue testCase;
-        QJSValue steps;
-        int stepsCount = 0;
-        int currentStepIdx = -1;
-        int finishedCount = 0;
-        QEventLoop loop;
-    };
-
-    void nextStep();
-
-    int m_intervalMsec = 1000;
-    TestCase m_testCase;
-    bool m_abort = false;
+    // Window
+    Q_INVOKABLE void showMainWindowOnFront();
 };
 }
 

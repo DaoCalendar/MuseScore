@@ -26,7 +26,7 @@
 
 #include "igetscore.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
 }
 
@@ -36,41 +36,37 @@ class NotationSelectionRange : public INotationSelectionRange
 public:
     NotationSelectionRange(IGetScore* getScore);
 
-    int startStaffIndex() const override;
+    engraving::staff_idx_t startStaffIndex() const override;
     Fraction startTick() const override;
 
-    int endStaffIndex() const override;
+    engraving::staff_idx_t endStaffIndex() const override;
     Fraction endTick() const override;
 
-    int startMeasureIndex() const override;
-    int endMeasureIndex() const override;
+    MeasureRange measureRange() const override;
+
+    std::vector<const Part*> selectedParts() const override;
 
     std::vector<RectF> boundingArea() const override;
     bool containsPoint(const PointF& point) const override;
 
 private:
-    Ms::Score* score() const;
+    mu::engraving::Score* score() const;
 
-    Ms::Segment* rangeStartSegment() const;
-    Ms::Segment* rangeEndSegment() const;
+    mu::engraving::Segment* rangeStartSegment() const;
+    mu::engraving::Segment* rangeEndSegment() const;
 
     int selectionLastVisibleStaff() const;
 
     struct RangeSection {
-        const Ms::System* system = nullptr;
-        const Ms::Segment* startSegment = nullptr;
-        const Ms::Segment* endSegment = nullptr;
+        const mu::engraving::System* system = nullptr;
+        const mu::engraving::Segment* startSegment = nullptr;
+        const mu::engraving::Segment* endSegment = nullptr;
     };
-    std::vector<RangeSection> splitRangeBySections(const Ms::Segment* rangeStartSegment, const Ms::Segment* rangeEndSegment) const;
+    std::vector<RangeSection> splitRangeBySections(const mu::engraving::Segment* rangeStartSegment,
+                                                   const mu::engraving::Segment* rangeEndSegment) const;
 
     int sectionElementsMaxY(const RangeSection& selection) const;
     int sectionElementsMinY(const RangeSection& selection) const;
-
-    struct MeasureRange {
-        int startIndex = 0;
-        int endIndex = 0;
-    };
-    MeasureRange measureRange() const;
 
     IGetScore* m_getScore = nullptr;
 };

@@ -35,12 +35,12 @@ class SvgWriter : public AbstractImageWriter
 
 public:
     std::vector<project::INotationWriter::UnitType> supportedUnitTypes() const override;
-    Ret write(notation::INotationPtr notation, io::Device& destinationDevice, const Options& options = Options()) override;
+    Ret write(notation::INotationPtr notation, QIODevice& destinationDevice, const Options& options = Options()) override;
 
 private:
-    using NotesColors = QHash<int /* noteIndex */, QColor>;
+    using BeatsColors = QHash<int /* beatIndex */, QColor>;
 
-    NotesColors parseNotesColors(const QVariant& obj) const;
+    BeatsColors parseBeatsColors(const QVariant& obj) const;
 };
 }
 

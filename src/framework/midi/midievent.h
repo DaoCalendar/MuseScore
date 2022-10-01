@@ -133,10 +133,23 @@ struct Event {
         return 0;
     }
 
+    static Event fromRawData(const uint32_t* data, size_t count)
+    {
+        Event e;
+        size_t numBytes = std::min(count, e.m_data.size()) * sizeof(uint32_t);
+        memcpy(e.m_data.data(), data, numBytes);
+        return e;
+    }
+
     bool operator ==(const Event& other) const { return m_data == other.m_data; }
     bool operator !=(const Event& other) const { return !operator==(other); }
     operator bool() const {
         return operator!=(NOOP()) && isValid();
+    }
+
+    bool operator <(const Event& other) const
+    {
+        return m_data < other.m_data;
     }
 
     bool isChannelVoice() const { return messageType() == MessageType::ChannelVoice10 || messageType() == MessageType::ChannelVoice20; }
@@ -271,7 +284,7 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return attribute() >> 9;
+            return static_cast<uint8_t>(attribute() >> 9);
         }
         return note();
     }
@@ -281,7 +294,7 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (attributeType() == AttributeType::Pitch) {
-            return (attribute() & 0x1FF) / static_cast<float>(0x200);
+            return static_cast<float>((attribute() & 0x1FF) / static_cast<float>(0x200));
         }
         return 0.f;
     }
@@ -309,7 +322,7 @@ struct Event {
     {
         assertOpcode({ Opcode::NoteOn, Opcode::NoteOff });
         if (messageType() == MessageType::ChannelVoice20) {
-            return m_data[1] >> 16;
+            return static_cast<uint16_t>(m_data[1] >> 16);
         }
         return m_data[0] & 0x7F;
     }
@@ -442,6 +455,11 @@ struct Event {
             break;
         default: assert(false);
         }
+    }
+
+    const uint32_t* rawData() const
+    {
+        return m_data.data();
     }
 
     /*! return signed value:
@@ -629,9 +647,9 @@ struct Event {
     }
 
     //!convert ChannelVoice from MIDI2.0 to MIDI1.0
-    std::list<Event> toMIDI10() const
+    std::vector<Event> toMIDI10() const
     {
-        std::list<Event> events;
+        std::vector<Event> events;
         switch (messageType()) {
         case MessageType::ChannelVoice10: events.push_back(*this);
             break;
@@ -647,7 +665,7 @@ struct Event {
                 auto v = scaleDown(velocity(), 16, 7);
                 e.setNote(note());
                 if (v != 0) {
-                    e.setVelocity(v);
+                    e.setVelocity(static_cast<uint16_t>(v));
                 } else {
                     //4.2.2 velocity comment
                     e.setVelocity(1);
@@ -667,7 +685,7 @@ struct Event {
             //D2.3
             case Opcode::AssignableController:
             case Opcode::RegisteredController: {
-                std::list<std::pair<uint8_t, uint8_t> > controlChanges = {
+                std::vector<std::pair<uint8_t, uint8_t> > controlChanges = {
                     { (opcode() == Opcode::RegisteredController ? 101 : 99), bank() },
                     { (opcode() == Opcode::RegisteredController ? 100 : 98), index() },
                     { 6,  (data() & 0x7FFFFFFF) >> 24 },
@@ -736,7 +754,7 @@ struct Event {
             case Opcode::NoteOn:
             case Opcode::NoteOff:
                 event.setNote(note());
-                event.setVelocity(scaleUp(velocity(), 7, 16));
+                event.setVelocity(static_cast<uint16_t>(scaleUp(velocity(), 7, 16)));
                 if (velocity() == 0) {
                     event.setOpcode(Opcode::NoteOff);
                 }
@@ -755,15 +773,15 @@ struct Event {
                 switch (index()) {
                 case 99:
                     event.setOpcode(Opcode::AssignableController);
-                    event.setBank(data());
+                    event.setBank(static_cast<uint16_t>(data()));
                     break;
                 case 101:
                     event.setOpcode(Opcode::RegisteredController);
-                    event.setBank(data());
+                    event.setBank(static_cast<uint16_t>(data()));
                     break;
                 case 98:
                 case 100:
-                    event.setIndex(data());
+                    event.setIndex(static_cast<uint8_t>(data()));
                     break;
                 case 6:
                     event.m_data[0] &= 0x1FFFFFF;
@@ -943,7 +961,7 @@ struct Event {
             dataToStr();
             break;
         case MessageType::SystemExclusiveData:
-            str += "MIDI System Exlusive";
+            str += "MIDI System Exclusive";
             dataToStr();
             break;
         case MessageType::Data:

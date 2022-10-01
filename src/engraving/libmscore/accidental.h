@@ -28,30 +28,16 @@
  Definition of class Accidental
 */
 
-#include <QString>
-#include <QList>
-#include <QVariant>
+#include <vector>
 
-#include "config.h"
 #include "engravingitem.h"
-#include "symid.h"
+
+#include "types.h"
 
 namespace mu::engraving {
 class Factory;
-}
-
-namespace Ms {
 class Note;
 enum class AccidentalVal : signed char;
-
-//---------------------------------------------------------
-//   AccidentalRole
-//---------------------------------------------------------
-
-enum class AccidentalRole : char {
-    AUTO,                 // layout created accidental
-    USER                  // user created accidental
-};
 
 //---------------------------------------------------------
 //   AccidentalBracket
@@ -61,7 +47,7 @@ enum class AccidentalBracket : char {
     NONE,
     PARENTHESIS,
     BRACKET,
-    BRACE,
+    BRACE, //! Deprecated; removed from the UI and kept here only for compatibility purposes
 };
 
 //---------------------------------------------------------
@@ -70,9 +56,9 @@ enum class AccidentalBracket : char {
 
 struct SymElement {
     SymId sym;
-    qreal x;
-    qreal y;
-    SymElement(SymId _sym, qreal _x, qreal _y)
+    double x;
+    double y;
+    SymElement(SymId _sym, double _x, double _y)
         : sym(_sym), x(_x), y(_y) {}
 };
 
@@ -84,13 +70,15 @@ struct SymElement {
 
 class Accidental final : public EngravingItem
 {
-    QList<SymElement> el;
+    OBJECT_ALLOCATOR(engraving, Accidental)
+
+    std::vector<SymElement> el;
     AccidentalType _accidentalType { AccidentalType::NONE };
     bool m_isSmall                    { false };
     AccidentalBracket _bracket     { AccidentalBracket::NONE };
     AccidentalRole _role           { AccidentalRole::AUTO };
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
 
     Accidental(EngravingItem* parent);
 
@@ -100,18 +88,15 @@ public:
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
 
-    QString subtypeUserName() const;
-    void setSubtype(const QString& s);
+    TranslatableString subtypeUserName() const override;
+    void setSubtype(const AsciiStringView& s);
     void setAccidentalType(AccidentalType t) { _accidentalType = t; }
 
     AccidentalType accidentalType() const { return _accidentalType; }
     AccidentalRole role() const { return _role; }
 
     int subtype() const override { return (int)_accidentalType; }
-    QString subtypeName() const override { return QString(subtype2name(_accidentalType)); }
 
     bool acceptDrop(EditData&) const override;
     EngravingItem* drop(EditData&) override;
@@ -123,7 +108,7 @@ public:
     void startEdit(EditData&) override { setGenerated(false); }
 
     SymId symbol() const;
-    Note* note() const { return (parent() && parent()->isNote()) ? toNote(parent()) : 0; }
+    Note* note() const { return (explicitParent() && explicitParent()->isNote()) ? toNote(explicitParent()) : 0; }
 
     AccidentalBracket bracket() const { return _bracket; }
     void setBracket(AccidentalBracket val) { _bracket = val; }
@@ -138,25 +123,21 @@ public:
     void read(XmlReader&) override;
     void write(XmlWriter& xml) const override;
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid propertyId) const override;
-    Pid propertyId(const QStringRef& xmlName) const override;
-    QString propertyUserValue(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid propertyId) const override;
 
     static AccidentalVal subtype2value(AccidentalType);               // return effective pitch offset
     static SymId subtype2symbol(AccidentalType);
-    static const char* subtype2name(AccidentalType);
+    static mu::AsciiStringView subtype2name(AccidentalType);
     static AccidentalType value2subtype(AccidentalVal);
-    static AccidentalType name2subtype(const QString&);
+    static AccidentalType name2subtype(const mu::AsciiStringView&);
     static bool isMicrotonal(AccidentalType t) { return t > AccidentalType::FLAT3; }
 
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 };
 
 extern AccidentalVal sym2accidentalVal(SymId id);
-}     // namespace Ms
-
-Q_DECLARE_METATYPE(Ms::AccidentalRole);
+} // namespace mu::engraving
 
 #endif

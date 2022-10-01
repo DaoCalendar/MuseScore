@@ -20,18 +20,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
+
 import MuseScore.Ui 1.0
 import MuseScore.NotationScene 1.0
 import MuseScore.UiComponents 1.0
 
-Rectangle {
+Item {
     id: root
 
     property alias navigation: keynavSub
 
     signal activeFocusRequested()
 
-    color: ui.theme.backgroundPrimaryColor
+    width: view.width
+    height: view.height
 
     Component.onCompleted: {
         toolbarModel.load()
@@ -42,7 +44,7 @@ Rectangle {
         name: "NotationToolBar"
         enabled: root.enabled && root.visible
         accessible.name: qsTrc("notation", "Notation toolbar")
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.activeFocusRequested()
                 root.forceActiveFocus()
@@ -57,8 +59,6 @@ Rectangle {
     ListView {
         id: view
 
-        anchors.verticalCenter: parent.verticalCenter
-
         width: contentWidth
         height: contentItem.childrenRect.height
 
@@ -69,27 +69,31 @@ Rectangle {
         model: toolbarModel
 
         delegate: FlatButton {
-            text: model.title
-            icon: model.icon
+            height: 30
+
+            property var item: Boolean(model) ? model.itemRole : null
+
+            text: Boolean(item) ? item.title : ""
+            icon: Boolean(item) ? item.icon : IconCode.NONE
             iconFont: ui.theme.toolbarIconsFont
 
-            toolTipTitle: model.title
-            toolTipDescription: model.description
-            toolTipShortcut: model.shortcut
+            toolTipTitle: Boolean(item) ? item.title : ""
+            toolTipDescription: Boolean(item) ? item.description : ""
+            toolTipShortcut: Boolean(item) ? item.shortcuts : ""
 
-            enabled: model.enabled
-            textFont: ui.theme.tabFont
+            enabled: Boolean(item) ? item.enabled : false
+
+            textFont: ui.theme.largeBodyFont
 
             navigation.panel: keynavSub
-            navigation.name: model.title
+            navigation.name: toolTipTitle
             navigation.order: model.index
-            navigation.enabled: model.enabled
 
             transparent: true
             orientation: Qt.Horizontal
 
             onClicked: {
-                toolbarModel.handleAction(model.code)
+                toolbarModel.handleMenuItem(item.id)
             }
         }
     }

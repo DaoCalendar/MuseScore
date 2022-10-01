@@ -24,32 +24,48 @@
 
 #include "istartupscenario.h"
 
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
 #include "iinteractive.h"
-#include "iappshellconfiguration.h"
 #include "actions/iactionsdispatcher.h"
+#include "multiinstances/imultiinstancesprovider.h"
+#include "iappshellconfiguration.h"
+#include "isessionsmanager.h"
+#include "project/iprojectautosaver.h"
 
 namespace mu::appshell {
-class StartupScenario : public IStartupScenario
+class StartupScenario : public IStartupScenario, public async::Asyncable
 {
-    INJECT(appshell, IAppShellConfiguration, configuration)
     INJECT(appshell, framework::IInteractive, interactive)
     INJECT(appshell, actions::IActionsDispatcher, dispatcher)
+    INJECT(appshell, mi::IMultiInstancesProvider, multiInstancesProvider)
+    INJECT(appshell, IAppShellConfiguration, configuration)
+    INJECT(appshell, ISessionsManager, sessionsManager)
+    INJECT(appshell, project::IProjectAutoSaver, projectAutoSaver)
 
 public:
 
-    void setSessionType(const QString& sessionType) override;
-    void setStartupScorePath(const io::path& path) override;
+    void setModeType(const QString& modeType) override;
+    void setStartupScorePath(const io::path_t& path) override;
+
     void run() override;
+    bool startupCompleted() const override;
 
 private:
-    StartupSessionType sessionTypeTromString(const QString& str) const;
-    std::string startupPageUri(StartupSessionType sessionType) const;
+    void onStartupPageOpened(StartupModeType modeType);
 
-    void openScore(const io::path& path);
+    StartupModeType resolveStartupModeType() const;
+    Uri startupPageUri(StartupModeType modeType) const;
 
-    QString m_sessionType;
-    io::path m_startupScorePath;
+    void openScore(const io::path_t& path);
+
+    void restoreLastSession();
+    void removeProjectsUnsavedChanges(const io::paths_t& projectsPaths);
+
+    QString m_modeTypeStr;
+    io::path_t m_startupScorePath;
+    bool m_startupCompleted = false;
 };
 }
 

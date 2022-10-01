@@ -20,14 +20,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
 #include "rehearsalmark.h"
+
 #include "measure.h"
+#include "score.h"
 #include "system.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   rehearsalMarkStyle
 //---------------------------------------------------------
@@ -37,15 +38,54 @@ static const ElementStyle rehearsalMarkStyle {
     { Sid::rehearsalMarkMinDistance, Pid::MIN_DISTANCE },
 };
 
+static const ElementStyle mainRehearsalMarkStyle {
+    { Sid::rehearsalMarkFrameType, Pid::FRAME_TYPE },
+    { Sid::rehearsalMarkFontSize, Pid::FONT_SIZE },
+    { Sid::rehearsalMarkAlign, Pid::ALIGN },
+};
+
+static const ElementStyle additionalRehearsalMarkStyle {
+    { Sid::tempoFrameType, Pid::FRAME_TYPE },
+    { Sid::tempoFontSize, Pid::FONT_SIZE },
+    { Sid::tempoAlign, Pid::ALIGN },
+};
+
 //---------------------------------------------------------
 //   RehearsalMark
 //---------------------------------------------------------
 
 RehearsalMark::RehearsalMark(Segment* parent)
-    : TextBase(ElementType::REHEARSAL_MARK, parent, Tid::REHEARSAL_MARK)
+    : TextBase(ElementType::REHEARSAL_MARK, parent, TextStyleType::REHEARSAL_MARK, ElementFlag::ON_STAFF)
 {
     initElementStyle(&rehearsalMarkStyle);
     setSystemFlag(true);
+}
+
+//---------------------------------------------------------
+//   setType
+//---------------------------------------------------------
+
+void RehearsalMark::setType(RehearsalMark::Type type)
+{
+    if (type == _type) {
+        return;
+    }
+    _type = type;
+    applyTypeStyle();
+}
+
+void RehearsalMark::applyTypeStyle()
+{
+    const auto& elemStyleMap = (_type == Type::Main ? mainRehearsalMarkStyle : additionalRehearsalMarkStyle);
+    for (const auto& elem : elemStyleMap) {
+        setProperty(elem.pid, score()->styleV(elem.sid));
+    }
+}
+
+void RehearsalMark::styleChanged()
+{
+    TextBase::styleChanged();
+    applyTypeStyle();
 }
 
 //---------------------------------------------------------
@@ -64,26 +104,26 @@ void RehearsalMark::layout()
 
             Measure* m = s->measure();
             Segment* header = s->prev();        // possibly just a start repeat
-            qreal measureX = -s->x();
+            double measureX = -s->x();
             Segment* repeat = m->findSegmentR(SegmentType::StartRepeatBarLine, Fraction(0, 1));
-            qreal barlineX = repeat ? repeat->x() - s->x() : measureX;
+            double barlineX = repeat ? repeat->x() - s->x() : measureX;
             System* sys = m->system();
             bool systemFirst = (sys && m->isFirstInSystem());
 
             if (!header || repeat || !systemFirst) {
                 // no header, or header with repeat, or header mid-system - align with barline
-                rxpos() = barlineX;
+                setPosX(barlineX);
             } else {
                 // header at start of system
                 // align to a point just after the header
                 EngravingItem* e = header->element(track());
-                qreal w = e ? e->width() : header->width();
-                rxpos() = header->x() + w - s->x();
+                double w = e ? e->width() : header->width();
+                setPosX(header->x() + w - s->x());
 
                 // special case for right aligned rehearsal marks at start of system
                 // left align with start of measure if that is further left
-                if (align() & Align::RIGHT) {
-                    rxpos() = qMin(rpos().x(), measureX + width());
+                if (align() == AlignH::RIGHT) {
+                    setPosX(std::min(xpos(), measureX + width()));
                 }
             }
         }
@@ -95,15 +135,15 @@ void RehearsalMark::layout()
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant RehearsalMark::propertyDefault(Pid id) const
+engraving::PropertyValue RehearsalMark::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::REHEARSAL_MARK);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::REHEARSAL_MARK;
     case Pid::PLACEMENT:
         return score()->styleV(Sid::rehearsalMarkPlacement);
     default:
         return TextBase::propertyDefault(id);
     }
 }
-} // namespace Ms
+} // namespace mu::engraving

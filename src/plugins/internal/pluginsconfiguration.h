@@ -22,35 +22,53 @@
 #ifndef MU_PLUGINS_PLUGINSCONFIGURATION_H
 #define MU_PLUGINS_PLUGINSCONFIGURATION_H
 
-#include "ipluginsconfiguration.h"
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
+#include "io/ifilesystem.h"
+#include "multiinstances/imultiinstancesprovider.h"
 #include "iglobalconfiguration.h"
-#include "val.h"
-#include "system/ifilesystem.h"
+#include "ui/iuiconfiguration.h"
+
+#include "ipluginsconfiguration.h"
 
 namespace mu::plugins {
-class PluginsConfiguration : public IPluginsConfiguration
+class PluginsConfiguration : public IPluginsConfiguration, public async::Asyncable
 {
     INJECT(plugins, framework::IGlobalConfiguration, globalConfiguration)
-    INJECT(plugins, system::IFileSystem, fileSystem)
+    INJECT(plugins, mi::IMultiInstancesProvider, multiInstancesProvider)
+    INJECT(plugins, io::IFileSystem, fileSystem)
+    INJECT(plugins, ui::IUiConfiguration, uiConfiguration)
 
 public:
     void init();
 
-    io::paths availablePluginsPaths() const override;
+    io::paths_t availablePluginsPaths() const override;
 
-    io::path userPluginsPath() const override;
-    void setUserPluginsPath(const io::path& path) override;
-    async::Channel<io::path> userPluginsPathChanged() const override;
+    io::path_t userPluginsPath() const override;
+    void setUserPluginsPath(const io::path_t& path) override;
+    async::Channel<io::path_t> userPluginsPathChanged() const override;
 
-    ValCh<CodeKeyList> installedPlugins() const override;
-    void setInstalledPlugins(const CodeKeyList& codeKeyList) override;
+    const PluginsConfigurationHash& pluginsConfiguration() const override;
+    Ret setPluginsConfiguration(const PluginsConfigurationHash& configuration) override;
+
+    QColor viewBackgroundColor() const override;
 
 private:
-    CodeKeyList parseInstalledPlugins(const mu::Val& val) const;
+    io::path_t pluginsDataPath() const;
+    io::path_t pluginsFilePath() const;
 
-    async::Channel<CodeKeyList> m_installedPluginsChanged;
-    async::Channel<io::path> m_userPluginsPathChanged;
+    RetVal<mu::ByteArray> readPluginsConfiguration() const;
+    Ret writePluginsConfiguration(const QByteArray& data);
+
+    PluginsConfigurationHash parsePluginsConfiguration(const QByteArray& json) const;
+
+    void updatePluginsConfiguration();
+
+    async::Channel<CodeKeyList> m_configuredPluginsChanged;
+    async::Channel<io::path_t> m_userPluginsPathChanged;
+
+    PluginsConfigurationHash m_pluginsConfiguration;
 };
 }
 

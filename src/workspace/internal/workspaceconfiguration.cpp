@@ -39,18 +39,15 @@ void WorkspaceConfiguration::init()
     });
 }
 
-io::paths WorkspaceConfiguration::workspacePaths() const
+io::paths_t WorkspaceConfiguration::workspacePaths() const
 {
-    io::paths paths;
+    io::paths_t paths;
     paths.push_back(userWorkspacesPath());
-
-    std::vector<io::path> extensionsPath = this->extensionsPaths();
-    paths.insert(paths.end(), extensionsPath.begin(), extensionsPath.end());
 
     return paths;
 }
 
-io::path WorkspaceConfiguration::userWorkspacesPath() const
+io::path_t WorkspaceConfiguration::userWorkspacesPath() const
 {
     return globalConfiguration()->userAppDataPath() + "/workspaces";
 }
@@ -69,9 +66,4 @@ void WorkspaceConfiguration::setCurrentWorkspaceName(const std::string& workspac
 async::Channel<std::string> WorkspaceConfiguration::currentWorkspaceNameChanged() const
 {
     return m_currentWorkspaceNameChanged;
-}
-
-io::paths WorkspaceConfiguration::extensionsPaths() const
-{
-    return extensionsConfiguration()->workspacesPaths();
 }

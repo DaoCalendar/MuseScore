@@ -31,39 +31,26 @@ ExportSettingsPage {
 
     property bool showBitRateControl: false
 
-    CheckBox {
-        width: parent.width
-        text: qsTrc("project", "Normalize")
-
-        navigation.name: "NormalizeAudioCheckbox"
-        navigation.panel: root.navigationPanel
-        navigation.row: root.navigationOrder + 1
-
-        checked: root.model.normalizeAudio
-        onClicked: {
-            root.model.normalizeAudio = !checked
-        }
-    }
-
     ExportOptionItem {
         id: sampleRateLabel
-        text: qsTrc("project", "Sample rate:")
+        text: qsTrc("project/export", "Sample rate:")
 
-        Dropdown {
+        StyledDropdown {
             Layout.preferredWidth: 126
 
             navigation.name: "SampleRatesDropdown"
             navigation.panel: root.navigationPanel
-            navigation.row: root.navigationOrder + 2
+            navigation.row: root.navigationOrder + 1
             navigation.accessible.name: sampleRateLabel.text + " " + currentText
 
-            model: root.model.availableSampleRates().map(function (sampleRate) {
-                return { text: qsTrc("project", "%1 Hz").arg(sampleRate), value: sampleRate }
+            model: root.model.availableSampleRates().map(function(sampleRate) {
+                return { text: qsTrc("project/export", "%1 Hz").arg(sampleRate), value: sampleRate }
             })
 
             currentIndex: indexOfValue(root.model.sampleRate)
-            onCurrentValueChanged: {
-                root.model.sampleRate = currentValue
+
+            onActivated: function(index, value) {
+                root.model.sampleRate = value
             }
         }
     }
@@ -71,30 +58,31 @@ ExportSettingsPage {
     ExportOptionItem {
         id: bitrateLabel
         visible: root.showBitRateControl
-        text: qsTrc("project", "Bitrate:")
+        text: qsTrc("project/export", "Bitrate:")
 
-        Dropdown {
+        StyledDropdown {
             Layout.preferredWidth: 126
 
             navigation.name: "BitratesDropdown"
             navigation.panel: root.navigationPanel
-            navigation.row: root.navigationOrder + 3
+            navigation.row: root.navigationOrder + 2
             navigation.accessible.name: bitrateLabel.text + " " + currentText
 
-            model: root.model.availableBitRates().map(function (bitRate) {
-                return { text: qsTrc("project", "%1 kBit/s").arg(bitRate), value: bitRate }
+            model: root.model.availableBitRates().map(function(bitRate) {
+                return { text: qsTrc("project/export", "%1 kBit/s").arg(bitRate), value: bitRate }
             })
 
             currentIndex: indexOfValue(root.model.bitRate)
-            onCurrentValueChanged: {
-                root.model.bitRate = currentValue
+
+            onActivated: function(index, value) {
+                root.model.bitRate = value
             }
         }
     }
 
     StyledTextLabel {
         width: parent.width
-        text: qsTrc("project", "Each selected part will be exported as a separate audio file.")
+        text: qsTrc("project/export", "Each selected part will be exported as a separate audio file.")
         horizontalAlignment: Text.AlignLeft
         wrapMode: Text.WordWrap
     }

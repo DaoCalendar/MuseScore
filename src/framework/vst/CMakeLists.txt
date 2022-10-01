@@ -49,11 +49,15 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/vstcomponenthandler.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/vstaudioclient.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/vstaudioclient.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/vstmodulesmetaregister.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/vstmodulesmetaregister.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/synth/vstsynthesiser.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/synth/vstsynthesiser.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/synth/vstiresolver.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/synth/vstiresolver.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synth/vstsequencer.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/synth/vstsequencer.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/fx/vstfxprocessor.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/fx/vstfxprocessor.h
@@ -63,6 +67,8 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/devtools/vstpluginlistmodelexample.cpp
     ${CMAKE_CURRENT_LIST_DIR}/devtools/vstpluginlistmodelexample.h
 
+    ${CMAKE_CURRENT_LIST_DIR}/view/abstractvsteditorview.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/abstractvsteditorview.h
     ${CMAKE_CURRENT_LIST_DIR}/view/vstieditorview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/vstieditorview.h
     ${CMAKE_CURRENT_LIST_DIR}/view/vstfxeditorview.cpp
@@ -85,6 +91,4 @@ if (OS_IS_LIN)
         )
 endif()
 
-include(${PROJECT_SOURCE_DIR}/build/module.cmake)
-
-install(DIRECTORY DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/VST3)
+include(SetupModule)

@@ -21,19 +21,23 @@
  */
 
 #include "accidental.h"
-#include "io/xml.h"
-#include "note.h"
-#include "symbol.h"
-#include "symnames.h"
-#include "score.h"
-#include "scorefont.h"
+
+#include "infrastructure/symbolfont.h"
+#include "rw/xml.h"
+#include "types/symnames.h"
+#include "types/translatablestring.h"
+#include "types/typesconv.h"
+
 #include "actionicon.h"
-#include "staff.h"
-#include "undo.h"
+#include "note.h"
+#include "score.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Acc
 //---------------------------------------------------------
@@ -46,7 +50,7 @@ struct Acc {
         : offset(o), centOffset(o2), sym(s) {}
 };
 
-// NOTE: keep this in sync with with AccidentalType enum in types.h, watch out for isMicrotonal()
+// NOTE: keep this in sync with AccidentalType enum in types.h, watch out for isMicrotonal()
 static Acc accList[] = {
     Acc(AccidentalVal::NATURAL,    0,   SymId::noSym),                  // NONE
     Acc(AccidentalVal::FLAT,       0,   SymId::accidentalFlat),         // FLAT
@@ -252,19 +256,16 @@ Accidental::Accidental(EngravingItem* parent)
 void Accidental::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "bracket") {
             int i = e.readInt();
             if (i == 0 || i == 1 || i == 2) {
                 _bracket = AccidentalBracket(i);
             }
         } else if (tag == "subtype") {
-            setSubtype(e.readElementText());
+            setSubtype(e.readAsciiText());
         } else if (tag == "role") {
-            AccidentalRole r = AccidentalRole(e.readInt());
-            if (r == AccidentalRole::AUTO || r == AccidentalRole::USER) {
-                _role = r;
-            }
+            _role = TConv::fromXml(e.readAsciiText(), AccidentalRole::AUTO);
         } else if (tag == "small") {
             m_isSmall = e.readInt();
         } else if (EngravingItem::readProperties(e)) {
@@ -280,22 +281,22 @@ void Accidental::read(XmlReader& e)
 
 void Accidental::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     writeProperty(xml, Pid::ACCIDENTAL_BRACKET);
-    writeProperty(xml, Pid::ROLE);
+    writeProperty(xml, Pid::ACCIDENTAL_ROLE);
     writeProperty(xml, Pid::SMALL);
     writeProperty(xml, Pid::ACCIDENTAL_TYPE);
     EngravingItem::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
 //   subTypeUserName
 //---------------------------------------------------------
 
-QString Accidental::subtypeUserName() const
+TranslatableString Accidental::subtypeUserName() const
 {
-    return SymNames::translatedUserNameForSymId(symbol());
+    return TranslatableString("engraving/sym", SymNames::userNameForSymId(symbol()));
 }
 
 //---------------------------------------------------------
@@ -321,7 +322,7 @@ AccidentalVal Accidental::subtype2value(AccidentalType st)
 //   subtype2name
 //---------------------------------------------------------
 
-const char* Accidental::subtype2name(AccidentalType st)
+AsciiStringView Accidental::subtype2name(AccidentalType st)
 {
     return SymNames::nameForSymId(accList[int(st)].sym);
 }
@@ -339,11 +340,11 @@ SymId Accidental::subtype2symbol(AccidentalType st)
 //   name2subtype
 //---------------------------------------------------------
 
-AccidentalType Accidental::name2subtype(const QString& tag)
+AccidentalType Accidental::name2subtype(const AsciiStringView& tag)
 {
     SymId symId = SymNames::symIdByName(tag);
     if (symId == SymId::noSym) {
-        // qDebug("no symbol found");
+        // LOGD("no symbol found");
     } else {
         int i = 0;
         for (const Acc& acc : accList) {
@@ -360,7 +361,7 @@ AccidentalType Accidental::name2subtype(const QString& tag)
 //   setSubtype
 //---------------------------------------------------------
 
-void Accidental::setSubtype(const QString& tag)
+void Accidental::setSubtype(const AsciiStringView& tag)
 {
     setAccidentalType(name2subtype(tag));
 }
@@ -380,7 +381,7 @@ void Accidental::layout()
         return;
     }
 
-    qreal m = parent() ? parentItem()->mag() : 1.0;
+    double m = explicitParent() ? parentItem()->mag() : 1.0;
     if (m_isSmall) {
         m *= score()->styleD(Sid::smallNoteMag);
     }
@@ -426,23 +427,23 @@ void Accidental::layoutSingleGlyphAccidental()
         default:
             break;
         }
-        if (!score()->scoreFont()->isValid(s)) {
+        if (!score()->symbolFont()->isValid(s)) {
             layoutMultiGlyphAccidental();
             return;
         }
     }
 
     SymElement e(s, 0.0, 0.0);
-    el.append(e);
+    el.push_back(e);
     r.unite(symBbox(s));
     setbbox(r);
 }
 
 void Accidental::layoutMultiGlyphAccidental()
 {
-    qreal margin = score()->styleP(Sid::bracketedAccidentalPadding);
+    double margin = score()->styleMM(Sid::bracketedAccidentalPadding);
     RectF r;
-    qreal x = 0.0;
+    double x = 0.0;
 
     // should always be true
     if (_bracket != AccidentalBracket::NONE) {
@@ -461,14 +462,14 @@ void Accidental::layoutMultiGlyphAccidental()
             break;
         }
         SymElement se(id, 0.0, _bracket == AccidentalBracket::BRACE ? spatium() * 0.4 : 0.0);
-        el.append(se);
+        el.push_back(se);
         r.unite(symBbox(id));
         x += symAdvance(id) + margin;
     }
 
     SymId s = symbol();
     SymElement e(s, x, 0.0);
-    el.append(e);
+    el.push_back(e);
     r.unite(symBbox(s).translated(x, 0.0));
 
     // should always be true
@@ -489,7 +490,7 @@ void Accidental::layoutMultiGlyphAccidental()
             break;
         }
         SymElement se(id, x, _bracket == AccidentalBracket::BRACE ? spatium() * 0.4 : 0.0);
-        el.append(se);
+        el.push_back(se);
         r.unite(symBbox(id).translated(x, 0.0));
     }
     setbbox(r);
@@ -510,7 +511,7 @@ AccidentalType Accidental::value2subtype(AccidentalVal v)
     case AccidentalVal::FLAT2:   return AccidentalType::FLAT2;
     case AccidentalVal::FLAT3:   return AccidentalType::FLAT3;
     default:
-        qFatal("value2subtype: illegal accidental val %d", int(v));
+        ASSERT_X(u"value2subtype: illegal accidental val: " + String::number(int(v)));
     }
     return AccidentalType::NONE;
 }
@@ -529,7 +530,7 @@ void Accidental::draw(mu::draw::Painter* painter) const
 
     painter->setPen(curColor());
     for (const SymElement& e : el) {
-        score()->scoreFont()->draw(e.sym, painter, magS(), PointF(e.x, e.y));
+        score()->symbolFont()->draw(e.sym, painter, magS(), PointF(e.x, e.y));
     }
 }
 
@@ -543,9 +544,8 @@ bool Accidental::acceptDrop(EditData& data) const
 
     if (e->isActionIcon()) {
         ActionIconType type = toActionIcon(e)->actionType();
-        return type == ActionIconType::BRACKETS
-               || type == ActionIconType::PARENTHESES
-               || type == ActionIconType::BRACES;
+        return type == ActionIconType::PARENTHESES
+               || type == ActionIconType::BRACKETS;
     }
 
     return false;
@@ -561,17 +561,14 @@ EngravingItem* Accidental::drop(EditData& data)
     switch (e->type()) {
     case ElementType::ACTION_ICON:
         switch (toActionIcon(e)->actionType()) {
-        case ActionIconType::BRACKETS:
-            undoChangeProperty(Pid::ACCIDENTAL_BRACKET, int(AccidentalBracket::BRACKET), PropertyFlags::NOSTYLE);
-            break;
         case ActionIconType::PARENTHESES:
             undoChangeProperty(Pid::ACCIDENTAL_BRACKET, int(AccidentalBracket::PARENTHESIS), PropertyFlags::NOSTYLE);
             break;
-        case ActionIconType::BRACES:
-            undoChangeProperty(Pid::ACCIDENTAL_BRACKET, int(AccidentalBracket::BRACE), PropertyFlags::NOSTYLE);
+        case ActionIconType::BRACKETS:
+            undoChangeProperty(Pid::ACCIDENTAL_BRACKET, int(AccidentalBracket::BRACKET), PropertyFlags::NOSTYLE);
             break;
         default:
-            qDebug("unknown icon type");
+            LOGD("unknown icon type");
             break;
         }
         break;
@@ -595,13 +592,13 @@ void Accidental::undoSetSmall(bool val)
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Accidental::getProperty(Pid propertyId) const
+PropertyValue Accidental::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::ACCIDENTAL_TYPE:    return int(_accidentalType);
     case Pid::SMALL:              return m_isSmall;
     case Pid::ACCIDENTAL_BRACKET: return int(bracket());
-    case Pid::ROLE:               return int(role());
+    case Pid::ACCIDENTAL_ROLE:    return role();
     default:
         return EngravingItem::getProperty(propertyId);
     }
@@ -611,13 +608,13 @@ QVariant Accidental::getProperty(Pid propertyId) const
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Accidental::propertyDefault(Pid propertyId) const
+PropertyValue Accidental::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::ACCIDENTAL_TYPE:    return int(AccidentalType::NONE);
     case Pid::SMALL:              return false;
     case Pid::ACCIDENTAL_BRACKET: return int(AccidentalBracket::NONE);
-    case Pid::ROLE:               return int(AccidentalRole::AUTO);
+    case Pid::ACCIDENTAL_ROLE:    return AccidentalRole::AUTO;
     default:
         return EngravingItem::propertyDefault(propertyId);
     }
@@ -627,7 +624,7 @@ QVariant Accidental::propertyDefault(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Accidental::setProperty(Pid propertyId, const QVariant& v)
+bool Accidental::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::ACCIDENTAL_TYPE:
@@ -639,7 +636,7 @@ bool Accidental::setProperty(Pid propertyId, const QVariant& v)
     case Pid::ACCIDENTAL_BRACKET:
         _bracket = AccidentalBracket(v.toInt());
         break;
-    case Pid::ROLE:
+    case Pid::ACCIDENTAL_ROLE:
         _role = v.value<AccidentalRole>();
         break;
     default:
@@ -650,37 +647,11 @@ bool Accidental::setProperty(Pid propertyId, const QVariant& v)
 }
 
 //---------------------------------------------------------
-//   propertyId
-//---------------------------------------------------------
-
-Pid Accidental::propertyId(const QStringRef& xmlName) const
-{
-    if (xmlName == propertyName(Pid::ACCIDENTAL_TYPE)) {
-        return Pid::ACCIDENTAL_TYPE;
-    }
-    return EngravingItem::propertyId(xmlName);
-}
-
-//---------------------------------------------------------
-//   propertyUserValue
-//---------------------------------------------------------
-
-QString Accidental::propertyUserValue(Pid pid) const
-{
-    switch (pid) {
-    case Pid::ACCIDENTAL_TYPE:
-        return subtypeUserName();
-    default:
-        return EngravingItem::propertyUserValue(pid);
-    }
-}
-
-//---------------------------------------------------------
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Accidental::accessibleInfo() const
+String Accidental::accessibleInfo() const
 {
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), Accidental::subtypeUserName());
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), translatedSubtypeUserName());
 }
 }

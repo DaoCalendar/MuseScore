@@ -27,7 +27,7 @@
 
 #include "modularity/imoduleexport.h"
 
-#include "retval.h"
+#include "types/retval.h"
 #include "io/path.h"
 
 namespace mu::palette {
@@ -43,8 +43,11 @@ public:
     virtual double paletteScaling() const = 0;
     virtual void setPaletteScaling(double scale) = 0;
 
-    virtual bool isSinglePalette() const = 0;
+    virtual ValCh<bool> isSinglePalette() const = 0;
     virtual void setIsSinglePalette(bool isSingle) = 0;
+
+    virtual ValCh<bool> isSingleClickToOpenPalette() const = 0;
+    virtual void setIsSingleClickToOpenPalette(bool isSingleClick) = 0;
 
     virtual QColor elementsBackgroundColor() const = 0;
     virtual QColor elementsColor() const = 0;
@@ -52,8 +55,8 @@ public:
     virtual QColor accentColor() const = 0;
     virtual async::Notification colorsChanged() const = 0;
 
-    virtual io::path keySignaturesDirPath() const = 0;
-    virtual io::path timeSignaturesDirPath() const = 0;
+    virtual io::path_t keySignaturesDirPath() const = 0;
+    virtual io::path_t timeSignaturesDirPath() const = 0;
 
     virtual bool useFactorySettings() const = 0;
     virtual bool enableExperimental() const = 0;

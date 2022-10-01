@@ -26,6 +26,7 @@ MuseScorePortable
 /*.files
 /*.includes
 *.user
+/share/locale/*placeholder.ts
 *.qm
 share/manual/en
 share/manual/de
@@ -52,11 +53,13 @@ vtest/Pictures
 dependencies
 
 # Downloaded files during build process
-MuseScore_General.sf3
-MuseScore_General_License.md
-MuseScore_General_Changelog.txt
-MuseScore_General_Readme.md
 VERSION
-SF_VERSION
 /mscore/data/mscore.aps
 /msvc.*
+
+# Files created during build process
+/thirdparty/lame/config.h
+/thirdparty/flac/flac-1.3.4/config.h
+
+# Backup Files created by Merging Softwares (Example: Meld)
+*.orig

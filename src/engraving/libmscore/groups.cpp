@@ -21,15 +21,28 @@
  */
 
 #include "groups.h"
-#include "io/xml.h"
-#include "durationtype.h"
+
+#include "rw/xml.h"
+
 #include "chordrest.h"
+#include "durationtype.h"
 #include "staff.h"
 #include "tuplet.h"
 
+#include "log.h"
+
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
+//---------------------------------------------------------
+//   NoteGroup
+//---------------------------------------------------------
+
+struct NoteGroup {
+    Fraction timeSig;
+    Groups endings;
+};
+
 //---------------------------------------------------------
 //   noteGroups
 //---------------------------------------------------------
@@ -88,38 +101,56 @@ static std::vector<NoteGroup> noteGroups {
 //   endBeam
 //---------------------------------------------------------
 
-Beam::Mode Groups::endBeam(ChordRest* cr, ChordRest* prev)
+BeamMode Groups::endBeam(const ChordRest* cr, const ChordRest* prev)
 {
-    if (cr->isGrace() || cr->beamMode() != Beam::Mode::AUTO) {
+    if (cr->isGrace() || cr->beamMode() != BeamMode::AUTO) {
         return cr->beamMode();
     }
-    Q_ASSERT(cr->staff());
+    assert(cr->staff());
 
-    TDuration d      = cr->durationType();
-    const Groups& g  = cr->staff()->group(cr->tick());
+    // we need to figure out the longest note value beat upon which cr falls in the measure
+    Fraction maxTickLen = std::max(cr->ticks(), prev ? prev->ticks() : Fraction());
+    Fraction smallestTickLen = Fraction(1, 8); // start with 8th
+    Fraction tickLenLimit = Fraction(1, 32); // only check up to 32nds because that's all thats available
+                                             // in timesig properties
+    while (smallestTickLen > maxTickLen || cr->tick().ticks() % smallestTickLen.ticks() != 0) {
+        smallestTickLen /= 2; // proceed to 16th, 32nd, etc
+        if (smallestTickLen < tickLenLimit) {
+            smallestTickLen = cr->ticks();
+            break;
+        }
+    }
+    DurationType bigBeatDuration = TDuration(smallestTickLen).type();
+
+    TDuration crDuration = cr->durationType();
+    const Groups& g = cr->staff()->group(cr->tick());
     Fraction stretch = cr->staff()->timeStretch(cr->tick());
-    Fraction tick    = cr->rtick() * stretch;
+    Fraction tick = cr->rtick() * stretch;
 
-    Beam::Mode val = g.beamMode(tick.ticks(), d.type());
+    // We can choose to break beams based on its place in the measure, or by its duration. These
+    // can be consolidated mostly, with bias towards its duration.
+    BeamMode byType = g.beamMode(tick.ticks(), crDuration.type());
+    BeamMode byPos = g.beamMode(tick.ticks(), bigBeatDuration);
+    BeamMode val = byType == BeamMode::AUTO ? byPos : byType;
 
     // context-dependent checks
-    if (val == Beam::Mode::AUTO && tick.isNotZero()) {
+    if (val == BeamMode::AUTO && tick.isNotZero()) {
         // if current or previous cr is in tuplet (but not both in same tuplet):
         // consider it as if this were next shorter duration
-        if (prev && (cr->tuplet() != prev->tuplet()) && (d == prev->durationType())) {
-            if (d >= TDuration::DurationType::V_EIGHTH) {
-                val = g.beamMode(tick.ticks(), TDuration::DurationType::V_16TH);
-            } else if (d == TDuration::DurationType::V_16TH) {
-                val = g.beamMode(tick.ticks(), TDuration::DurationType::V_32ND);
+        if (prev && (cr->tuplet() != prev->tuplet()) && (crDuration == prev->durationType())) {
+            if (crDuration >= DurationType::V_EIGHTH) {
+                val = g.beamMode(tick.ticks(), DurationType::V_16TH);
+            } else if (crDuration == DurationType::V_16TH) {
+                val = g.beamMode(tick.ticks(), DurationType::V_32ND);
             } else {
-                val = g.beamMode(tick.ticks(), TDuration::DurationType::V_64TH);
+                val = g.beamMode(tick.ticks(), DurationType::V_64TH);
             }
         }
         // if there is a hole between previous and current cr, break beam
         // exclude tuplets from this check; tick calculations can be unreliable
         // and they seem to be handled well anyhow
         if (cr->voice() && prev && !prev->tuplet() && prev->tick() + prev->actualTicks() < cr->tick()) {
-            val = Beam::Mode::BEGIN;
+            val = BeamMode::BEGIN;
         }
     }
 
@@ -131,21 +162,21 @@ Beam::Mode Groups::endBeam(ChordRest* cr, ChordRest* prev)
 //    tick is relative to begin of measure
 //---------------------------------------------------------
 
-Beam::Mode Groups::beamMode(int tick, TDuration::DurationType d) const
+BeamMode Groups::beamMode(int tick, DurationType d) const
 {
     int shift;
     switch (d) {
-    case TDuration::DurationType::V_EIGHTH: shift = 0;
+    case DurationType::V_EIGHTH: shift = 0;
         break;
-    case TDuration::DurationType::V_16TH:   shift = 4;
+    case DurationType::V_16TH:   shift = 4;
         break;
-    case TDuration::DurationType::V_32ND:   shift = 8;
+    case DurationType::V_32ND:   shift = 8;
         break;
     default:
-        return Beam::Mode::AUTO;
+        return BeamMode::AUTO;
     }
-    const int dm = MScore::division / 8;
-    for (const GroupNode& e : *this) {
+    const int dm = Constants::division / 8;
+    for (const GroupNode& e : m_nodes) {
         if (e.pos * dm < tick) {
             continue;
         }
@@ -155,16 +186,16 @@ Beam::Mode Groups::beamMode(int tick, TDuration::DurationType d) const
 
         int action = (e.action >> shift) & 0xf;
         switch (action) {
-        case 0: return Beam::Mode::AUTO;
-        case 1: return Beam::Mode::BEGIN;
-        case 2: return Beam::Mode::BEGIN32;
-        case 3: return Beam::Mode::BEGIN64;
+        case 0: return BeamMode::AUTO;
+        case 1: return BeamMode::BEGIN;
+        case 2: return BeamMode::BEGIN32;
+        case 3: return BeamMode::BEGIN64;
         default:
-            qDebug("   Groups::beamMode: bad action %d", action);
-            return Beam::Mode::AUTO;
+            LOGD("   Groups::beamMode: bad action %d", action);
+            return BeamMode::AUTO;
         }
     }
-    return Beam::Mode::AUTO;
+    return BeamMode::AUTO;
 }
 
 //---------------------------------------------------------
@@ -200,7 +231,7 @@ const Groups& Groups::endings(const Fraction& f)
         GroupNode n;
         n.pos    = pos * i;
         n.action = 0x111;
-        g.endings.push_back(n);
+        g.endings.addNode(n);
     }
     return noteGroups.back().endings;
 }
@@ -211,12 +242,11 @@ const Groups& Groups::endings(const Fraction& f)
 
 void Groups::write(XmlWriter& xml) const
 {
-    xml.startObject("Groups");
-    for (const GroupNode& n : *this) {
-        xml.tagE(QString("Node pos=\"%1\" action=\"%2\"")
-                 .arg(n.pos).arg(n.action));
+    xml.startElement("Groups");
+    for (const GroupNode& n : m_nodes) {
+        xml.tag("Node", { { "pos", n.pos }, { "action", n.action } });
     }
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -226,12 +256,12 @@ void Groups::write(XmlWriter& xml) const
 void Groups::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "Node") {
             GroupNode n;
             n.pos    = e.intAttribute("pos");
             n.action = e.intAttribute("action");
-            push_back(n);
+            m_nodes.push_back(n);
             e.skipCurrentElement();
         } else {
             e.unknown();
@@ -243,25 +273,25 @@ void Groups::read(XmlReader& e)
 //   addStop
 //---------------------------------------------------------
 
-void Groups::addStop(int pos, TDuration::DurationType d, Beam::Mode bm)
+void Groups::addStop(int pos, DurationType d, BeamMode bm)
 {
     int shift;
     switch (d) {
-    case TDuration::DurationType::V_EIGHTH: shift = 0;
+    case DurationType::V_EIGHTH: shift = 0;
         break;
-    case TDuration::DurationType::V_16TH:   shift = 4;
+    case DurationType::V_16TH:   shift = 4;
         break;
-    case TDuration::DurationType::V_32ND:   shift = 8;
+    case DurationType::V_32ND:   shift = 8;
         break;
     default:
         return;
     }
     int action;
-    if (bm == Beam::Mode::BEGIN) {
+    if (bm == BeamMode::BEGIN) {
         action = 1;
-    } else if (bm == Beam::Mode::BEGIN32) {
+    } else if (bm == BeamMode::BEGIN32) {
         action = 2;
-    } else if (bm == Beam::Mode::BEGIN64) {
+    } else if (bm == BeamMode::BEGIN64) {
         action = 3;
     } else {
         return;
@@ -270,8 +300,8 @@ void Groups::addStop(int pos, TDuration::DurationType d, Beam::Mode bm)
     pos    /= 60;
     action <<= shift;
 
-    auto i = begin();
-    for (; i != end(); ++i) {
+    auto i = m_nodes.begin();
+    for (; i != m_nodes.end(); ++i) {
         if (i->pos == pos) {
             i->action = (i->action & ~(0xf << shift)) | action;
             return;
@@ -280,7 +310,7 @@ void Groups::addStop(int pos, TDuration::DurationType d, Beam::Mode bm)
             break;
         }
     }
-    insert(i, GroupNode({ pos, action }));
+    m_nodes.insert(i, GroupNode({ pos, action }));
 }
 
 //---------------------------------------------------------
@@ -289,9 +319,9 @@ void Groups::addStop(int pos, TDuration::DurationType d, Beam::Mode bm)
 
 void Groups::dump(const char* m) const
 {
-    qDebug("%s", m);
-    for (const GroupNode& n : *this) {
-        qDebug("  group tick %d action 0x%02x", n.pos * 60, n.action);
+    LOGD("%s", m);
+    for (const GroupNode& n : m_nodes) {
+        LOGD("  group tick %d action 0x%02x", n.pos * 60, n.action);
     }
 }
 }

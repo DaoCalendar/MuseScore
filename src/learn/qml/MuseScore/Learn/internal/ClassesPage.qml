@@ -46,7 +46,21 @@ FocusScope {
 
     NavigationPanel {
         id: navPanel
-        direction: NavigationPanel.Both
+        name: "Classes"
+        enabled: root.enabled && root.visible
+        direction: NavigationPanel.Horizontal
+
+        onActiveChanged: function(active) {
+            if (active) {
+                openMoreInfoButton.navigation.requestActive()
+                accessibleInfo.ignored = false
+                accessibleInfo.focused = true
+            } else {
+                accessibleInfo.ignored = true
+                accessibleInfo.focused = false
+                openMoreInfoButton.accessible.ignored = true
+            }
+        }
     }
 
     Rectangle {
@@ -74,6 +88,22 @@ FocusScope {
             height: childrenRect.height + 72
 
             spacing: 30
+
+            AccessibleItem {
+                id: accessibleInfo
+                accessibleParent: root.navigation.accessible
+                visualItem: authorInfo
+                role: MUAccessible.Button
+                name: {
+                    var template = "%1 %2. %3. %4. %5"
+
+                    return template.arg(root.authorRole)
+                    .arg(root.authorName)
+                    .arg(root.authorPosition)
+                    .arg(root.authorDescription)
+                    .arg(openMoreInfoButton.text)
+                }
+            }
 
             Row {
                 width: parent.width
@@ -149,10 +179,22 @@ FocusScope {
             }
 
             FlatButton {
+                id: openMoreInfoButton
                 orientation: Qt.Horizontal
                 icon: IconCode.OPEN_LINK
-                text: qsTrc("learn", "Open") + " " + root.authorOrganizationName
+                text: qsTrc("learn", "Open %1").arg(root.authorOrganizationName)
                 accentButton: true
+
+                navigation.panel: root.navigation
+                navigation.name: "OpenMoreInfoButton"
+                navigation.column: 1
+                navigation.accessible.ignored: true
+                navigation.onActiveChanged: {
+                    if (!navigation.active) {
+                        accessible.ignored = false
+                        accessibleInfo.ignored = true
+                    }
+                }
 
                 onClicked: {
                     root.requestOpenOrganizationUrl()

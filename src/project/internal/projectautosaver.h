@@ -24,24 +24,46 @@
 
 #include <QTimer>
 
-#include "modularity/ioc.h"
-#include "context/iglobalcontext.h"
 #include "async/asyncable.h"
 
+#include "modularity/ioc.h"
+#include "context/iglobalcontext.h"
+#include "io/ifilesystem.h"
+#include "iprojectconfiguration.h"
+
+#include "../iprojectautosaver.h"
+
 namespace mu::project {
-class ProjectAutoSaver : public async::Asyncable
+class ProjectAutoSaver : public IProjectAutoSaver, public async::Asyncable
 {
     INJECT(project, context::IGlobalContext, globalContext)
+    INJECT(project, io::IFileSystem, fileSystem)
+    INJECT(project, IProjectConfiguration, configuration)
+
 public:
     ProjectAutoSaver() = default;
 
     void init();
 
+    bool projectHasUnsavedChanges(const io::path_t& projectPath) const override;
+    void removeProjectUnsavedChanges(const io::path_t& projectPath) override;
+
+    bool isAutosaveOfNewlyCreatedProject(const io::path_t& projectPath) const override;
+
+    io::path_t projectOriginalPath(const io::path_t& projectAutoSavePath) const override;
+    io::path_t projectAutoSavePath(const io::path_t& projectPath) const override;
+
 private:
+    INotationProjectPtr currentProject() const;
+
+    void update();
 
     void onTrySave();
 
+    io::path_t projectPath(INotationProjectPtr project) const;
+
     QTimer m_timer;
+    io::path_t m_lastProjectPathNeedingAutosave;
 };
 }
 

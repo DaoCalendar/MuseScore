@@ -26,20 +26,23 @@
 #include <QPalette>
 #include <cmath>
 
-#include "draw/pen.h"
+#include "draw/types/pen.h"
+
+#include "log.h"
 
 using namespace mu::inspector;
 using namespace mu::ui;
+using namespace mu::engraving;
 
 GridCanvas::GridCanvas(QQuickItem* parent)
-    : QQuickPaintedItem(parent)
+    : uicomponents::QuickPaintedView(parent)
 {
     setAcceptedMouseButtons(Qt::AllButtons);
 }
 
 QVariant GridCanvas::pointList() const
 {
-    return Ms::pitchValuesToVariant(m_points);
+    return pitchValuesToQVariant(m_points);
 }
 
 int GridCanvas::rowCount() const
@@ -117,9 +120,9 @@ void GridCanvas::setShouldShowNegativeRows(bool shouldShowNegativeRows)
     emit shouldShowNegativeRowsChanged(m_showNegativeRows);
 }
 
-void GridCanvas::setPointList(QVariant pointList)
+void GridCanvas::setPointList(QVariant points)
 {
-    QList<Ms::PitchValue> newPointList = Ms::pitchValuesFromVariant(pointList);
+    PitchValues newPointList = pitchValuesFromQVariant(points);
 
     if (m_points == newPointList) {
         return;
@@ -128,7 +131,7 @@ void GridCanvas::setPointList(QVariant pointList)
     m_points = newPointList;
 
     update();
-    emit pointListChanged(pointList);
+    emit pointListChanged(points);
 }
 
 //---------------------------------------------------------
@@ -138,8 +141,8 @@ void GridCanvas::setPointList(QVariant pointList)
 void GridCanvas::paint(QPainter* painter)
 {
     if (!(m_rows && m_columns)) {
-        qDebug("SqareCanvas::paintEvent: number of columns or rows set to 0.\nColumns: %i, Rows: %i", m_rows,
-               m_columns);
+        LOGD("GridCanvas::paintEvent: number of columns or rows set to 0.\nColumns: %i, Rows: %i", m_rows,
+             m_columns);
         return;
     }
     // not qreal here, even though elsewhere yes,
@@ -187,7 +190,7 @@ void GridCanvas::paint(QPainter* painter)
     }
 
     // this lambda takes as input a pitch value, and determines where what are its x and y coordinates
-    auto getPosition = [this, columnWidth, rowHeight, leftPos, topPos, bottomPos](const Ms::PitchValue& v) -> QPointF {
+    auto getPosition = [this, columnWidth, rowHeight, leftPos, topPos, bottomPos](const mu::engraving::PitchValue& v) -> QPointF {
         const qreal x = round((qreal(v.time) / 60) * (m_columns - 1)) * columnWidth + leftPos;
         qreal y = 0;
         if (m_showNegativeRows) {                    // get the middle pos and add the top margin and half of the rows
@@ -208,7 +211,7 @@ void GridCanvas::paint(QPainter* painter)
     pen.setColor(Qt::red);   // not theme dependant
     painter->setPen(pen);
     // draw line between points
-    for (const Ms::PitchValue& v : m_points) {
+    for (const mu::engraving::PitchValue& v : m_points) {
         QPointF currentPoint = getPosition(v);
         // draw line only if there is a point before the current one
         if (lastPoint.x()) {
@@ -220,7 +223,7 @@ void GridCanvas::paint(QPainter* painter)
     painter->setPen(Qt::NoPen);
     painter->setBrush(QColor::fromRgb(32, 116, 189));   // Musescore blue
     // draw points
-    for (const Ms::PitchValue& v : m_points) {
+    for (const mu::engraving::PitchValue& v : m_points) {
         painter->drawEllipse(getPosition(v), GRIP_HALF_RADIUS, GRIP_HALF_RADIUS);
     }
 }
@@ -232,8 +235,8 @@ void GridCanvas::paint(QPainter* painter)
 void GridCanvas::mousePressEvent(QMouseEvent* ev)
 {
     if (!(m_rows && m_columns)) {
-        qDebug("GridCanvas::mousePressEvent: number of columns or rows set to 0.\nColumns: %i, Rows: %i", m_rows,
-               m_columns);
+        LOGD("GridCanvas::mousePressEvent: number of columns or rows set to 0.\nColumns: %i, Rows: %i", m_rows,
+             m_columns);
         return;
     }
     const qreal columnWidth = qreal(width()) / m_columns;
@@ -268,18 +271,18 @@ void GridCanvas::mousePressEvent(QMouseEvent* ev)
     const int time = column * 60 / (m_columns - 1);
     const int pitch = row * 100 / m_primaryRowsInterval;
 
-    const int numberOfPoints = m_points.size();
+    const size_t numberOfPoints = m_points.size();
     bool found = false;
-    for (int i = 0; i < numberOfPoints; ++i) {
+    for (size_t i = 0; i < numberOfPoints; ++i) {
         if (round(qreal(m_points[i].time) / 60 * (m_columns - 1)) > column) {
-            m_points.insert(i, Ms::PitchValue(time, pitch, false));
+            m_points.insert(m_points.begin() + i, mu::engraving::PitchValue(time, pitch, false));
             found = true;
             break;
         }
         if (round(qreal(m_points[i].time) / 60 * (m_columns - 1)) == column) {
             if (round(qreal(m_points[i].pitch) / (100 * (m_rows / m_primaryRowsInterval)) * (m_rows - 1)) == row
                 && i > 0 && i < (numberOfPoints - 1)) {
-                m_points.removeAt(i);
+                m_points.erase(m_points.begin() + i);
             } else {
                 m_points[i].pitch = pitch;
             }
@@ -288,7 +291,7 @@ void GridCanvas::mousePressEvent(QMouseEvent* ev)
         }
     }
     if (!found) {
-        m_points.append(Ms::PitchValue(time, pitch, false));
+        m_points.push_back(mu::engraving::PitchValue(time, pitch, false));
     }
 
     update();

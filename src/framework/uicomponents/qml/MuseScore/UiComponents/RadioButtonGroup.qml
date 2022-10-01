@@ -22,7 +22,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 
-ListView {
+StyledListView {
     id: root
 
     property alias radioButtonGroup: buttonGroup
@@ -35,6 +35,7 @@ ListView {
     opacity: root.enabled ? 1.0 : ui.theme.itemOpacityDisabled
     orientation: ListView.Horizontal
     interactive: false
+    clip: false
 
     ButtonGroup {
         id: buttonGroup

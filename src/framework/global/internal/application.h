@@ -35,6 +35,12 @@ public:
     RunMode runMode() const override;
     bool noGui() const override;
 
+    QWindow* focusWindow() const override;
+
+    bool notify(QObject* object, QEvent* event) override;
+
+    void restart() override;
+
 private:
 
     RunMode m_runMode = RunMode::Editor;

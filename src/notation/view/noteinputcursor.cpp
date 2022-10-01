@@ -22,21 +22,35 @@
 #include "noteinputcursor.h"
 
 using namespace mu::notation;
+using namespace mu::engraving;
 
 void NoteInputCursor::paint(mu::draw::Painter* painter)
 {
-    if (!isNoteInputMode()) {
+    INotationNoteInputPtr noteInput = currentNoteInput();
+    if (!noteInput || !noteInput->isNoteInputMode()) {
         return;
     }
 
-    QRectF cursorRect = rect();
-    QColor cursorRectColor = cursorColor();
-    painter->fillRect(RectF::fromQRectF(cursorRect), cursorRectColor);
+    NoteInputState state = noteInput->state();
+    RectF cursorRect = noteInput->cursorRect();
+
+    Color fillColor = configuration()->selectionColor(state.currentVoiceIndex);
+    Color cursorRectColor = fillColor;
+    cursorRectColor.setAlpha(configuration()->cursorOpacity());
+    painter->fillRect(cursorRect, cursorRectColor);
 
     constexpr int leftLineWidth = 3;
-    QRectF leftLine = QRectF(cursorRect.topLeft().x(), cursorRect.topLeft().y(), leftLineWidth, cursorRect.height());
-    QColor lineColor = fillColor();
-    painter->fillRect(RectF::fromQRectF(leftLine), lineColor);
+    RectF leftLine(cursorRect.topLeft().x(), cursorRect.topLeft().y(), leftLineWidth, cursorRect.height());
+    Color lineColor = fillColor;
+    painter->fillRect(leftLine, lineColor);
+
+    if (state.staffGroup == StaffGroup::TAB) {
+        const StaffType* staffType = state.staff ? state.staff->staffType() : nullptr;
+
+        if (staffType) {
+            staffType->drawInputStringMarks(painter, state.currentString, state.currentVoiceIndex, cursorRect);
+        }
+    }
 }
 
 INotationNoteInputPtr NoteInputCursor::currentNoteInput() const
@@ -52,42 +66,4 @@ INotationNoteInputPtr NoteInputCursor::currentNoteInput() const
     }
 
     return interaction->noteInput();
-}
-
-bool NoteInputCursor::isNoteInputMode() const
-{
-    auto noteInput = currentNoteInput();
-    if (!noteInput) {
-        return false;
-    }
-
-    return noteInput->isNoteInputMode();
-}
-
-QRectF NoteInputCursor::rect() const
-{
-    auto noteInput = currentNoteInput();
-    if (!noteInput) {
-        return QRectF();
-    }
-
-    return noteInput->cursorRect();
-}
-
-QColor NoteInputCursor::cursorColor() const
-{
-    QColor color = fillColor();
-    color.setAlpha(configuration()->cursorOpacity());
-    return color;
-}
-
-QColor NoteInputCursor::fillColor() const
-{
-    auto noteInput = currentNoteInput();
-    if (!noteInput) {
-        return QColor();
-    }
-
-    int voiceIndex = noteInput->state().currentVoiceIndex;
-    return configuration()->selectionColor(voiceIndex);
 }

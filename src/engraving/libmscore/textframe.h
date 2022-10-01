@@ -25,7 +25,7 @@
 
 #include "box.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Text;
 
 //---------------------------------------------------------
@@ -35,32 +35,39 @@ class Text;
 
 class TBox : public VBox
 {
-    Text* _text;
-
+    OBJECT_ALLOCATOR(engraving, TBox)
 public:
     TBox(System* parent);
     TBox(const TBox&);
-    ~TBox();
+    ~TBox() override;
+
+    Text* text() const { return m_text; }
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
+    void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all = true) override;
 
-    virtual TBox* clone() const override { return new TBox(*this); }
+    TBox* clone() const override { return new TBox(*this); }
 
-    virtual void write(XmlWriter&) const override;
+    void write(XmlWriter&) const override;
     using VBox::write;
-    virtual void read(XmlReader&) override;
-    virtual EngravingItem* drop(EditData&) override;
-    virtual void add(EngravingItem* e) override;
-    virtual void remove(EngravingItem* el) override;
+    void read(XmlReader&) override;
+    EngravingItem* drop(EditData&) override;
+    void add(EngravingItem* e) override;
+    void remove(EngravingItem* el) override;
 
-    virtual void layout() override;
-    virtual QString accessibleExtraInfo() const override;
-    Text* text() { return _text; }
+    void layout() override;
+    String accessibleExtraInfo() const override;
 
-    EditBehavior normalModeEditBehavior() const override { return EditBehavior::SelectOnly; }
+    int gripsCount() const override;
+    Grip initialEditModeGrip() const override;
+    Grip defaultGrip() const override;
+
+    bool needStartEditingAfterSelecting() const override { return false; }
+
+private:
+    Text* m_text = nullptr;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

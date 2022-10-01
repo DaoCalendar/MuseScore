@@ -20,13 +20,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Controls 2.2
+import QtQuick.Controls 2.15
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Project 1.0
 
-GridView {
+StyledGridView {
     id: root
 
     property string backgroundColor: ui.theme.backgroundPrimaryColor
@@ -38,14 +38,15 @@ GridView {
 
     readonly property int sideMargin: 30
 
-    clip: true
-    boundsBehavior: Flickable.StopAtBounds
+    flickableDirection: Flickable.VerticalFlick
 
     cellHeight: 334
     cellWidth: sideMargin + 172 + sideMargin
 
     property int rows: Math.max(0, Math.floor(root.height / root.cellHeight))
     property int columns: Math.max(0, Math.floor(root.width / root.cellWidth))
+
+    property bool isSearching: false
 
     NavigationPanel {
         id: navPanel
@@ -79,7 +80,6 @@ GridView {
         anchors.top: root.top
         anchors.bottom: root.bottom
         anchors.right: parent.right
-        anchors.rightMargin: 16
 
         visible: root.contentHeight > root.height
         z: 1
@@ -99,16 +99,25 @@ GridView {
             navigation.panel: navPanel
             navigation.row: root.columns === 0 ? 0 : Math.floor(model.index / root.columns)
             navigation.column: model.index - (navigation.row * root.columns)
+            navigation.onActiveChanged: {
+                if (navigation.active) {
+                    root.positionViewAtIndex(index, ListView.Contain)
+                }
+            }
 
-            title: score.title
-            thumbnail: score.thumbnail
+            name: score.name
+            suffix: score.suffix ?? ""
+            thumbnail: score.thumbnail ?? null
             isAdd: score.isAddNew
-            timeSinceModified: !isAdd ? score.timeSinceModified : ""
+            isNoResultFound: score.isNoResultFound
+            isCloud: score.isCloud
+            timeSinceModified: (!isAdd && !isNoResultFound) ? score.timeSinceModified : ""
+            visible: !isNoResultFound ? true : root.count == 2 && root.isSearching     // New score and No result items
 
             onClicked: {
                 if (isAdd) {
                     root.addNewScoreRequested()
-                } else {
+                } else if (!isNoResultFound) {
                     root.openScoreRequested(score.path)
                 }
             }

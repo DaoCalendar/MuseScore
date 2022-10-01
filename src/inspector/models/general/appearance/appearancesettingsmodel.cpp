@@ -21,15 +21,17 @@
  */
 #include "appearancesettingsmodel.h"
 
-#include "dataformatter.h"
-#include "log.h"
+#include "types/commontypes.h"
 #include "translation.h"
+
+#include "log.h"
 
 using namespace mu::inspector;
 using namespace mu::actions;
 using namespace mu::framework;
+using namespace mu::engraving;
 
-static constexpr int REARRANGE_ORDER_STEP = 100;
+static constexpr int REARRANGE_ORDER_STEP = 50;
 
 AppearanceSettingsModel::AppearanceSettingsModel(QObject* parent, IElementRepositoryService* repository)
     : AbstractInspectorModel(parent, repository)
@@ -41,18 +43,18 @@ AppearanceSettingsModel::AppearanceSettingsModel(QObject* parent, IElementReposi
 
 void AppearanceSettingsModel::createProperties()
 {
-    m_leadingSpace = buildPropertyItem(Ms::Pid::LEADING_SPACE);
-    m_barWidth = buildPropertyItem(Ms::Pid::USER_STRETCH);
-    m_minimumDistance = buildPropertyItem(Ms::Pid::MIN_DISTANCE);
-    m_color = buildPropertyItem(Ms::Pid::COLOR);
-    m_arrangeOrder = buildPropertyItem(Ms::Pid::Z);
+    m_leadingSpace = buildPropertyItem(Pid::LEADING_SPACE);
+    m_measureWidth = buildPropertyItem(Pid::USER_STRETCH);
+    m_minimumDistance = buildPropertyItem(Pid::MIN_DISTANCE);
+    m_color = buildPropertyItem(Pid::COLOR);
+    m_arrangeOrder = buildPropertyItem(Pid::Z);
 
-    m_horizontalOffset = buildPropertyItem(Ms::Pid::OFFSET, [this](const Ms::Pid pid, const QVariant& newValue) {
-        onPropertyValueChanged(pid, PointF(newValue.toDouble(), m_verticalOffset->value().toDouble()));
+    m_horizontalOffset = buildPropertyItem(Pid::OFFSET, [this](const Pid pid, const QVariant& newValue) {
+        onPropertyValueChanged(pid, QPointF(newValue.toDouble(), m_verticalOffset->value().toDouble()));
     });
 
-    m_verticalOffset = buildPropertyItem(Ms::Pid::OFFSET, [this](const Ms::Pid pid, const QVariant& newValue) {
-        onPropertyValueChanged(pid, PointF(m_horizontalOffset->value().toDouble(), newValue.toDouble()));
+    m_verticalOffset = buildPropertyItem(Pid::OFFSET, [this](const Pid pid, const QVariant& newValue) {
+        onPropertyValueChanged(pid, QPointF(m_horizontalOffset->value().toDouble(), newValue.toDouble()));
     });
 }
 
@@ -63,47 +65,149 @@ void AppearanceSettingsModel::requestElements()
 
 void AppearanceSettingsModel::loadProperties()
 {
-    auto formatDoubleFunc = [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.toDouble());
+    static const PropertyIdSet propertyIdSet {
+        Pid::LEADING_SPACE,
+        Pid::USER_STRETCH,
+        Pid::MIN_DISTANCE,
+        Pid::COLOR,
+        Pid::Z,
+        Pid::OFFSET,
     };
 
-    loadPropertyItem(m_leadingSpace, formatDoubleFunc);
-    loadPropertyItem(m_minimumDistance, formatDoubleFunc);
-
-    loadPropertyItem(m_barWidth);
-    loadPropertyItem(m_color);
-    loadPropertyItem(m_arrangeOrder);
-
-    loadPropertyItem(m_horizontalOffset, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.value<PointF>().x());
-    });
-
-    loadPropertyItem(m_verticalOffset, [](const QVariant& elementPropertyValue) -> QVariant {
-        return DataFormatter::roundDouble(elementPropertyValue.value<PointF>().y());
-    });
-
-    emit isSnappedToGridChanged(isSnappedToGrid());
+    loadProperties(propertyIdSet);
 }
 
 void AppearanceSettingsModel::resetProperties()
 {
     m_leadingSpace->resetToDefault();
     m_minimumDistance->resetToDefault();
-    m_barWidth->resetToDefault();
+    m_measureWidth->resetToDefault();
     m_color->resetToDefault();
     m_arrangeOrder->resetToDefault();
     m_horizontalOffset->resetToDefault();
     m_verticalOffset->resetToDefault();
 }
 
-void AppearanceSettingsModel::pushBackInOrder()
+void AppearanceSettingsModel::onNotationChanged(const PropertyIdSet& changedPropertyIdSet, const StyleIdSet&)
 {
-    m_arrangeOrder->setValue(m_arrangeOrder->value().toInt() - REARRANGE_ORDER_STEP);
+    loadProperties(changedPropertyIdSet);
 }
 
-void AppearanceSettingsModel::pushFrontInOrder()
+void AppearanceSettingsModel::loadProperties(const PropertyIdSet& propertyIdSet)
 {
-    m_arrangeOrder->setValue(m_arrangeOrder->value().toInt() + REARRANGE_ORDER_STEP);
+    if (mu::contains(propertyIdSet, Pid::LEADING_SPACE)) {
+        loadPropertyItem(m_leadingSpace, formatDoubleFunc);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::USER_STRETCH)) {
+        loadPropertyItem(m_measureWidth);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::MIN_DISTANCE)) {
+        loadPropertyItem(m_minimumDistance, formatDoubleFunc);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::COLOR)) {
+        loadPropertyItem(m_color);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::Z)) {
+        loadPropertyItem(m_arrangeOrder);
+    }
+
+    if (mu::contains(propertyIdSet, Pid::OFFSET)) {
+        loadPropertyItem(m_horizontalOffset, [](const QVariant& elementPropertyValue) -> QVariant {
+            return DataFormatter::roundDouble(elementPropertyValue.value<QPointF>().x());
+        });
+
+        loadPropertyItem(m_verticalOffset, [](const QVariant& elementPropertyValue) -> QVariant {
+            return DataFormatter::roundDouble(elementPropertyValue.value<QPointF>().y());
+        });
+    }
+
+    emit isSnappedToGridChanged(isSnappedToGrid());
+}
+
+Page* AppearanceSettingsModel::page() const
+{
+    return toPage(m_elementList.first()->findAncestor(ElementType::PAGE));
+}
+
+std::vector<EngravingItem*> AppearanceSettingsModel::allElementsInPage() const
+{
+    return page()->elements();
+}
+
+std::vector<EngravingItem*> AppearanceSettingsModel::allOverlappingElements() const
+{
+    RectF bbox = m_elementList.first()->abbox();
+    for (EngravingItem* element : m_elementList) {
+        bbox |= element->abbox();
+    }
+    if (bbox.width() == 0 || bbox.height() == 0) {
+        LOGD() << "Bounding box appears to have a size of 0, so we'll get all the elements in the page";
+        return allElementsInPage();
+    }
+    return page()->items(bbox);
+}
+
+void AppearanceSettingsModel::pushBackwardsInOrder()
+{
+    std::vector<EngravingItem*> elements = allOverlappingElements();
+    std::sort(elements.begin(), elements.end(), elementLessThan);
+
+    int minZ = (*std::min_element(m_elementList.begin(), m_elementList.end(), elementLessThan))->z();
+    int i;
+    for (i = 0; i < static_cast<int>(elements.size()); i++) {
+        if (elements[i]->z() == minZ) {
+            break;
+        }
+    }
+
+    EngravingItem* elementBehind = elements[i - 1 >= 0 ? i - 1 : 0];
+    m_arrangeOrder->setValue(elementBehind->z() - REARRANGE_ORDER_STEP);
+}
+
+void AppearanceSettingsModel::pushForwardsInOrder()
+{
+    std::vector<EngravingItem*> elements = allOverlappingElements();
+    std::sort(elements.begin(), elements.end(), elementLessThan);
+
+    int maxZ = (*std::max_element(m_elementList.begin(), m_elementList.end(), elementLessThan))->z();
+    int elementsCount = static_cast<int>(elements.size());
+    int i;
+    for (i = elementsCount - 1; i > 0; i--) {
+        if (elements[i]->z() == maxZ) {
+            break;
+        }
+    }
+
+    EngravingItem* elementInFront = elements[i + 1 < elementsCount ? i + 1 : elementsCount - 1];
+    m_arrangeOrder->setValue(elementInFront->z() + REARRANGE_ORDER_STEP);
+}
+
+void AppearanceSettingsModel::pushToBackInOrder()
+{
+    std::vector<EngravingItem*> elements = allElementsInPage();
+    EngravingItem* minElement = *std::min_element(elements.begin(), elements.end(), elementLessThan);
+
+    if (m_elementList.contains(minElement)) {
+        m_arrangeOrder->setValue(minElement->z());
+    } else {
+        m_arrangeOrder->setValue(minElement->z() - REARRANGE_ORDER_STEP);
+    }
+}
+
+void AppearanceSettingsModel::pushToFrontInOrder()
+{
+    std::vector<EngravingItem*> elements = allElementsInPage();
+    EngravingItem* maxElement = *std::max_element(elements.begin(), elements.end(), elementLessThan);
+
+    if (m_elementList.contains(maxElement)) {
+        m_arrangeOrder->setValue(maxElement->z());
+    } else {
+        m_arrangeOrder->setValue(maxElement->z() + REARRANGE_ORDER_STEP);
+    }
 }
 
 void AppearanceSettingsModel::configureGrid()
@@ -116,9 +220,9 @@ PropertyItem* AppearanceSettingsModel::leadingSpace() const
     return m_leadingSpace;
 }
 
-PropertyItem* AppearanceSettingsModel::barWidth() const
+PropertyItem* AppearanceSettingsModel::measureWidth() const
 {
-    return m_barWidth;
+    return m_measureWidth;
 }
 
 PropertyItem* AppearanceSettingsModel::minimumDistance() const
@@ -148,8 +252,8 @@ PropertyItem* AppearanceSettingsModel::verticalOffset() const
 
 bool AppearanceSettingsModel::isSnappedToGrid() const
 {
-    bool isSnapped = notationConfiguration()->isSnappedToGrid(Orientation::Horizontal);
-    isSnapped &= notationConfiguration()->isSnappedToGrid(Orientation::Vertical);
+    bool isSnapped = notationConfiguration()->isSnappedToGrid(framework::Orientation::Horizontal);
+    isSnapped &= notationConfiguration()->isSnappedToGrid(framework::Orientation::Vertical);
 
     return isSnapped;
 }
@@ -160,8 +264,8 @@ void AppearanceSettingsModel::setIsSnappedToGrid(bool isSnapped)
         return;
     }
 
-    notationConfiguration()->setIsSnappedToGrid(Orientation::Horizontal, isSnapped);
-    notationConfiguration()->setIsSnappedToGrid(Orientation::Vertical, isSnapped);
+    notationConfiguration()->setIsSnappedToGrid(framework::Orientation::Horizontal, isSnapped);
+    notationConfiguration()->setIsSnappedToGrid(framework::Orientation::Vertical, isSnapped);
 
     emit isSnappedToGridChanged(isSnappedToGrid());
 }

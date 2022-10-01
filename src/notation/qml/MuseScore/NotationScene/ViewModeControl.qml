@@ -35,6 +35,10 @@ FlatButton {
     transparent: !menu.isMenuOpened
     accentButton: menu.isMenuOpened
 
+    buttonType: FlatButton.Horizontal
+    isNarrow: true
+    margins: 6
+
     visible: Boolean(root.currentViewMode)
 
     text: Boolean(root.currentViewMode) ? root.currentViewMode.title : ""
@@ -72,9 +76,7 @@ FlatButton {
 
         menuAnchorItem: ui.rootItem
 
-        navigation: root.navigation
-
-        onHandleMenuItem: {
+        onHandleMenuItem: function(itemId) {
             Qt.callLater(root.changeCurrentViewModeRequested, itemId)
         }
     }

@@ -20,29 +20,31 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "score.h"
 #include "bracketItem.h"
+
 #include "property.h"
+#include "score.h"
 #include "staff.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 BracketItem::BracketItem(EngravingItem* parent)
-    : EngravingObject(ElementType::BRACKET_ITEM, parent)
+    : EngravingItem(ElementType::BRACKET_ITEM, parent)
 {
 }
 
 BracketItem::BracketItem(EngravingItem* parent, BracketType a, int b)
-    : EngravingObject(ElementType::BRACKET_ITEM, parent), _bracketType(a), _bracketSpan(b)
+    : EngravingItem(ElementType::BRACKET_ITEM, parent), _bracketType(a), _bracketSpan(b)
 {
 }
 
-//---------------------------------------------------------
-//   getProperty
-//---------------------------------------------------------
+EngravingItem* BracketItem::clone() const
+{
+    return new BracketItem(*this);
+}
 
-QVariant BracketItem::getProperty(Pid id) const
+PropertyValue BracketItem::getProperty(Pid id) const
 {
     switch (id) {
     case Pid::SYSTEM_BRACKET:
@@ -50,42 +52,32 @@ QVariant BracketItem::getProperty(Pid id) const
     case Pid::BRACKET_COLUMN:
         return _column;
     case Pid::BRACKET_SPAN:
-        return _bracketSpan;
-        break;
+        return static_cast<int>(_bracketSpan);
     default:
-        return QVariant();
+        return EngravingItem::getProperty(id);
     }
 }
 
-//---------------------------------------------------------
-//   setProperty
-//---------------------------------------------------------
-
-bool BracketItem::setProperty(Pid id, const QVariant& v)
+bool BracketItem::setProperty(Pid id, const PropertyValue& v)
 {
     switch (id) {
     case Pid::SYSTEM_BRACKET:
-        staff()->setBracketType(column(), BracketType(v.toInt()));             // change bracket type global
+        staff()->setBracketType(column(), BracketType(v.toInt())); // change bracket type global
         break;
     case Pid::BRACKET_COLUMN:
         staff()->changeBracketColumn(column(), v.toInt());
         break;
     case Pid::BRACKET_SPAN:
-        _bracketSpan = v.toInt();
+        _bracketSpan = static_cast<size_t>(v.toInt());
         break;
     default:
-        // return EngravingItem::setProperty(id, v);
-        break;
+        return EngravingItem::setProperty(id, v);
     }
     score()->setLayoutAll();
     return true;
 }
 
-//---------------------------------------------------------
-//   propertyDefault
-//---------------------------------------------------------
-
-QVariant BracketItem::propertyDefault(Pid id) const
+PropertyValue BracketItem::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::SYSTEM_BRACKET:
@@ -93,7 +85,7 @@ QVariant BracketItem::propertyDefault(Pid id) const
     case Pid::BRACKET_COLUMN:
         return 0;
     default:
-        return QVariant();
+        return EngravingItem::propertyDefault(id);
     }
 }
 }

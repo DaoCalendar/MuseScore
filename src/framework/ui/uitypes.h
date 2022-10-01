@@ -28,27 +28,47 @@
 #include <QString>
 #include <QMetaType>
 
-#include "ret.h"
-#include "val.h"
+#include "types/ret.h"
+#include "types/translatablestring.h"
+#include "types/val.h"
 #include "actions/actiontypes.h"
 #include "view/iconcodes.h"
+#include "shortcuts/shortcutstypes.h"
+#include "context/shortcutcontext.h"
 
 namespace mu::ui {
 using ThemeCode = std::string;
 
-static const ThemeCode DARK_THEME_CODE("dark");
+inline ThemeCode themeCodeFromString(const QString& str)
+{
+    return str.toStdString();
+}
+
 static const ThemeCode LIGHT_THEME_CODE("light");
-static const ThemeCode HIGH_CONTRAST_BLACK_THEME_CODE("high_contrast_black");
+static const ThemeCode DARK_THEME_CODE("dark");
 static const ThemeCode HIGH_CONTRAST_WHITE_THEME_CODE("high_contrast_white");
+static const ThemeCode HIGH_CONTRAST_BLACK_THEME_CODE("high_contrast_black");
 
 inline std::vector<ThemeCode> allStandardThemeCodes()
 {
     return {
         LIGHT_THEME_CODE,
         DARK_THEME_CODE,
-        HIGH_CONTRAST_BLACK_THEME_CODE,
-        HIGH_CONTRAST_WHITE_THEME_CODE
+        HIGH_CONTRAST_WHITE_THEME_CODE,
+        HIGH_CONTRAST_BLACK_THEME_CODE
     };
+}
+
+inline bool isDarkTheme(const ThemeCode& themeCode)
+{
+    return themeCode == DARK_THEME_CODE
+           || themeCode == HIGH_CONTRAST_BLACK_THEME_CODE;
+}
+
+inline bool isHighContrastTheme(const ThemeCode& themeCode)
+{
+    return themeCode == HIGH_CONTRAST_WHITE_THEME_CODE
+           || themeCode == HIGH_CONTRAST_BLACK_THEME_CODE;
 }
 
 enum ThemeStyleKey
@@ -146,7 +166,12 @@ struct UiContext
         return std::strcmp(const_data, ctx.const_data) == 0;
     }
 
-    std::string toString() const { return std::string(const_data); }
+    inline bool operator !=(const UiContext& ctx) const
+    {
+        return !this->operator ==(ctx);
+    }
+
+    std::string toString() const { return const_data ? std::string(const_data) : std::string(); }
 
 private:
     const char* const_data = nullptr;
@@ -165,29 +190,49 @@ enum class Checkable {
 struct UiAction
 {
     actions::ActionCode code;
-    UiContext context = UiCtxAny;
-    QString title;
-    QString description;
+    UiContext uiCtx = UiCtxAny;
+    std::string scCtx = "any";
+    TranslatableString title;
+    TranslatableString description;
     IconCode::Code iconCode = IconCode::Code::NONE;
     Checkable checkable = Checkable::No;
-    std::string shortcut;
+    std::vector<std::string> shortcuts;
 
     UiAction() = default;
-    UiAction(const actions::ActionCode& code, UiContext ctx, Checkable ch = Checkable::No)
-        : code(code), context(ctx), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, const char* desc, Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), description(desc), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, const char* desc, IconCode::Code icon,
+    UiAction(const actions::ActionCode& code, UiContext ctx, std::string scCtx, Checkable ch = Checkable::No)
+        : code(code), uiCtx(ctx), scCtx(scCtx), checkable(ch) {}
+
+    UiAction(const actions::ActionCode& code, UiContext ctx, std::string scCtx, const TranslatableString& title,
              Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), description(desc), iconCode(icon), checkable(ch) {}
-    UiAction(const actions::ActionCode& code, UiContext ctx, const char* title, IconCode::Code icon, Checkable ch = Checkable::No)
-        : code(code), context(ctx), title(title), iconCode(icon), checkable(ch) {}
+        : code(code), uiCtx(ctx), scCtx(scCtx), title(title), checkable(ch) {}
+
+    UiAction(const actions::ActionCode& code, UiContext ctx, std::string scCtx, const TranslatableString& title,
+             const TranslatableString& desc, Checkable ch = Checkable::No)
+        : code(code), uiCtx(ctx), scCtx(scCtx), title(title), description(desc),  checkable(ch) {}
+
+    UiAction(const actions::ActionCode& code, UiContext ctx, std::string scCtx, const TranslatableString& title,
+             const TranslatableString& desc, IconCode::Code icon, Checkable ch = Checkable::No)
+        : code(code), uiCtx(ctx), scCtx(scCtx), title(title), description(desc), iconCode(icon), checkable(ch) {}
+
+    UiAction(const actions::ActionCode& code, UiContext ctx, std::string scCtx, const TranslatableString& title, IconCode::Code icon,
+             Checkable ch = Checkable::No)
+        : code(code), uiCtx(ctx), scCtx(scCtx), title(title), iconCode(icon), checkable(ch) {}
 
     bool isValid() const
     {
         return !code.empty();
+    }
+
+    bool operator==(const UiAction& other) const
+    {
+        return code == other.code
+               && uiCtx == other.uiCtx
+               && scCtx == other.scCtx
+               && title == other.title
+               && description == other.description
+               && iconCode == other.iconCode
+               && checkable == other.checkable
+               && shortcuts == shortcuts;
     }
 };
 
@@ -244,55 +289,15 @@ struct UiActionState
     {
         return UiActionState { true, checked };
     }
-};
-
-struct MenuItem : public UiAction
-{
-    QString id;
-    QString section;
-    UiActionState state;
-    bool selectable = false;
-    bool selected = false;
-    actions::ActionData args;
-    QList<MenuItem> subitems;
-
-    MenuItem() = default;
-    MenuItem(const UiAction& a)
-        : UiAction(a)
-    {
-        id = QString::fromStdString(a.code);
-    }
 
     QVariantMap toMap() const
     {
-        QVariantList subitemsVariantList;
-        for (const MenuItem& item: subitems) {
-            subitemsVariantList << item.toMap();
-        }
-
         return {
-            { "id", id },
-            { "code", QString::fromStdString(code) },
-            { "shortcut", QString::fromStdString(shortcut) },
-            { "title", title },
-            { "description", description },
-            { "section", section },
-            { "icon", static_cast<int>(iconCode) },
-            { "enabled", state.enabled },
-            { "checkable", checkable == Checkable::Yes },
-            { "checked", state.checked },
-            { "selectable", selectable },
-            { "selected", selected },
-            { "subitems", subitemsVariantList }
+            { "enabled", enabled },
+            { "checked", checked }
         };
     }
-
-    bool isValid() const
-    {
-        return !id.isEmpty();
-    }
 };
-using MenuItemList = QList<MenuItem>;
 
 struct ToolConfig
 {
@@ -304,6 +309,17 @@ struct ToolConfig
         Item() = default;
         Item(const actions::ActionCode& a, bool sh)
             : action(a), show(sh) {}
+
+        bool isSeparator() const
+        {
+            return action.empty();
+        }
+
+        bool operator ==(const Item& other) const
+        {
+            return action == other.action
+                   && show == other.show;
+        }
     };
 
     QList<Item> items;

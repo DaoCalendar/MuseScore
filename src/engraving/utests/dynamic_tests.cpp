@@ -22,16 +22,15 @@
 
 #include <gtest/gtest.h>
 
-#include "libmscore/masterscore.h"
 #include "libmscore/dynamic.h"
+#include "libmscore/masterscore.h"
 
 #include "engraving/compat/scoreaccess.h"
 #include "utils/scorerw.h"
 
 using namespace mu::engraving;
-using namespace Ms;
 
-class DynamicTests : public ::testing::Test
+class Engraving_DynamicTests : public ::testing::Test
 {
 };
 
@@ -39,37 +38,37 @@ class DynamicTests : public ::testing::Test
 //    read write test
 //---------------------------------------------------------
 
-TEST_F(DynamicTests, test1)
+TEST_F(Engraving_DynamicTests, test1)
 {
     MasterScore* score = compat::ScoreAccess::createMasterScore();
 
     Dynamic* dynamic = new Dynamic(score->dummy()->segment());
-    dynamic->setDynamicType(Dynamic::Type(1));
+    dynamic->setDynamicType(DynamicType(1));
 
     Dynamic* d;
 
-    dynamic->setPlacement(Placement::ABOVE);
+    dynamic->setPlacement(PlacementV::ABOVE);
     dynamic->setPropertyFlags(Pid::PLACEMENT, PropertyFlags::UNSTYLED);
     d = toDynamic(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->placement(), Placement::ABOVE);
+    EXPECT_EQ(d->placement(), PlacementV::ABOVE);
     delete d;
 
-    dynamic->setPlacement(Placement::BELOW);
+    dynamic->setPlacement(PlacementV::BELOW);
     dynamic->setPropertyFlags(Pid::PLACEMENT, PropertyFlags::UNSTYLED);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->placement(), Placement::BELOW);
+    EXPECT_EQ(d->placement(), PlacementV::BELOW);
     delete d;
 
-    dynamic->setProperty(Pid::PLACEMENT, int(Placement::ABOVE));
+    dynamic->setProperty(Pid::PLACEMENT, PlacementV::ABOVE);
     dynamic->setPropertyFlags(Pid::PLACEMENT, PropertyFlags::UNSTYLED);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->placement(), Placement::ABOVE);
+    EXPECT_EQ(d->placement(), PlacementV::ABOVE);
     delete d;
 
-    dynamic->setProperty(Pid::PLACEMENT, int(Placement::BELOW));
+    dynamic->setProperty(Pid::PLACEMENT, PlacementV::BELOW);
     dynamic->setPropertyFlags(Pid::PLACEMENT, PropertyFlags::UNSTYLED);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->placement(), Placement::BELOW);
+    EXPECT_EQ(d->placement(), PlacementV::BELOW);
     delete d;
 
     dynamic->setVelocity(23);
@@ -92,33 +91,33 @@ TEST_F(DynamicTests, test1)
     EXPECT_EQ(d->velocity(), 57);
     delete d;
 
-    dynamic->setDynRange(Dynamic::Range::STAFF);
+    dynamic->setDynRange(DynamicRange::STAFF);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->dynRange(), Dynamic::Range::STAFF);
+    EXPECT_EQ(d->dynRange(), DynamicRange::STAFF);
     delete d;
 
-    dynamic->setDynRange(Dynamic::Range::PART);
+    dynamic->setDynRange(DynamicRange::PART);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->dynRange(), Dynamic::Range::PART);
+    EXPECT_EQ(d->dynRange(), DynamicRange::PART);
     delete d;
 
-    dynamic->setDynRange(Dynamic::Range::SYSTEM);
+    dynamic->setDynRange(DynamicRange::SYSTEM);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->dynRange(), Dynamic::Range::SYSTEM);
+    EXPECT_EQ(d->dynRange(), DynamicRange::SYSTEM);
     delete d;
 
-    dynamic->setProperty(Pid::DYNAMIC_RANGE, int(Dynamic::Range::STAFF));
+    dynamic->setProperty(Pid::DYNAMIC_RANGE, DynamicRange::STAFF);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->dynRange(), Dynamic::Range::STAFF);
+    EXPECT_EQ(d->dynRange(), DynamicRange::STAFF);
     delete d;
 
-    dynamic->setProperty(Pid::DYNAMIC_RANGE, int(Dynamic::Range::PART));
+    dynamic->setProperty(Pid::DYNAMIC_RANGE, DynamicRange::PART);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->dynRange(), Dynamic::Range::PART);
+    EXPECT_EQ(d->dynRange(), DynamicRange::PART);
     delete d;
 
-    dynamic->setDynRange(Dynamic::Range::SYSTEM);
+    dynamic->setDynRange(DynamicRange::SYSTEM);
     d = static_cast<Dynamic*>(ScoreRW::writeReadElement(dynamic));
-    EXPECT_EQ(d->dynRange(), Dynamic::Range::SYSTEM);
+    EXPECT_EQ(d->dynRange(), DynamicRange::SYSTEM);
     delete d;
 }

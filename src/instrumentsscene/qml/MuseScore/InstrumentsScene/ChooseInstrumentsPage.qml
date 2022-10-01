@@ -33,18 +33,20 @@ Rectangle {
 
     property bool canSelectMultipleInstruments: true
     property string currentInstrumentId: ""
-    property string description: instrumentsModel.selectedInstrumentDescription
+    property string description: instrumentsModel.selectedInstrument ? instrumentsModel.selectedInstrument.description : ""
 
     property bool hasSelectedInstruments: instrumentsOnScoreView.hasInstruments
 
     property NavigationSection navigationSection: null
+
+    signal submitRequested()
 
     function instruments() {
         if (root.canSelectMultipleInstruments) {
             return instrumentsOnScoreView.instruments()
         }
 
-        return instrumentsModel.selectedInstruments()
+        return [ instrumentsModel.selectedInstrument ]
     }
 
     function currentOrder() {
@@ -55,12 +57,16 @@ Rectangle {
         return undefined
     }
 
+    function focusOnFirst() {
+        familyView.focusOnFirst()
+    }
+
     color: ui.theme.backgroundPrimaryColor
 
     InstrumentListModel {
         id: instrumentsModel
 
-        onFocusRequested: {
+        onFocusRequested: function(groupIndex) {
             familyView.focusGroup(groupIndex)
             instrumentsView.focusInstrument(instrumentIndex)
         }
@@ -70,8 +76,7 @@ Rectangle {
         id: prv
 
         function addSelectedInstrumentsToScore() {
-            var selectedInstruments = instrumentsModel.selectedInstruments()
-            instrumentsOnScoreView.addInstruments(selectedInstruments)
+            instrumentsOnScoreView.addInstruments(instrumentsModel.selectedInstrumentIdList())
 
             Qt.callLater(instrumentsOnScoreView.scrollViewToEnd)
         }
@@ -103,14 +108,21 @@ Rectangle {
             currentGenreIndex: instrumentsModel.currentGenreIndex
             currentGroupIndex: instrumentsModel.currentGroupIndex
 
-            onGenreSelected: {
+            onGenreSelected: function(newIndex) {
                 instrumentsModel.currentGenreIndex = newIndex
                 instrumentsView.clearSearch()
             }
 
-            onGroupSelected: {
+            onGroupSelected: function(newIndex) {
+                var selectedGroupName = groupName(newIndex)
                 instrumentsModel.currentGroupIndex = newIndex
-                instrumentsView.clearSearch()
+
+                if (instrumentsView.searching) {
+                    instrumentsModel.saveCurrentGroup()
+                    instrumentsView.clearSearch()
+                }
+
+                restoreGroupNavigationActive(selectedGroupName)
             }
         }
 
@@ -131,6 +143,10 @@ Rectangle {
 
             onAddSelectedInstrumentsToScoreRequested: {
                 prv.addSelectedInstrumentsToScore()
+
+                if (!root.canSelectMultipleInstruments) {
+                    root.submitRequested()
+                }
             }
         }
 
@@ -143,15 +159,16 @@ Rectangle {
             NavigationPanel {
                 id: navSelectPanel
                 name: "SelectPanel"
+                enabled: root.enabled && root.visible
                 section: root.navigationSection
                 order: 4
-                enabled: root.visible
             }
 
             navigation.name: "Select"
             navigation.panel: navSelectPanel
             navigation.order: 1
-            navigation.accessible.name: qsTrc("project", "Select instrument")
+
+            toolTipTitle: qsTrc("instruments", "Add selected instruments to score")
 
             visible: root.canSelectMultipleInstruments
 
@@ -199,10 +216,10 @@ Rectangle {
             NavigationPanel {
                 id: navUpDownPanel
                 name: "UpDownSelected"
+                enabled: root.enabled && root.visible
                 section: root.navigationSection
                 order: 6
                 direction: NavigationPanel.Vertical
-                enabled: root.visible
             }
 
             FlatButton {
@@ -212,6 +229,8 @@ Rectangle {
                 navigation.name: "Up"
                 navigation.panel: navUpDownPanel
                 navigation.row: 1
+
+                toolTipTitle: qsTrc("instruments", "Move selected instruments up")
 
                 onClicked: {
                     instrumentsOnScoreView.moveSelectedInstrumentsUp()
@@ -225,6 +244,8 @@ Rectangle {
                 navigation.name: "Down"
                 navigation.panel: navUpDownPanel
                 navigation.row: 2
+
+                toolTipTitle: qsTrc("instruments", "Move selected instruments down")
 
                 onClicked: {
                     instrumentsOnScoreView.moveSelectedInstrumentsDown()

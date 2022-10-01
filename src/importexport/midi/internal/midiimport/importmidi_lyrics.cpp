@@ -24,6 +24,7 @@
 #include "importmidi_fraction.h"
 #include "importmidi_chord.h"
 #include "importmidi_operations.h"
+#include "../midishared/midifile.h"
 
 #include "libmscore/factory.h"
 #include "libmscore/box.h"
@@ -33,11 +34,11 @@
 #include "libmscore/staff.h"
 #include "libmscore/text.h"
 
-#include "engraving/compat/midi/midifile.h"
-
 #include <set>
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace MidiLyrics {
 const std::string META_PREFIX = "@";
 const std::string TEXT_PREFIX = "@T";
@@ -54,8 +55,7 @@ bool isLyricText(const std::string& text)
 
 bool isLyricEvent(const MidiEvent& e)
 {
-    return e.type() == ME_META && (e.metaType() == META_TEXT
-                                   || e.metaType() == META_LYRIC);
+    return e.type() == ME_META && (e.metaType() == META_TEXT || e.metaType() == META_LYRIC);
 }
 
 std::multimap<ReducedFraction, std::string>
@@ -161,11 +161,11 @@ bool isTitlePrefix(const QString& text)
 
 void addTitleToScore(Score* score, const QString& string, int textCounter)
 {
-    Tid ssid = Tid::DEFAULT;
+    TextStyleType ssid = TextStyleType::DEFAULT;
     if (textCounter == 1) {
-        ssid = Tid::TITLE;
+        ssid = TextStyleType::TITLE;
     } else if (textCounter == 2) {
-        ssid = Tid::COMPOSER;
+        ssid = TextStyleType::COMPOSER;
     }
 
     MeasureBase* measure = score->first();
@@ -173,7 +173,7 @@ void addTitleToScore(Score* score, const QString& string, int textCounter)
     text->setPlainText(string.right(string.size() - int(TEXT_PREFIX.size())));
 
     if (!measure->isVBox()) {
-        measure = new VBox(score->dummy()->system());
+        measure = mu::engraving::Factory::createVBox(score->dummy()->system());
         measure->setTick(Fraction(0, 1));
         measure->setNext(score->first());
         score->measures()->add(measure);
@@ -354,4 +354,4 @@ QList<std::string> makeLyricsListForUI()
     return list;
 }
 } // namespace MidiLyrics
-} // namespace Ms
+} // namespace mu::iex::midi

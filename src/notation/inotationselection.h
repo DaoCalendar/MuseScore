@@ -23,11 +23,12 @@
 #define MU_NOTATION_INOTATIONSELECTION_H
 
 #include <vector>
-#include <QRectF>
-#include <QMimeData>
 
 #include "notationtypes.h"
 #include "internal/inotationselectionrange.h"
+#include "types/ret.h"
+
+class QMimeData;
 
 namespace mu::notation {
 class INotationSelection
@@ -37,8 +38,9 @@ public:
 
     virtual bool isNone() const = 0;
     virtual bool isRange() const = 0;
+    virtual SelectionState state() const = 0;
 
-    virtual bool canCopy() const = 0;
+    virtual mu::Ret canCopy() const = 0;
     virtual QMimeData* mimeData() const = 0;
 
     virtual EngravingItem* element() const = 0;
@@ -46,9 +48,11 @@ public:
 
     virtual std::vector<Note*> notes(NoteFilter filter = NoteFilter::All) const = 0;
 
-    virtual QRectF canvasBoundingRect() const = 0;
+    virtual RectF canvasBoundingRect() const = 0;
 
     virtual INotationSelectionRangePtr range() const = 0;
+
+    virtual EngravingItem* lastElementHit() const = 0;
 };
 
 using INotationSelectionPtr = std::shared_ptr<INotationSelection>;

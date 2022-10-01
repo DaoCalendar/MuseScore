@@ -22,6 +22,10 @@
 
 #include "winframelesswindowcontroller.h"
 
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT < 0x600)
+#undef _WIN32_WINNT // like defined to `0x502` in _mingw.h for Qt 5.15
+#define _WIN32_WINNT 0x0600 // Vista or later, needed for `iPaddedBorderWidth`
+#endif
 #include <Windows.h>
 #include <windowsx.h>
 #include <dwmapi.h>
@@ -34,9 +38,15 @@ using namespace mu::appshell;
 
 static HWND s_hwnd = 0;
 
+static void updateWindowPosition()
+{
+    SetWindowPos(s_hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
+}
+
 WinFramelessWindowController::WinFramelessWindowController()
     : FramelessWindowController()
 {
+    qApp->installEventFilter(this);
     qApp->installNativeEventFilter(this);
 }
 
@@ -56,8 +66,32 @@ void WinFramelessWindowController::init()
     const MARGINS shadow_on = { 1, 1, 1, 1 };
     DwmExtendFrameIntoClientArea(s_hwnd, &shadow_on);
 
-    SetWindowPos(s_hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE);
-    ShowWindow(s_hwnd, SW_SHOW);
+    updateWindowPosition();
+}
+
+bool WinFramelessWindowController::eventFilter(QObject* watched, QEvent* event)
+{
+    if (event->type() != QEvent::Move || !watched->isWindowType()) {
+        return false;
+    }
+
+    QWindow* window = dynamic_cast<QWindow*>(watched);
+    if (!window) {
+        return false;
+    }
+
+    if (!m_screen) {
+        m_screen = window->screen();
+        return false;
+    }
+
+    if (m_screen != window->screen()) {
+        m_screen = window->screen();
+        //! Redrawing a window by updating a position
+        updateWindowPosition();
+    }
+
+    return false;
 }
 
 bool WinFramelessWindowController::nativeEventFilter(const QByteArray& eventType, void* message, long* result)
@@ -98,8 +132,17 @@ bool WinFramelessWindowController::nativeEventFilter(const QByteArray& eventType
 bool WinFramelessWindowController::removeWindowFrame(MSG* message, long* result) const
 {
     NCCALCSIZE_PARAMS& params = *reinterpret_cast<NCCALCSIZE_PARAMS*>(message->lParam);
-    if (params.rgrc[0].top != 0) {
-        params.rgrc[0].top -= 1;
+
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(WINDOWPLACEMENT);
+    GetWindowPlacement(s_hwnd, &placement);
+
+    if (placement.showCmd == SW_SHOWMAXIMIZED) {
+        qreal borderWidth = this->borderWidth();
+        params.rgrc[0].left += borderWidth;
+        params.rgrc[0].top += borderWidth;
+        params.rgrc[0].right -= borderWidth;
+        params.rgrc[0].bottom -= borderWidth;
     }
 
     /// NOTE: remove window frame
@@ -120,16 +163,12 @@ bool WinFramelessWindowController::calculateWindowSize(MSG* message, long* resul
     }
 
     const QRect availableGeometry = windowScreen->availableGeometry();
-    int scaleFactor = uiConfiguration()->guiScaling();
+    double scaleFactor = uiConfiguration()->guiScaling();
 
     auto minMaxInfo = reinterpret_cast<MINMAXINFO*>(message->lParam);
 
     minMaxInfo->ptMaxSize.x = availableGeometry.width() * scaleFactor;
-
-    // NOTE: Qt doesn't work well with windows that don't have title bar but have native frames.
-    // When maximized they go out of bounds and the title bar is clipped,
-    // so decreasing the height by 1 fixes the window size
-    minMaxInfo->ptMaxSize.y = availableGeometry.height() * scaleFactor - 1;
+    minMaxInfo->ptMaxSize.y = availableGeometry.height() * scaleFactor;
 
     if (windowScreen == QGuiApplication::primaryScreen()) {
         minMaxInfo->ptMaxPosition.x = availableGeometry.x();

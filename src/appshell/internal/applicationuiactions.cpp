@@ -38,149 +38,172 @@ const ActionCode TOGGLE_NAVIGATOR_ACTION_CODE("toggle-navigator");
 const UiActionList ApplicationUiActions::m_actions = {
     UiAction("quit",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Quit")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Quit"),
+             TranslatableString("action", "Quit")
+             ),
+    UiAction("restart",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Restart")
              ),
     UiAction("fullscreen",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Full screen"),
-             QT_TRANSLATE_NOOP("action", "Full screen"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Full screen"),
+             TranslatableString("action", "Full screen"),
              Checkable::Yes
              ),
     UiAction("about",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "About…")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&About…")
              ),
     UiAction("about-qt",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "About Qt…")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "About &Qt…")
              ),
     UiAction("about-musicxml",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "About MusicXML…")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "About &MusicXML…")
              ),
     UiAction("online-handbook",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Online handbook")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Online &handbook"),
+             TranslatableString("action", "Open online handbook")
              ),
     UiAction("ask-help",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Ask for help")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "As&k for help")
              ),
     UiAction("report-bug",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Report a bug"),
-             QT_TRANSLATE_NOOP("action", "Report a bug")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Report a bug")
              ),
     UiAction("leave-feedback",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Feedback"),
-             QT_TRANSLATE_NOOP("action", "Leave feedback")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "F&eedback")
              ),
     UiAction("revert-factory",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Revert to factory settings"),
-             QT_TRANSLATE_NOOP("action", "Revert to factory settings")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Revert to &factory settings"),
+             TranslatableString("action", "Revert to factory settings")
              ),
-    UiAction("toggle-mixer",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Mixer"),
-             QT_TRANSLATE_NOOP("action", "Toggle mixer"),
-             IconCode::Code::MIXER,
-             Checkable::Yes
+
+    // Docking
+    UiAction("dock-restore-default-layout",
+             mu::context::UiCtxAny,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Restore the &default layout"),
+             TranslatableString("action", "Restore the default layout")
              ),
-    UiAction("toggle-navigator",
+
+    // Toolbars
+    UiAction("toggle-transport",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Navigator"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Navigator'"),
-             Checkable::Yes
-             ),
-    UiAction("toggle-palettes",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Palettes"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Palettes'"),
-             Checkable::Yes
-             ),
-    UiAction("toggle-instruments",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Instruments"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Instruments'"),
-             Checkable::Yes
-             ),
-    UiAction("inspector",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Properties"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Properties'"),
-             Checkable::Yes
-             ),
-    UiAction("toggle-selection-filter",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Selection filter"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Selection filter'"),
-             Checkable::Yes
-             ),
-    UiAction("toggle-statusbar",
-             mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Status bar"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Status bar'"),
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "&Playback controls"),
+             TranslatableString("action", "Show/hide playback controls"),
              Checkable::Yes
              ),
     UiAction("toggle-noteinput",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Note Input"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Note Input' toolbar"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Note input"),
+             TranslatableString("action", "Show/hide note input toolbar"),
              Checkable::Yes
              ),
-    UiAction("toggle-notationtoolbar",
+
+    // Vertical panels
+    UiAction("toggle-palettes",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Notation toolbar"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Notation' toolbar"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Palettes"),
+             TranslatableString("action", "Show/hide palettes"),
              Checkable::Yes
              ),
-    UiAction("toggle-undoredo",
+    UiAction("toggle-instruments",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Undo/redo toolbar"),
-             QT_TRANSLATE_NOOP("action", "Toggle 'Undo/Redo' toolbar"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Instr&uments"),
+             TranslatableString("action", "Open instruments dialog…"),
              Checkable::Yes
              ),
-    UiAction("toggle-transport",
+    UiAction("inspector",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Playback Controls"),
-             QT_TRANSLATE_NOOP("action", "Toggle Playback Controls toolbar"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Propert&ies"),
+             TranslatableString("action", "Show/hide properties"),
              Checkable::Yes
              ),
+    UiAction("toggle-selection-filter",
+             mu::context::UiCtxNotationOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "Se&lection filter"),
+             TranslatableString("action", "Show/hide selection filter"),
+             Checkable::Yes
+             ),
+
+    // Navigator
+    UiAction("toggle-navigator",
+             mu::context::UiCtxNotationOpened,
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Navigator"),
+             TranslatableString("action", "Show/hide navigator"),
+             Checkable::Yes
+             ),
+
+    // Horizontal panels
     UiAction("toggle-timeline",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Timeline"),
-             QT_TRANSLATE_NOOP("action", "Toggle timeline"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Tim&eline"),
+             TranslatableString("action", "Show/hide timeline"),
              Checkable::Yes
              ),
-    UiAction("synth-control",
+    UiAction("toggle-mixer",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Synthesizer"),
-             QT_TRANSLATE_NOOP("action", "Toggle synthesizer"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Mixer"),
+             TranslatableString("action", "Show/hide mixer"),
+             IconCode::Code::MIXER,
              Checkable::Yes
              ),
-    UiAction("toggle-piano",
+    UiAction("toggle-piano-keyboard",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Piano"),
-             QT_TRANSLATE_NOOP("action", "Toggle piano"),
+             mu::context::CTX_ANY,
+             TranslatableString("action", "Piano &keyboard"),
+             TranslatableString("action", "Show/hide piano keyboard"),
              Checkable::Yes
              ),
     UiAction("toggle-scorecmp-tool",
              mu::context::UiCtxNotationOpened,
-             QT_TRANSLATE_NOOP("action", "Score comparison tool"),
-             QT_TRANSLATE_NOOP("action", "Toggle score comparison tool"),
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "Score comparison tool"),
              Checkable::Yes
              ),
+
+    // Status bar
+    UiAction("toggle-statusbar",
+             mu::context::UiCtxNotationOpened,
+             mu::context::CTX_NOTATION_OPENED,
+             TranslatableString("action", "&Status bar"),
+             TranslatableString("action", "Show/hide status bar"),
+             Checkable::Yes
+             ),
+
     UiAction("preference-dialog",
              mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Preferences"),
-             QT_TRANSLATE_NOOP("action", "Open preferences dialog")
-             ),
-    UiAction("check-update",
-             mu::context::UiCtxAny,
-             QT_TRANSLATE_NOOP("action", "Check for updates"),
-             QT_TRANSLATE_NOOP("action", "Check for updates")
+             mu::context::CTX_ANY,
+             TranslatableString("action", "&Preferences"),
+             TranslatableString("action", "Preferences…")
              )
 };
 
@@ -267,18 +290,21 @@ mu::async::Channel<mu::actions::ActionCodeList> ApplicationUiActions::actionChec
 const QMap<mu::actions::ActionCode, DockName>& ApplicationUiActions::toggleDockActions()
 {
     static const QMap<mu::actions::ActionCode, DockName> actionsMap {
-        { TOGGLE_NAVIGATOR_ACTION_CODE, NOTATION_NAVIGATOR_PANEL_NAME },
-        { "toggle-mixer", MIXER_PANEL_NAME },
-        { "toggle-timeline", TIMELINE_PANEL_NAME },
+        { "toggle-transport", PLAYBACK_TOOLBAR_NAME },
+        { "toggle-noteinput", NOTE_INPUT_BAR_NAME },
+
         { "toggle-palettes", PALETTES_PANEL_NAME },
         { "toggle-instruments", INSTRUMENTS_PANEL_NAME },
         { "inspector", INSPECTOR_PANEL_NAME },
         { "toggle-selection-filter", SELECTION_FILTERS_PANEL_NAME },
+
+        { TOGGLE_NAVIGATOR_ACTION_CODE, NOTATION_NAVIGATOR_PANEL_NAME },
+
+        { "toggle-timeline", TIMELINE_PANEL_NAME },
+        { "toggle-mixer", MIXER_PANEL_NAME },
+        { "toggle-piano-keyboard", PIANO_KEYBOARD_PANEL_NAME },
+
         { "toggle-statusbar", NOTATION_STATUSBAR_NAME },
-        { "toggle-noteinput", NOTE_INPUT_BAR_NAME },
-        { "toggle-notationtoolbar", NOTATION_TOOLBAR_NAME },
-        { "toggle-undoredo", UNDO_REDO_TOOLBAR_NAME },
-        { "toggle-transport", PLAYBACK_TOOLBAR_NAME }
     };
 
     return actionsMap;

@@ -23,7 +23,7 @@
 #define MU_APPSHELL_IAPPSHELLCONFIGURATION_H
 
 #include "modularity/imoduleexport.h"
-#include "retval.h"
+#include "types/retval.h"
 
 #include "io/path.h"
 #include "appshelltypes.h"
@@ -37,16 +37,16 @@ class IAppShellConfiguration : MODULE_EXPORT_INTERFACE
 public:
     virtual ~IAppShellConfiguration() = default;
 
-    virtual StartupSessionType startupSessionType() const = 0;
-    virtual void setStartupSessionType(StartupSessionType type) = 0;
+    virtual bool hasCompletedFirstLaunchSetup() const = 0;
+    virtual void setHasCompletedFirstLaunchSetup(bool has) = 0;
 
-    virtual io::path startupScorePath() const = 0;
-    virtual void setStartupScorePath(const io::path& scorePath) = 0;
+    virtual StartupModeType startupModeType() const = 0;
+    virtual void setStartupModeType(StartupModeType type) = 0;
 
-    virtual bool isAppUpdatable() const = 0;
+    virtual io::path_t startupScorePath() const = 0;
+    virtual void setStartupScorePath(const io::path_t& scorePath) = 0;
 
-    virtual bool needCheckForUpdate() const = 0;
-    virtual void setNeedCheckForUpdate(bool needCheck) = 0;
+    virtual io::path_t userDataPath() const = 0;
 
     virtual std::string handbookUrl() const = 0;
     virtual std::string askForHelpUrl() const = 0;
@@ -68,14 +68,14 @@ public:
     virtual bool needShowSplashScreen() const = 0;
     virtual void setNeedShowSplashScreen(bool show) = 0;
 
-    virtual bool needShowTours() const = 0;
-    virtual void setNeedShowTours(bool show) = 0;
-
     virtual void startEditSettings() = 0;
     virtual void applySettings() = 0;
     virtual void rollbackSettings() = 0;
 
-    virtual void revertToFactorySettings(bool keepDefaultSettings = false) const = 0;
+    virtual void revertToFactorySettings(bool keepDefaultSettings = false, bool notifyAboutChanges = true) const = 0;
+
+    virtual io::paths_t sessionProjectsPaths() const = 0;
+    virtual Ret setSessionProjectsPaths(const io::paths_t& paths) = 0;
 };
 }
 

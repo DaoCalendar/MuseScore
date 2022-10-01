@@ -23,33 +23,35 @@
 
 #include "realfn.h"
 
+#include "libmscore/barline.h"
+#include "libmscore/beam.h"
+#include "libmscore/box.h"
+#include "libmscore/bracketItem.h"
+#include "libmscore/chord.h"
+#include "libmscore/chordrest.h"
+#include "libmscore/durationelement.h"
 #include "libmscore/factory.h"
-#include "libmscore/score.h"
+#include "libmscore/measure.h"
+#include "libmscore/measurebase.h"
 #include "libmscore/page.h"
+#include "libmscore/score.h"
+#include "libmscore/segment.h"
+#include "libmscore/slur.h"
+#include "libmscore/spacer.h"
+#include "libmscore/staff.h"
 #include "libmscore/system.h"
 #include "libmscore/systemdivider.h"
-#include "libmscore/bracketItem.h"
-#include "libmscore/measurebase.h"
-#include "libmscore/measure.h"
-#include "libmscore/spanner.h"
-#include "libmscore/segment.h"
-#include "libmscore/staff.h"
-#include "libmscore/chordrest.h"
-#include "libmscore/duration.h"
-#include "libmscore/spacer.h"
-#include "libmscore/box.h"
-#include "libmscore/tuplet.h"
-#include "libmscore/chord.h"
 #include "libmscore/tremolo.h"
-#include "libmscore/barline.h"
+#include "libmscore/tuplet.h"
 
 #include "layoutsystem.h"
 #include "layoutbeams.h"
 #include "layouttuplets.h"
 #include "verticalgapdata.h"
 
+#include "log.h"
+
 using namespace mu::engraving;
-using namespace Ms;
 
 //---------------------------------------------------------
 //   getNextPage
@@ -64,10 +66,10 @@ void LayoutPage::getNextPage(const LayoutOptions& options, LayoutContext& lc)
         lc.pageOldMeasure = nullptr;
     } else {
         lc.page = lc.score()->pages()[lc.curPage];
-        QList<System*>& systems = lc.page->systems();
-        lc.pageOldMeasure = systems.isEmpty() ? nullptr : systems.back()->measures().back();
-        const int i = systems.indexOf(lc.curSystem);
-        if (i > 0 && systems[i - 1]->page() == lc.page) {
+        std::vector<System*>& systems = lc.page->systems();
+        lc.pageOldMeasure = systems.empty() ? nullptr : systems.back()->measures().back();
+        const system_idx_t i = mu::indexOf(systems, lc.curSystem);
+        if (i < systems.size() && i > 0 && systems[i - 1]->page() == lc.page) {
             // Current and previous systems are on the current page.
             // Erase only the current and the following systems
             // as the previous one will not participate in layout.
@@ -79,14 +81,14 @@ void LayoutPage::getNextPage(const LayoutOptions& options, LayoutContext& lc)
     }
     lc.page->bbox().setRect(0.0, 0.0, options.loWidth, options.loHeight);
     lc.page->setNo(lc.curPage);
-    qreal x = 0.0;
-    qreal y = 0.0;
+    double x = 0.0;
+    double y = 0.0;
     if (lc.curPage) {
         Page* prevPage = lc.score()->pages()[lc.curPage - 1];
         if (MScore::verticalOrientation()) {
             y = prevPage->pos().y() + lc.page->height() + MScore::verticalPageGap;
         } else {
-            qreal gap = (lc.curPage + lc.score()->pageNumberOffset()) & 1 ? MScore::horizontalPageGapOdd : MScore::horizontalPageGapEven;
+            double gap = (lc.curPage + lc.score()->pageNumberOffset()) & 1 ? MScore::horizontalPageGapOdd : MScore::horizontalPageGapEven;
             x = prevPage->pos().x() + lc.page->width() + gap;
         }
     }
@@ -100,30 +102,32 @@ void LayoutPage::getNextPage(const LayoutOptions& options, LayoutContext& lc)
 
 void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
 {
-    const qreal slb = ctx.score()->styleP(Sid::staffLowerBorder);
+    TRACEFUNC;
+
+    const double slb = ctx.score()->styleMM(Sid::staffLowerBorder);
     bool breakPages = ctx.score()->layoutMode() != LayoutMode::SYSTEM;
-    qreal footerExtension = ctx.page->footerExtension();
-    qreal headerExtension = ctx.page->headerExtension();
-    qreal headerFooterPadding = ctx.score()->styleP(Sid::staffHeaderFooterPadding);
-    qreal endY = ctx.page->height() - ctx.page->bm();
-    qreal y = 0.0;
+    double footerExtension = ctx.page->footerExtension();
+    double headerExtension = ctx.page->headerExtension();
+    double headerFooterPadding = ctx.score()->styleMM(Sid::staffHeaderFooterPadding);
+    double endY = ctx.page->height() - ctx.page->bm();
+    double y = 0.0;
 
     System* nextSystem = 0;
     int systemIdx = -1;
 
     // re-calculate positions for systems before current
     // (they may have been filled on previous layout)
-    int pSystems = ctx.page->systems().size();
+    size_t pSystems = ctx.page->systems().size();
     if (pSystems > 0) {
         ctx.page->system(0)->restoreLayout2();
         y = ctx.page->system(0)->y() + ctx.page->system(0)->height();
     } else {
         y = ctx.page->tm();
     }
-    for (int i = 1; i < pSystems; ++i) {
+    for (int i = 1; i < static_cast<int>(pSystems); ++i) {
         System* cs = ctx.page->system(i);
         System* ps = ctx.page->system(i - 1);
-        qreal distance = ps->minDistance(cs);
+        double distance = ps->minDistance(cs);
         y += distance;
         cs->setPos(ctx.page->lm(), y);
         cs->restoreLayout2();
@@ -134,7 +138,7 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
         //
         // calculate distance to previous system
         //
-        qreal distance;
+        double distance;
         if (ctx.prevSystem) {
             distance = ctx.prevSystem->minDistance(ctx.curSystem);
         } else {
@@ -144,7 +148,7 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
                 // to avoid collisions
                 distance = headerExtension ? headerExtension + headerFooterPadding : 0.0;
             } else {
-                distance = ctx.score()->styleP(Sid::staffUpperBorder);
+                distance = ctx.score()->styleMM(Sid::staffUpperBorder);
                 bool fixedDistance = false;
                 for (MeasureBase* mb : ctx.curSystem->measures()) {
                     if (mb->isMeasure()) {
@@ -156,18 +160,18 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
                                 fixedDistance = true;
                                 break;
                             } else {
-                                distance = qMax(distance, sp->gap());
+                                distance = std::max(distance, sp->gap().val());
                             }
                         }
                     }
                 }
                 if (!fixedDistance) {
-                    qreal top = ctx.curSystem->minTop();
+                    double top = ctx.curSystem->minTop();
                     // ensure it doesn't collide with header
                     if (headerExtension > 0.0) {
                         top += headerExtension + headerFooterPadding;
                     }
-                    distance = qMax(distance, top);
+                    distance = std::max(distance, top);
                 }
             }
         }
@@ -185,14 +189,14 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
         if (ctx.rangeDone) {
             // take next system unchanged
             if (systemIdx > 0) {
-                nextSystem = ctx.score()->systems().value(systemIdx++);
+                nextSystem = mu::value(ctx.score()->systems(), systemIdx++);
                 if (!nextSystem) {
                     // TODO: handle next movement
                 }
             } else {
-                nextSystem = ctx.systemList.empty() ? 0 : ctx.systemList.takeFirst();
+                nextSystem = ctx.systemList.empty() ? 0 : mu::takeFirst(ctx.systemList);
                 if (nextSystem) {
-                    ctx.score()->systems().append(nextSystem);
+                    ctx.score()->systems().push_back(nextSystem);
                 }
             }
         } else {
@@ -202,13 +206,13 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
             }
         }
         ctx.prevSystem = ctx.curSystem;
-        Q_ASSERT(ctx.curSystem != nextSystem);
+        assert(ctx.curSystem != nextSystem);
         ctx.curSystem  = nextSystem;
 
         bool breakPage = !ctx.curSystem || (breakPages && ctx.prevSystem->pageBreak());
 
         if (!breakPage) {
-            qreal dist = ctx.prevSystem->minDistance(ctx.curSystem) + ctx.curSystem->height();
+            double dist = ctx.prevSystem->minDistance(ctx.curSystem) + ctx.curSystem->height();
             Box* vbox = ctx.curSystem->vbox();
             if (vbox) {
                 dist += vbox->bottomGap();
@@ -216,24 +220,24 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
                     dist += footerExtension;
                 }
             } else if (!ctx.prevSystem->hasFixedDownDistance()) {
-                qreal margin = qMax(ctx.curSystem->minBottom(), ctx.curSystem->spacerDistance(false));
+                double margin = std::max(ctx.curSystem->minBottom(), ctx.curSystem->spacerDistance(false));
                 // ensure it doesn't collide with footer
                 if (footerExtension > 0) {
                     margin += footerExtension + headerFooterPadding;
                 }
-                dist += qMax(margin, slb);
+                dist += std::max(margin, slb);
             }
             breakPage = (y + dist) >= endY && breakPages;
         }
         if (breakPage) {
-            qreal dist = qMax(ctx.prevSystem->minBottom(), ctx.prevSystem->spacerDistance(false));
-            qreal footerPadding = 0.0;
+            double dist = std::max(ctx.prevSystem->minBottom(), ctx.prevSystem->spacerDistance(false));
+            double footerPadding = 0.0;
             // ensure it doesn't collide with footer
             if (footerExtension > 0) {
                 footerPadding = footerExtension + headerFooterPadding;
                 dist += footerPadding;
             }
-            dist = qMax(dist, slb);
+            dist = std::max(dist, slb);
             layoutPage(ctx, ctx.page, endY - (y + dist), footerPadding);
             // if we collected a system we cannot fit onto this page,
             // we need to collect next page in order to correctly set system positions
@@ -256,14 +260,14 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
                 stick = m->tick();
             }
 
-            for (int track = 0; track < currentScore->ntracks(); ++track) {
+            for (size_t track = 0; track < currentScore->ntracks(); ++track) {
                 for (Segment* segment = m->first(); segment; segment = segment->next()) {
-                    EngravingItem* e = segment->element(track);
+                    EngravingItem* e = segment->element(static_cast<int>(track));
                     if (!e) {
                         continue;
                     }
                     if (e->isChordRest()) {
-                        if (!currentScore->staff(track2staff(track))->show()) {
+                        if (!currentScore->staff(track2staff(static_cast<int>(track)))->show()) {
                             continue;
                         }
                         ChordRest* cr = toChordRest(e);
@@ -314,9 +318,33 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
     }
 
     if (options.isMode(LayoutMode::SYSTEM)) {
-        System* s = ctx.page->systems().last();
-        qreal height = s ? s->pos().y() + s->height() + s->minBottom() : ctx.page->tm();
+        System* s = ctx.page->systems().back();
+        double height = s ? s->pos().y() + s->height() + s->minBottom() : ctx.page->tm();
         ctx.page->bbox().setRect(0.0, 0.0, options.loWidth, height + ctx.page->bm());
+    }
+
+    // HACK: we relayout here cross-staff slurs because only now the information
+    // about staff distances is fully available.
+    for (System* system : ctx.page->systems()) {
+        long int stick = 0;
+        long int etick = 0;
+        if (system->firstMeasure()) {
+            stick = system->firstMeasure()->tick().ticks();
+        }
+        etick = system->endTick().ticks();
+        if (stick == 0 && etick == 0) {
+            continue;
+        }
+        auto spanners = ctx.score()->spannerMap().findOverlapping(stick, etick);
+        for (auto interval : spanners) {
+            Spanner* sp = interval.value;
+            if (!sp->isSlur()) {
+                continue;
+            }
+            if (toSlur(sp)->isCrossStaff()) {
+                toSlur(sp)->layout();
+            }
+        }
     }
 
     ctx.page->invalidateBspTree();
@@ -330,17 +358,17 @@ void LayoutPage::collectPage(const LayoutOptions& options, LayoutContext& ctx)
 //    systems.
 //---------------------------------------------------------
 
-void LayoutPage::layoutPage(const LayoutContext& ctx, Page* page, qreal restHeight, qreal footerPadding)
+void LayoutPage::layoutPage(const LayoutContext& ctx, Page* page, double restHeight, double footerPadding)
 {
     if (restHeight < 0.0) {
-        qDebug("restHeight < 0.0: %f\n", restHeight);
+        LOGD("restHeight < 0.0: %f\n", restHeight);
         restHeight = 0;
     }
 
     Score* score = ctx.score();
-    int gaps     = page->systems().size() - 1;
+    int gaps     = static_cast<int>(page->systems().size()) - 1;
 
-    QList<System*> sList;
+    std::vector<System*> sList;
 
     // build list of systems (excluding last)
     // set initial distance for each to the unstretched minimum distance to next
@@ -367,7 +395,7 @@ void LayoutPage::layoutPage(const LayoutContext& ctx, Page* page, qreal restHeig
 
     if (sList.empty() || MScore::noVerticalStretch || score->enableVerticalSpread() || score->layoutMode() == LayoutMode::SYSTEM) {
         if (score->layoutMode() == LayoutMode::FLOAT) {
-            qreal y = restHeight * .5;
+            double y = restHeight * .5;
             for (System* system : page->systems()) {
                 system->move(PointF(0.0, y));
             }
@@ -380,7 +408,7 @@ void LayoutPage::layoutPage(const LayoutContext& ctx, Page* page, qreal restHeig
             System* s1 = page->systems().at(i);
             System* s2 = page->systems().at(i + 1);
             if (!(s1->vbox() || s2->vbox())) {
-                qreal yOffset = s1->height() + (s1->distance() - s1->height()) * .5;
+                double yOffset = s1->height() + (s1->distance() - s1->height()) * .5;
                 checkDivider(ctx, true,  s1, yOffset);
                 checkDivider(ctx, false, s1, yOffset);
             }
@@ -388,27 +416,27 @@ void LayoutPage::layoutPage(const LayoutContext& ctx, Page* page, qreal restHeig
         return;
     }
 
-    qreal maxDist = score->maxSystemDistance();
+    double maxDist = score->maxSystemDistance();
 
     // allocate space as needed to normalize system distance (bottom of one system to top of next)
     std::sort(sList.begin(), sList.end(), [](System* a, System* b) { return a->distance() - a->height() < b->distance() - b->height(); });
     System* s0 = sList[0];
-    qreal dist = s0->distance() - s0->height();             // distance for shortest system
-    for (int i = 1; i < sList.size(); ++i) {
+    double dist = s0->distance() - s0->height();             // distance for shortest system
+    for (size_t i = 1; i < sList.size(); ++i) {
         System* si = sList[i];
-        qreal ndist = si->distance() - si->height();        // next taller system
-        qreal fill  = ndist - dist;                         // amount by which this system distance exceeds next shorter
+        double ndist = si->distance() - si->height();        // next taller system
+        double fill  = ndist - dist;                         // amount by which this system distance exceeds next shorter
         if (fill > 0.0) {
-            qreal totalFill = fill * i;                     // space required to add this amount to all shorter systems
+            double totalFill = fill * static_cast<double>(i); // space required to add this amount to all shorter systems
             if (totalFill > restHeight) {
                 totalFill = restHeight;                     // too much; adjust amount
-                fill = restHeight / i;
+                fill = restHeight / static_cast<double>(i);
             }
-            for (int k = 0; k < i; ++k) {                   // add amount to all shorter systems
+            for (size_t k = 0; k < i; ++k) {                   // add amount to all shorter systems
                 System* s = sList[k];
-                qreal d = s->distance() + fill;
+                double d = s->distance() + fill;
                 if ((d - s->height()) > maxDist) {          // but don't exceed max system distance
-                    d = qMax(maxDist + s->height(), s->distance());
+                    d = std::max(maxDist + s->height(), s->distance());
                 }
                 s->setDistance(d);
             }
@@ -421,33 +449,33 @@ void LayoutPage::layoutPage(const LayoutContext& ctx, Page* page, qreal restHeig
     }
 
     if (restHeight > 0.0) {                                 // space left?
-        qreal fill = restHeight / sList.size();
-        for (System* s : qAsConst(sList)) {                           // allocate it to systems equally
-            qreal d = s->distance() + fill;
+        double fill = restHeight / static_cast<double>(sList.size());
+        for (System* s : sList) {                           // allocate it to systems equally
+            double d = s->distance() + fill;
             if ((d - s->height()) > maxDist) {              // but don't exceed max system distance
-                d = qMax(maxDist + s->height(), s->distance());
+                d = std::max(maxDist + s->height(), s->distance());
             }
             s->setDistance(d);
         }
     }
 
-    qreal y = page->systems().at(0)->y();
+    double y = page->systems().at(0)->y();
     for (int i = 0; i < gaps; ++i) {
         System* s1  = page->systems().at(i);
         System* s2  = page->systems().at(i + 1);
-        s1->rypos() = y;
+        s1->setPosY(y);
         y          += s1->distance();
 
         if (!(s1->vbox() || s2->vbox())) {
-            qreal yOffset = s1->height() + (s1->distance() - s1->height()) * .5;
+            double yOffset = s1->height() + (s1->distance() - s1->height()) * .5;
             checkDivider(ctx, true,  s1, yOffset);
             checkDivider(ctx, false, s1, yOffset);
         }
     }
-    page->systems().back()->rypos() = y;
+    page->systems().back()->setPosY(y);
 }
 
-void LayoutPage::checkDivider(const LayoutContext& ctx, bool left, System* s, qreal yOffset, bool remove)
+void LayoutPage::checkDivider(const LayoutContext& ctx, bool left, System* s, double yOffset, bool remove)
 {
     SystemDivider* divider = left ? s->systemDividerLeft() : s->systemDividerRight();
     if ((ctx.score()->styleB(left ? Sid::dividerLeft : Sid::dividerRight)) && !remove) {
@@ -458,14 +486,14 @@ void LayoutPage::checkDivider(const LayoutContext& ctx, bool left, System* s, qr
             s->add(divider);
         }
         divider->layout();
-        divider->rypos() = divider->height() * .5 + yOffset;
+        divider->setPosY(divider->height() * .5 + yOffset);
         if (left) {
-            divider->rypos() += ctx.score()->styleD(Sid::dividerLeftY) * SPATIUM20;
-            divider->rxpos() =  ctx.score()->styleD(Sid::dividerLeftX) * SPATIUM20;
+            divider->movePosY(ctx.score()->styleD(Sid::dividerLeftY) * SPATIUM20);
+            divider->setPosX(ctx.score()->styleD(Sid::dividerLeftX) * SPATIUM20);
         } else {
-            divider->rypos() += ctx.score()->styleD(Sid::dividerRightY) * SPATIUM20;
-            divider->rxpos() =  ctx.score()->styleD(Sid::pagePrintableWidth) * DPI - divider->width();
-            divider->rxpos() += ctx.score()->styleD(Sid::dividerRightX) * SPATIUM20;
+            divider->movePosY(ctx.score()->styleD(Sid::dividerRightY) * SPATIUM20);
+            divider->setPosX(ctx.score()->styleD(Sid::pagePrintableWidth) * DPI - divider->width());
+            divider->movePosX(ctx.score()->styleD(Sid::dividerRightX) * SPATIUM20);
         }
     } else if (divider) {
         if (divider->generated()) {
@@ -477,16 +505,16 @@ void LayoutPage::checkDivider(const LayoutContext& ctx, bool left, System* s, qr
     }
 }
 
-void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal footerPadding)
+void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, double footerPadding)
 {
     Score* score = ctx.score();
     VerticalGapDataList vgdl;
 
     // Find and classify all gaps between staves.
     int ngaps { 0 };
-    qreal prevYBottom  { page->tm() };
-    qreal yBottom      { 0.0 };
-    qreal spacerOffset { 0.0 };
+    double prevYBottom  { page->tm() };
+    double yBottom      { 0.0 };
+    double spacerOffset { 0.0 };
     bool vbox          { false };
     Spacer* nextSpacer { nullptr };
     bool transferNormalBracket { false };
@@ -498,7 +526,7 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
             prevYBottom = system->y();
             yBottom     = system->y() + system->height();
             vbox        = true;
-            vgdl.append(vgd);
+            vgdl.push_back(vgd);
             transferNormalBracket = false;
             transferCurlyBracket  = false;
         } else {
@@ -508,17 +536,20 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
             int endNormalBracket { -1 };
             int endCurlyBracket  { -1 };
             int staffNr { -1 };
-            for (SysStaff* sysStaff : *system->staves()) {
+            for (SysStaff* sysStaff : system->staves()) {
                 Staff* staff { score->staff(++staffNr) };
+                IF_ASSERT_FAILED(staff) {
+                    break;
+                }
                 addSpaceAroundNormalBracket |= endNormalBracket == staffNr;
                 addSpaceAroundCurlyBracket  |= endCurlyBracket == staffNr;
                 for (const BracketItem* bi : staff->brackets()) {
                     if (bi->bracketType() == BracketType::NORMAL) {
-                        addSpaceAroundNormalBracket |= staff->idx() > (endNormalBracket - 1);
-                        endNormalBracket = qMax(endNormalBracket, staff->idx() + bi->bracketSpan());
+                        addSpaceAroundNormalBracket |= int(staff->idx()) > (endNormalBracket - 1);
+                        endNormalBracket = std::max(endNormalBracket, int(staff->idx() + bi->bracketSpan()));
                     } else if (bi->bracketType() == BracketType::BRACE) {
-                        addSpaceAroundCurlyBracket |= staff->idx() > (endCurlyBracket - 1);
-                        endCurlyBracket = qMax(endCurlyBracket, staff->idx() + bi->bracketSpan());
+                        addSpaceAroundCurlyBracket |= int(staff->idx()) > (endCurlyBracket - 1);
+                        endCurlyBracket = std::max(endCurlyBracket, int(staff->idx() + bi->bracketSpan()));
                     }
                 }
 
@@ -555,17 +586,20 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
                 prevYBottom  = system->y() + sysStaff->y() + sysStaff->bbox().height();
                 yBottom      = system->y() + sysStaff->y() + sysStaff->skyline().south().max();
                 spacerOffset = sysStaff->skyline().south().max() - sysStaff->bbox().height();
-                vgdl.append(vgd);
+                vgdl.push_back(vgd);
             }
             transferNormalBracket = endNormalBracket >= 0;
             transferCurlyBracket  = endCurlyBracket >= 0;
         }
     }
     --ngaps;
+    const double staffLowerBorder = score->styleMM(Sid::staffLowerBorder);
+    const double combinedBottomMargin = page->bm() + footerPadding;
+    const double marginToStaff = page->bm() + staffLowerBorder;
+    double spaceRemaining{ std::min(page->height() - combinedBottomMargin - yBottom, page->height() - marginToStaff - prevYBottom) };
 
-    qreal spaceRemaining { page->height() - page->bm() - footerPadding - score->styleP(Sid::staffLowerBorder) - yBottom };
     if (nextSpacer) {
-        spaceRemaining -= qMax(0.0, nextSpacer->gap() - spacerOffset - score->styleP(Sid::staffLowerBorder));
+        spaceRemaining -= std::max(0.0, nextSpacer->gap() - spacerOffset - staffLowerBorder);
     }
     if (spaceRemaining <= 0.0) {
         return;
@@ -576,8 +610,8 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
     int pass { 0 };
     while (!RealIsNull(spaceRemaining) && (ngaps > 0) && (++pass < maxPasses)) {
         ngaps = 0;
-        qreal smallest     { vgdl.smallest() };
-        qreal nextSmallest { vgdl.smallest(smallest) };
+        double smallest     { vgdl.smallest() };
+        double nextSmallest { vgdl.smallest(smallest) };
         if (RealIsNull(smallest) || RealIsNull(nextSmallest)) {
             break;
         }
@@ -586,20 +620,20 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
             nextSmallest = smallest + spaceRemaining / vgdl.sumStretchFactor();
         }
 
-        qreal addedSpace { 0.0 };
+        double addedSpace { 0.0 };
         VerticalGapDataList modified;
         for (VerticalGapData* vgd : vgdl) {
             if (!RealIsNull(vgd->spacing() - smallest)) {
                 continue;
             }
-            qreal step { nextSmallest - vgd->spacing() };
+            double step { nextSmallest - vgd->spacing() };
             if (step < 0.0) {
                 continue;
             }
             step = vgd->addSpacing(step);
             if (!RealIsNull(step)) {
                 addedSpace += step * vgd->factor();
-                modified.append(vgd);
+                modified.push_back(vgd);
                 ++ngaps;
             }
             if ((spaceRemaining - addedSpace) <= 0.0) {
@@ -618,16 +652,16 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
 
     // If there is still space left, distribute the space of the staves.
     // However, there is a limit on how much space is added per gap.
-    const qreal maxPageFill { score->styleP(Sid::maxPageFillSpread) };
-    spaceRemaining = qMin(maxPageFill * vgdl.length(), spaceRemaining);
+    const double maxPageFill { score->styleMM(Sid::maxPageFillSpread) };
+    spaceRemaining = std::min(maxPageFill * static_cast<double>(vgdl.size()), spaceRemaining);
     pass = 0;
     ngaps = 1;
     while (!RealIsNull(spaceRemaining) && !RealIsNull(maxPageFill) && (ngaps > 0) && (++pass < maxPasses)) {
         ngaps = 0;
-        qreal addedSpace { 0.0 };
-        qreal step { spaceRemaining / vgdl.sumStretchFactor() };
+        double addedSpace { 0.0 };
+        double step { spaceRemaining / vgdl.sumStretchFactor() };
         for (VerticalGapData* vgd : vgdl) {
-            qreal res { vgd->addFillSpacing(step, maxPageFill) };
+            double res { vgd->addFillSpacing(step, maxPageFill) };
             if (!RealIsNull(res)) {
                 addedSpace += res * vgd->factor();
                 ++ngaps;
@@ -636,9 +670,9 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
         spaceRemaining -= addedSpace;
     }
 
-    QSet<System*> systems;
-    qreal systemShift { 0.0 };
-    qreal staffShift  { 0.0 };
+    std::set<System*> systems;
+    double systemShift { 0.0 };
+    double staffShift  { 0.0 };
     System* prvSystem { nullptr };
     for (VerticalGapData* vgd : vgdl) {
         if (vgd->sysStaff) {
@@ -648,7 +682,7 @@ void LayoutPage::distributeStaves(const LayoutContext& ctx, Page* page, qreal fo
         if (prvSystem == vgd->system) {
             staffShift += vgd->actualAddedSpace();
         } else {
-            vgd->system->rypos() += systemShift;
+            vgd->system->movePosY(systemShift);
             if (prvSystem) {
                 prvSystem->setDistance(vgd->system->y() - prvSystem->y());
                 prvSystem->setHeight(prvSystem->height() + staffShift);

@@ -24,11 +24,13 @@
 #include "settings.h"
 #include "io/path.h"
 
+#include "log.h"
+
 using namespace mu::shortcuts;
 using namespace mu::framework;
 
-static const mu::io::path SHORTCUTS_FILE_NAME("/shortcuts.xml");
-static const mu::io::path SHORTCUTS_DEFAULT_FILE_PATH(":/data" + SHORTCUTS_FILE_NAME);
+static const mu::io::path_t SHORTCUTS_FILE_NAME("/shortcuts.xml");
+static const mu::io::path_t SHORTCUTS_DEFAULT_FILE_PATH(":/data" + SHORTCUTS_FILE_NAME);
 
 static const std::string MIDIMAPPINGS_FILE_NAME("/midi_mappings.xml");
 
@@ -39,17 +41,30 @@ void ShortcutsConfiguration::init()
     settings()->setDefaultValue(ADVANCE_TO_NEXT_NOTE_ON_KEY_RELEASE, Val(true));
 }
 
-mu::io::path ShortcutsConfiguration::shortcutsUserAppDataPath() const
+QString ShortcutsConfiguration::currentKeyboardLayout() const
+{
+    NOT_IMPLEMENTED;
+    return "US-QWERTY";
+}
+
+void ShortcutsConfiguration::setCurrentKeyboardLayout(const QString& layout)
+{
+    UNUSED(layout);
+    NOT_IMPLEMENTED;
+    return;
+}
+
+mu::io::path_t ShortcutsConfiguration::shortcutsUserAppDataPath() const
 {
     return globalConfiguration()->userAppDataPath() + SHORTCUTS_FILE_NAME;
 }
 
-mu::io::path ShortcutsConfiguration::shortcutsAppDataPath() const
+mu::io::path_t ShortcutsConfiguration::shortcutsAppDataPath() const
 {
     return SHORTCUTS_DEFAULT_FILE_PATH;
 }
 
-mu::io::path ShortcutsConfiguration::midiMappingUserAppDataPath() const
+mu::io::path_t ShortcutsConfiguration::midiMappingUserAppDataPath() const
 {
     return globalConfiguration()->userAppDataPath() + MIDIMAPPINGS_FILE_NAME;
 }

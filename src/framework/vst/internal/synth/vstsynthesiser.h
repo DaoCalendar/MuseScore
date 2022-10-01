@@ -25,19 +25,20 @@
 
 #include <memory>
 
-#include "async/asyncable.h"
-#include "audio/isynthesizer.h"
+#include "audio/abstractsynthesizer.h"
 #include "audio/iaudioconfiguration.h"
 #include "audio/audiotypes.h"
 #include "modularity/ioc.h"
+#include "mpe/events.h"
 
 #include "internal/vstaudioclient.h"
 #include "ivstpluginsregister.h"
 #include "ivstmodulesrepository.h"
+#include "vstsequencer.h"
 #include "vsttypes.h"
 
 namespace mu::vst {
-class VstSynthesiser : public audio::synth::ISynthesizer, public async::Asyncable
+class VstSynthesiser : public audio::synth::AbstractSynthesizer
 {
     INJECT(vst, IVstPluginsRegister, pluginsRegister)
     INJECT(vst, IVstModulesRepository, modulesRepo)
@@ -46,49 +47,41 @@ class VstSynthesiser : public audio::synth::ISynthesizer, public async::Asyncabl
 public:
     explicit VstSynthesiser(VstPluginPtr&& pluginPtr, const audio::AudioInputParams& params);
 
-    Ret init() override;
-
     bool isValid() const override;
-    bool isActive() const override;
-    void setIsActive(bool arg) override;
 
     audio::AudioSourceType type() const override;
     std::string name() const override;
 
-    const audio::AudioInputParams& params() const override;
-    async::Channel<audio::AudioInputParams> paramsChanged() const override;
-
-    audio::synth::SoundFontFormats soundFontFormats() const override;
-    Ret addSoundFonts(const std::vector<io::path>& sfonts) override;
-    Ret removeSoundFonts() override;
-
-    bool handleEvent(const midi::Event& e) override;
-    void allSoundsOff() override;
+    void revokePlayingNotes() override;
     void flushSound() override;
 
-    Ret setupMidiChannels(const std::vector<midi::Event>& events) override;
-    void midiChannelSoundsOff(midi::channel_t chan) override;
-    bool midiChannelVolume(midi::channel_t chan, float val) override;
-    bool midiChannelBalance(midi::channel_t chan, float val) override;
-    bool midiChannelPitch(midi::channel_t chan, int16_t val) override;
+    void setupSound(const mpe::PlaybackSetupData& setupData) override;
+    void setupEvents(const mpe::PlaybackData& playbackData) override;
+
+    bool isActive() const override;
+    void setIsActive(const bool isActive) override;
+
+    audio::msecs_t playbackPosition() const override;
+    void setPlaybackPosition(const audio::msecs_t newPosition) override;
 
     // IAudioSource
     void setSampleRate(unsigned int sampleRate) override;
     unsigned int audioChannelsCount() const override;
     async::Channel<unsigned int> audioChannelsCountChanged() const override;
-    audio::samples_t process(float* buffer, audio::samples_t samplelPerChannel) override;
+    audio::samples_t process(float* buffer, audio::samples_t samplesPerChannel) override;
 
 private:
+    Ret init();
+    void toggleVolumeGain(const bool isActive);
+
     VstPluginPtr m_pluginPtr = nullptr;
 
     std::unique_ptr<VstAudioClient> m_vstAudioClient = nullptr;
 
-    bool m_isActive = false;
-
-    audio::AudioInputParams m_params;
-
-    async::Channel<audio::AudioInputParams> m_paramsChanges;
     async::Channel<unsigned int> m_streamsCountChanged;
+    audio::samples_t m_samplesPerChannel = 0;
+
+    VstSequencer m_sequencer;
 };
 
 using VstSynthPtr = std::shared_ptr<VstSynthesiser>;

@@ -22,6 +22,7 @@
 
 #include "dialogview.h"
 
+#include <QScreen>
 #include <QWindow>
 
 #include "log.h"
@@ -34,7 +35,7 @@ DialogView::DialogView(QQuickItem* parent)
     : PopupView(parent)
 {
     setObjectName("DialogView");
-    m_closePolicy = NoAutoClose;
+    setClosePolicy(NoAutoClose);
 }
 
 bool DialogView::isDialog() const
@@ -44,20 +45,23 @@ bool DialogView::isDialog() const
 
 void DialogView::beforeShow()
 {
-    if (!m_localPos.isNull()) {
-        return;
-    }
-
     QWindow* qMainWindow = mainWindow()->qWindow();
     IF_ASSERT_FAILED(qMainWindow) {
         return;
     }
 
-    QRect appRect = qMainWindow->geometry();
+    QRect referenceRect = qMainWindow->geometry();
+    if (referenceRect.isEmpty() && qMainWindow->screen()) {
+        referenceRect = qMainWindow->screen()->availableGeometry();
+    }
+
     const QRect& dlgRect = geometry();
 
-    m_globalPos.setX(appRect.x() + (appRect.width() / 2 - dlgRect.width() / 2));
-    m_globalPos.setY(appRect.y() + (appRect.height() / 2 - dlgRect.height() / 2) - DIALOG_WINDOW_FRAME_HEIGHT);
+    m_globalPos.setX(referenceRect.x() + (referenceRect.width() - dlgRect.width()) / 2);
+    m_globalPos.setY(referenceRect.y() + (referenceRect.height() - dlgRect.height()) / 2 - DIALOG_WINDOW_FRAME_HEIGHT);
+
+    m_globalPos.setX(m_globalPos.x() + m_localPos.x());
+    m_globalPos.setY(m_globalPos.y() + m_localPos.y());
 
     //! NOTE ok will be if they call accept
     setErrCode(Ret::Code::Cancel);
@@ -76,6 +80,8 @@ void DialogView::exec()
 {
     open();
     m_loop.exec();
+
+    activateNavigationParentControl();
 }
 
 void DialogView::show()
@@ -86,6 +92,13 @@ void DialogView::show()
 void DialogView::hide()
 {
     close();
+}
+
+void DialogView::raise()
+{
+    if (isOpened()) {
+        m_window->raise();
+    }
 }
 
 void DialogView::accept()

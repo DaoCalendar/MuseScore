@@ -25,7 +25,7 @@
 
 #include "line.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Trill;
 class Accidental;
 
@@ -35,6 +35,8 @@ class Accidental;
 
 class TrillSegment final : public LineSegment
 {
+    OBJECT_ALLOCATOR(engraving, TrillSegment)
+
     SymIdList _symbols;
 
     void symbolLine(SymId start, SymId fill);
@@ -53,6 +55,8 @@ public:
     EngravingItem* drop(EditData&) override;
     void layout() override;
 
+    void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all) override;
+
     EngravingItem* propertyDelegate(Pid) override;
 
     void add(EngravingItem*) override;
@@ -70,17 +74,14 @@ public:
 
 class Trill final : public SLine
 {
+    OBJECT_ALLOCATOR(engraving, Trill)
+
     Sid getPropertyStyle(Pid) const override;
 
-public:
-    enum class Type : char {
-        TRILL_LINE, UPPRALL_LINE, DOWNPRALL_LINE, PRALLPRALL_LINE,
-    };
-
 private:
-    Type _trillType;
+    TrillType _trillType;
     Accidental* _accidental;
-    MScore::OrnamentStyle _ornamentStyle;   // for use in ornaments such as trill
+    OrnamentStyle _ornamentStyle;   // for use in ornaments such as trill
     bool _playArticulation;
 
 public:
@@ -90,8 +91,7 @@ public:
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
 
     Trill* clone() const override { return new Trill(*this); }
 
@@ -102,39 +102,24 @@ public:
     void write(XmlWriter&) const override;
     void read(XmlReader&) override;
 
-    void setTrillType(const QString& s);
-    void setTrillType(Type tt) { _trillType = tt; }
-    Type trillType() const { return _trillType; }
-    void setOrnamentStyle(MScore::OrnamentStyle val) { _ornamentStyle = val; }
-    MScore::OrnamentStyle ornamentStyle() const { return _ornamentStyle; }
+    void setTrillType(TrillType tt) { _trillType = tt; }
+    TrillType trillType() const { return _trillType; }
+    void setOrnamentStyle(OrnamentStyle val) { _ornamentStyle = val; }
+    OrnamentStyle ornamentStyle() const { return _ornamentStyle; }
     void setPlayArticulation(bool val) { _playArticulation = val; }
     bool playArticulation() const { return _playArticulation; }
-    static QString type2name(Trill::Type t);
-    QString trillTypeName() const;
-    QString trillTypeUserName() const;
+    String trillTypeUserName() const;
     Accidental* accidental() const { return _accidental; }
     void setAccidental(Accidental* a) { _accidental = a; }
 
-    Segment* segment() const { return (Segment*)parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
-    Pid propertyId(const QStringRef& xmlName) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 };
-
-struct TrillTableItem {
-    Trill::Type type;
-    const char* name;
-    QString userName;
-};
-
-extern const TrillTableItem trillTable[];
-extern int trillTableSize();
-}     // namespace Ms
-
-Q_DECLARE_METATYPE(Ms::Trill::Type);
+} // namespace mu::engraving
 
 #endif

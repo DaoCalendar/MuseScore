@@ -26,8 +26,12 @@ import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Workspace 1.0
 
+import "internal"
+
 StyledDialogView {
     id: root
+
+    property string workspaceNames: ""
 
     contentWidth: 552
     contentHeight: 360
@@ -39,12 +43,24 @@ StyledDialogView {
     }
 
     Component.onCompleted: {
-        workspaceModel.load()
+        workspaceModel.load(root.workspaceNames)
+    }
+
+    onOpened: {
+        workspaceNameField.navigation.requestActive()
     }
 
     ColumnLayout {
+        id: content
         anchors.fill: parent
         spacing: 0
+
+        property NavigationPanel navigationPanel: NavigationPanel {
+            name: "NewWorkspacePanel"
+            direction: NavigationPanel.Vertical
+            section: root.navigationSection
+            order: 1
+        }
 
         StyledTextLabel {
             text: qsTrc("workspace", "Create new workspace")
@@ -52,18 +68,25 @@ StyledDialogView {
         }
 
         StyledTextLabel {
+            id: workspaceNameTitle
             Layout.topMargin: 24
 
             text: qsTrc("workspace", "Workspace name:")
         }
 
         TextInputField {
+            id: workspaceNameField
             Layout.topMargin: 12
             Layout.fillWidth: true
 
             currentText: workspaceModel.workspaceName
 
-            onCurrentTextEdited: {
+            navigation.name: "WorkspaceNameInputField"
+            navigation.panel: content.navigationPanel
+            navigation.row: 1
+            navigation.accessible.name: workspaceNameTitle.text + " " + currentText
+
+            onCurrentTextEdited: function(newTextValue) {
                 workspaceModel.workspaceName = newTextValue
             }
 
@@ -73,6 +96,16 @@ StyledDialogView {
         }
 
         StyledTextLabel {
+            Layout.topMargin: 12
+            Layout.fillWidth: true
+
+            horizontalAlignment: Qt.AlignLeft
+            text: workspaceModel.errorMessage
+        }
+
+        StyledTextLabel {
+            id: selectOptionsLabel
+
             Layout.topMargin: 24
             Layout.fillWidth: true
 
@@ -93,7 +126,12 @@ StyledDialogView {
             CheckBox {
                 checked: workspaceModel.useUiPreferences
 
-                text: qsTrc("workspace", "UI preferences (colours, canvas style, etc.)")
+                text: qsTrc("workspace", "UI preferences (colors, canvas style, etc.)")
+
+                navigation.name: "UIPreferencesCheckBox"
+                navigation.panel: content.navigationPanel
+                navigation.row: 2
+                navigation.accessible.name: selectOptionsLabel.text + " " + text
 
                 onClicked: {
                     workspaceModel.useUiPreferences = !checked
@@ -105,6 +143,10 @@ StyledDialogView {
 
                 text: qsTrc("workspace", "UI arrangement")
 
+                navigation.name: "UIPreferencesCheckBox"
+                navigation.panel: content.navigationPanel
+                navigation.row: 3
+
                 onClicked: {
                     workspaceModel.useUiArrangement = !checked
                 }
@@ -114,6 +156,10 @@ StyledDialogView {
                 checked: workspaceModel.usePalettes
 
                 text: qsTrc("workspace", "Palettes")
+
+                navigation.name: "UIPreferencesCheckBox"
+                navigation.panel: content.navigationPanel
+                navigation.row: 4
 
                 onClicked: {
                     workspaceModel.usePalettes = !checked
@@ -125,36 +171,33 @@ StyledDialogView {
 
                 text: qsTrc("workspace", "Toolbar customizations")
 
+                navigation.name: "UIPreferencesCheckBox"
+                navigation.panel: content.navigationPanel
+                navigation.row: 5
+
                 onClicked: {
                     workspaceModel.useToolbarCustomization = !checked
                 }
             }
         }
 
-        Row {
-            Layout.topMargin: 42
+        NewWorkspaceBottomPanel {
             Layout.preferredHeight: childrenRect.height
             Layout.alignment: Qt.AlignRight | Qt.AlignBottom
+            Layout.topMargin: 42
 
-            spacing: 12
+            canCreateWorkspace: workspaceModel.isWorkspaceNameAllowed
 
-            FlatButton {
-                text: qsTrc("global", "Cancel")
+            navigationPanel.section: root.navigationSection
+            navigationPanel.order: 2
 
-                onClicked: {
-                    root.reject()
-                }
+            onCancelRequested: {
+                root.reject()
             }
 
-            FlatButton {
-                text: qsTrc("global", "Select")
-
-                enabled: workspaceModel.canCreateWorkspace
-
-                onClicked: {
-                    root.ret = { errcode: 0, value: workspaceModel.createWorkspace() }
-                    root.hide()
-                }
+            onSelectRequested: {
+                root.ret = { errcode: 0, value: workspaceModel.createWorkspace() }
+                root.hide()
             }
         }
     }

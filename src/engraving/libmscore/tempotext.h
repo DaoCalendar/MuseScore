@@ -24,9 +24,9 @@
 #define __TEMPOTEXT_H__
 
 #include "durationtype.h"
-#include "text.h"
+#include "textbase.h"
 
-namespace Ms {
+namespace mu::engraving {
 //-------------------------------------------------------------------
 //   @@ TempoText
 ///    Tempo marker which determines the midi tempo.
@@ -37,16 +37,7 @@ namespace Ms {
 
 class TempoText final : public TextBase
 {
-    qreal _tempo;             // beats per second
-    bool _followText;         // parse text to determine tempo
-    qreal _relative;
-    bool _isRelative;
-
-    void updateScore();
-    void updateTempo();
-    void endEdit(EditData&) override;
-    void undoChangeProperty(Pid id, const QVariant&, PropertyFlags ps) override;
-
+    OBJECT_ALLOCATOR(engraving, TempoText)
 public:
     TempoText(Segment* parent);
 
@@ -55,15 +46,15 @@ public:
     void write(XmlWriter& xml) const override;
     void read(XmlReader&) override;
 
-    Segment* segment() const { return toSegment(parent()); }
-    Measure* measure() const { return toMeasure(parent()->parent()); }
+    Segment* segment() const { return toSegment(explicitParent()); }
+    Measure* measure() const { return toMeasure(explicitParent()->explicitParent()); }
 
-    qreal tempo() const { return _tempo; }
-    qreal tempoBpm() const;
-    void setTempo(qreal v);
-    void undoSetTempo(qreal v);
+    BeatsPerSecond tempo() const { return _tempo; }
+    double tempoBpm() const;
+    void setTempo(BeatsPerSecond v);
+    void undoSetTempo(double v);
     bool isRelative() { return _isRelative; }
-    void setRelative(qreal v) { _isRelative = true; _relative = v; }
+    void setRelative(double v) { _isRelative = true; _relative = v; }
 
     bool followText() const { return _followText; }
     void setFollowText(bool v) { _followText = v; }
@@ -74,14 +65,29 @@ public:
 
     TDuration duration() const;
 
-    static int findTempoDuration(const QString& s, int& len, TDuration& dur);
-    static QString duration2tempoTextString(const TDuration dur);
-    static QString duration2userName(const TDuration t);
+    static int findTempoDuration(const String& s, int& len, TDuration& dur);
+    static String duration2tempoTextString(const TDuration dur);
+    static String duration2userName(const TDuration t);
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid id) const override;
-    QString accessibleInfo() const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
+    String accessibleInfo() const override;
+
+protected:
+    void added() override;
+    void removed() override;
+    void commitText() override;
+
+    void undoChangeProperty(Pid id, const PropertyValue&, PropertyFlags ps) override;
+
+    void updateScore();
+    void updateTempo();
+
+    BeatsPerSecond _tempo;             // beats per second
+    bool _followText;         // parse text to determine tempo
+    double _relative;
+    bool _isRelative;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

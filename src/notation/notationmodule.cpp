@@ -31,9 +31,10 @@
 #include "internal/notation.h"
 #include "internal/notationactioncontroller.h"
 #include "internal/notationconfiguration.h"
-#include "internal/midiinputcontroller.h"
+#include "internal/midiinputoutputcontroller.h"
 #include "internal/notationuiactions.h"
 #include "internal/positionswriter.h"
+#include "internal/mscnotationwriter.h"
 #include "internal/instrumentsrepository.h"
 
 #include "view/notationpaintview.h"
@@ -49,6 +50,9 @@
 #include "view/selectionfiltermodel.h"
 #include "view/editgridsizedialogmodel.h"
 
+#include "view/pianokeyboard/pianokeyboardview.h"
+#include "view/pianokeyboard/pianokeyboardpanelcontextmenumodel.h"
+
 #include "ui/iinteractiveuriregister.h"
 #include "ui/uitypes.h"
 #include "view/widgets/editstyle.h"
@@ -56,16 +60,19 @@
 #include "view/widgets/editstaff.h"
 #include "view/widgets/breaksdialog.h"
 #include "view/widgets/pagesettings.h"
-#include "view/widgets/scoreproperties.h"
 #include "view/widgets/transposedialog.h"
 #include "view/widgets/selectnotedialog.h"
 #include "view/widgets/selectdialog.h"
 #include "view/widgets/tupletdialog.h"
 #include "view/widgets/stafftextpropertiesdialog.h"
 #include "view/widgets/timelineview.h"
+#include "view/widgets/realizeharmonydialog.h"
 #include "view/notationcontextmenumodel.h"
 #include "view/internal/undoredomodel.h"
-#include "view/internal/noteflagstypeselectormodel.h"
+
+#include "view/styledialog/styleitem.h"
+#include "view/styledialog/notespagemodel.h"
+#include "view/styledialog/beamspagemodel.h"
 
 #include "diagnostics/idiagnosticspathsregister.h"
 
@@ -78,7 +85,7 @@ using namespace mu::uicomponents;
 static std::shared_ptr<NotationConfiguration> s_configuration = std::make_shared<NotationConfiguration>();
 static std::shared_ptr<NotationActionController> s_actionController = std::make_shared<NotationActionController>();
 static std::shared_ptr<NotationUiActions> s_notationUiActions = std::make_shared<NotationUiActions>(s_actionController);
-static std::shared_ptr<MidiInputController> s_midiInputController = std::make_shared<MidiInputController>();
+static std::shared_ptr<MidiInputOutputController> s_midiInputOutputController = std::make_shared<MidiInputOutputController>();
 static std::shared_ptr<InstrumentsRepository> s_instrumentsRepository = std::make_shared<InstrumentsRepository>();
 
 static void notationscene_init_qrc()
@@ -108,6 +115,8 @@ void NotationModule::resolveImports()
     if (writers) {
         writers->reg({ "sposXML" }, std::make_shared<PositionsWriter>(PositionsWriter::ElementType::SEGMENT));
         writers->reg({ "mposXML" }, std::make_shared<PositionsWriter>(PositionsWriter::ElementType::MEASURE));
+        writers->reg({ "mscz" }, std::make_shared<MscNotationWriter>(engraving::MscIoMode::Zip));
+        writers->reg({ "mscx" }, std::make_shared<MscNotationWriter>(engraving::MscIoMode::Dir));
     }
 
     auto ir = ioc()->resolve<IInteractiveUriRegister>(moduleName());
@@ -117,9 +126,6 @@ void NotationModule::resolveImports()
 
         ir->registerUri(Uri("musescore://notation/pagesettings"),
                         ContainerMeta(ContainerType::QWidgetDialog, qRegisterMetaType<PageSettings>("PageSettings")));
-
-        ir->registerUri(Uri("musescore://notation/properties"),
-                        ContainerMeta(ContainerType::QWidgetDialog, qRegisterMetaType<ScorePropertiesDialog>("ScorePropertiesDialog")));
 
         ir->registerUri(Uri("musescore://notation/measureproperties"),
                         ContainerMeta(ContainerType::QWidgetDialog, qRegisterMetaType<MeasurePropertiesDialog>("MeasurePropertiesDialog")));
@@ -143,7 +149,7 @@ void NotationModule::resolveImports()
                         ContainerMeta(ContainerType::QWidgetDialog, qRegisterMetaType<TupletDialog>("TupletDialog")));
 
         ir->registerUri(Uri("musescore://notation/stafftextproperties"),
-                        ContainerMeta(ContainerType::QWidgetDialog, Ms::StaffTextPropertiesDialog::static_metaTypeId()));
+                        ContainerMeta(ContainerType::QWidgetDialog, StaffTextPropertiesDialog::static_metaTypeId()));
 
         ir->registerUri(Uri("musescore://notation/parts"),
                         ContainerMeta(ContainerType::QmlDialog, "MuseScore/NotationScene/PartsDialog.qml"));
@@ -153,6 +159,9 @@ void NotationModule::resolveImports()
 
         ir->registerUri(Uri("musescore://notation/editgridsize"),
                         ContainerMeta(ContainerType::QmlDialog, "MuseScore/NotationScene/EditGridSizeDialog.qml"));
+
+        ir->registerUri(Uri("musescore://notation/realizechordsymbols"),
+                        ContainerMeta(ContainerType::QWidgetDialog, qRegisterMetaType<RealizeHarmonyDialog>("RealizeHarmonyDialog")));
     }
 }
 
@@ -163,6 +172,8 @@ void NotationModule::registerResources()
 
 void NotationModule::registerUiTypes()
 {
+    qmlRegisterUncreatableType<AbstractNotationPaintView>("MuseScore.NotationScene", 1, 0, "AbstractNotationPaintView",
+                                                          "Not creatable as it is an abstract type");
     qmlRegisterType<NotationPaintView>("MuseScore.NotationScene", 1, 0, "NotationPaintView");
     qmlRegisterType<NotationContextMenuModel>("MuseScore.NotationScene", 1, 0, "NotationContextMenuModel");
     qmlRegisterType<NotationSwitchListModel>("MuseScore.NotationScene", 1, 0, "NotationSwitchListModel");
@@ -176,13 +187,18 @@ void NotationModule::registerUiTypes()
     qmlRegisterType<TimelineView>("MuseScore.NotationScene", 1, 0, "TimelineView");
     qmlRegisterType<SelectionFilterModel>("MuseScore.NotationScene", 1, 0, "SelectionFilterModel");
     qmlRegisterType<EditGridSizeDialogModel>("MuseScore.NotationScene", 1, 0, "EditGridSizeDialogModel");
-    qmlRegisterType<NoteFlagsTypeSelectorModel>("MuseScore.NotationScene", 1, 0, "NoteFlagsTypeSelectorModel");
+    qmlRegisterType<PianoKeyboardView>("MuseScore.NotationScene", 1, 0, "PianoKeyboardView");
+    qmlRegisterType<PianoKeyboardPanelContextMenuModel>("MuseScore.NotationScene", 1, 0, "PianoKeyboardPanelContextMenuModel");
+
+    qmlRegisterUncreatableType<StyleItem>("MuseScore.NotationScene", 1, 0, "StyleItem", "Cannot create StyleItem from QML");
+    qmlRegisterType<NotesPageModel>("MuseScore.NotationScene", 1, 0, "NotesPageModel");
+    qmlRegisterType<BeamsPageModel>("MuseScore.NotationScene", 1, 0, "BeamsPageModel");
 
     qRegisterMetaType<EditStyle>("EditStyle");
     qRegisterMetaType<EditStaff>("EditStaff");
     qRegisterMetaType<SelectNoteDialog>("SelectNoteDialog");
     qRegisterMetaType<SelectDialog>("SelectDialog");
-    qRegisterMetaType<Ms::StaffTextPropertiesDialog>("StaffTextPropertiesDialog");
+    qRegisterMetaType<StaffTextPropertiesDialog>("StaffTextPropertiesDialog");
 
     qmlRegisterUncreatableType<NoteInputBarCustomiseItem>("MuseScore.NotationScene", 1, 0, "NoteInputBarCustomiseItem", "Cannot create");
 
@@ -192,35 +208,38 @@ void NotationModule::registerUiTypes()
     }
 }
 
-void NotationModule::onInit(const framework::IApplication::RunMode&)
+void NotationModule::onInit(const framework::IApplication::RunMode& mode)
 {
     s_configuration->init();
     s_instrumentsRepository->init();
     s_actionController->init();
     s_notationUiActions->init();
-    s_midiInputController->init();
+
+    if (mode == framework::IApplication::RunMode::Editor) {
+        s_midiInputOutputController->init();
+    }
 
     Notation::init();
 
     auto pr = modularity::ioc()->resolve<diagnostics::IDiagnosticsPathsRegister>(moduleName());
     if (pr) {
-        io::paths instrPaths = s_configuration->instrumentListPaths();
-        for (const io::path& p : instrPaths) {
+        io::paths_t instrPaths = s_configuration->instrumentListPaths();
+        for (const io::path_t& p : instrPaths) {
             pr->reg("instruments", p);
         }
 
-        io::paths uinstrPaths = s_configuration->userInstrumentListPaths();
-        for (const io::path& p : uinstrPaths) {
+        io::paths_t uinstrPaths = s_configuration->userInstrumentListPaths();
+        for (const io::path_t& p : uinstrPaths) {
             pr->reg("user instruments", p);
         }
 
-        io::paths scoreOrderPaths = s_configuration->scoreOrderListPaths();
-        for (const io::path& p : scoreOrderPaths) {
+        io::paths_t scoreOrderPaths = s_configuration->scoreOrderListPaths();
+        for (const io::path_t& p : scoreOrderPaths) {
             pr->reg("scoreOrder", p);
         }
 
-        io::paths uscoreOrderPaths = s_configuration->userScoreOrderListPaths();
-        for (const io::path& p : uscoreOrderPaths) {
+        io::paths_t uscoreOrderPaths = s_configuration->userScoreOrderListPaths();
+        for (const io::path_t& p : uscoreOrderPaths) {
             pr->reg("user scoreOrder", p);
         }
     }

@@ -22,9 +22,13 @@
 #ifndef MU_PROJECT_PROJECTTYPES_H
 #define MU_PROJECT_PROJECTTYPES_H
 
+#include <variant>
+
 #include <QString>
+#include <QUrl>
 
 #include "io/path.h"
+#include "log.h"
 
 #include "notation/notationtypes.h"
 
@@ -37,7 +41,7 @@ struct ProjectCreateOptions
     QString lyricist;
     QString copyright;
 
-    io::path templatePath;
+    io::path_t templatePath;
 
     notation::ScoreCreateOptions scoreOptions;
 };
@@ -49,9 +53,11 @@ struct MigrationOptions
     bool isApplyMigration = false;
     bool isAskAgain = true;
 
-    // for MU 4.0 (from 3.6)
-    bool isApplyLeland = false;
-    bool isApplyEdwin = false;
+    bool isApplyLeland = true;
+    bool isApplyEdwin = true;
+    bool isApplyAutoSpacing = true;
+
+    bool isValid() const { return appVersion != 0; }
 };
 
 enum class SaveMode
@@ -59,13 +65,91 @@ enum class SaveMode
     Save,
     SaveAs,
     SaveCopy,
-    SaveSelection
+    SaveSelection,
+    AutoSave
+};
+
+enum class SaveLocationType
+{
+    Undefined,
+    Local,
+    Cloud
+};
+
+enum class CloudProjectVisibility {
+    Undefined,
+    Private,
+    Public
+};
+
+struct CloudProjectInfo {
+    QUrl sourceUrl;
+    QString name;
+
+    CloudProjectVisibility visibility = CloudProjectVisibility::Undefined;
+
+    bool isValid() const
+    {
+        return !name.isEmpty();
+    }
+};
+
+struct SaveLocation
+{
+    SaveLocationType type = SaveLocationType::Undefined;
+
+    std::variant<io::path_t, CloudProjectInfo> data;
+
+    bool isLocal() const
+    {
+        return type == SaveLocationType::Local
+               && std::holds_alternative<io::path_t>(data);
+    }
+
+    bool isCloud() const
+    {
+        return type == SaveLocationType::Cloud
+               && std::holds_alternative<CloudProjectInfo>(data);
+    }
+
+    bool isValid() const
+    {
+        return isLocal() || isCloud();
+    }
+
+    const io::path_t& localPath() const
+    {
+        IF_ASSERT_FAILED(isLocal()) {
+            static io::path_t null;
+            return null;
+        }
+
+        return std::get<io::path_t>(data);
+    }
+
+    const CloudProjectInfo& cloudInfo() const
+    {
+        IF_ASSERT_FAILED(isCloud()) {
+            static CloudProjectInfo null;
+            return null;
+        }
+
+        return std::get<CloudProjectInfo>(data);
+    }
+
+    SaveLocation() = default;
+
+    SaveLocation(const io::path_t& localPath)
+        : type(SaveLocationType::Local), data(localPath) {}
+
+    SaveLocation(const CloudProjectInfo& cloudInfo)
+        : type(SaveLocationType::Cloud), data(cloudInfo) {}
 };
 
 struct ProjectMeta
 {
-    io::path fileName;
-    io::path filePath;
+    io::path_t filePath;
+
     QString title;
     QString subtitle;
     QString composer;
@@ -84,19 +168,92 @@ struct ProjectMeta
     int mscVersion = 0;
 
     QVariantMap additionalTags;
+
+    io::path_t fileName(bool includingExtension = true) const
+    {
+        return io::filename(filePath, includingExtension);
+    }
+
+    bool operator==(const ProjectMeta& other) const
+    {
+        bool equal = filePath == other.filePath;
+        equal &= title == other.title;
+        equal &= subtitle == other.subtitle;
+        equal &= composer == other.composer;
+        equal &= lyricist == other.lyricist;
+        equal &= copyright == other.copyright;
+        equal &= translator == other.translator;
+        equal &= arranger == other.arranger;
+        equal &= partsCount == other.partsCount;
+        equal &= creationDate == other.creationDate;
+        equal &= source == other.source;
+        equal &= platform == other.platform;
+        equal &= musescoreVersion == other.musescoreVersion;
+        equal &= musescoreRevision == other.musescoreRevision;
+        equal &= mscVersion == other.mscVersion;
+        equal &= additionalTags == other.additionalTags;
+        equal &= thumbnail.toImage() == other.thumbnail.toImage();
+        return equal;
+    }
+
+    bool operator!=(const ProjectMeta& other) const
+    {
+        return !(*this == other);
+    }
 };
 
 using ProjectMetaList = QList<ProjectMeta>;
 
-struct Template : public ProjectMeta {
+struct Template
+{
     QString categoryTitle;
-
-    Template() = default;
-    Template(const ProjectMeta& meta)
-        : ProjectMeta(meta) {}
+    ProjectMeta meta;
 };
 
 using Templates = QList<Template>;
+
+class GenerateAudioTimePeriod
+{
+    Q_GADGET
+
+public:
+    enum class Type {
+        Never = 0,
+        Always,
+        AfterCertainNumberOfSaves
+    };
+    Q_ENUM(Type)
+};
+
+using GenerateAudioTimePeriodType = GenerateAudioTimePeriod::Type;
+
+class Migration
+{
+    Q_GADGET
+
+public:
+    enum class Type
+    {
+        Unknown,
+        Pre300,
+        Post300AndPre362,
+        Ver362
+    };
+    Q_ENUM(Type)
+};
+
+using MigrationType = Migration::Type;
+
+inline std::vector<MigrationType> allMigrationTypes()
+{
+    static const std::vector<MigrationType> types {
+        MigrationType::Pre300,
+        MigrationType::Post300AndPre362,
+        MigrationType::Ver362
+    };
+
+    return types;
+}
 }
 
 #endif // MU_PROJECT_PROJECTTYPES_H

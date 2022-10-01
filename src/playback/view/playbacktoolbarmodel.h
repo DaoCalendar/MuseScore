@@ -22,13 +22,13 @@
 #ifndef MU_PLAYBACK_PLAYBACKTOOLBARMODEL_H
 #define MU_PLAYBACK_PLAYBACKTOOLBARMODEL_H
 
-#include "ui/view/abstractmenumodel.h"
+#include "uicomponents/view/abstractmenumodel.h"
 
 #include "modularity/ioc.h"
 #include "iplaybackcontroller.h"
 
 namespace mu::playback {
-class PlaybackToolBarModel : public ui::AbstractMenuModel
+class PlaybackToolBarModel : public uicomponents::AbstractMenuModel
 {
     Q_OBJECT
 
@@ -38,15 +38,16 @@ class PlaybackToolBarModel : public ui::AbstractMenuModel
     Q_PROPERTY(bool isPlayAllowed READ isPlayAllowed NOTIFY isPlayAllowedChanged)
 
     Q_PROPERTY(QDateTime maxPlayTime READ maxPlayTime NOTIFY maxPlayTimeChanged)
-    Q_PROPERTY(QDateTime playTime READ playTime WRITE setPlayTime NOTIFY playTimeChanged)
-    Q_PROPERTY(qreal playPosition READ playPosition WRITE setPlayPosition NOTIFY playTimeChanged)
 
-    Q_PROPERTY(int measureNumber READ measureNumber WRITE setMeasureNumber NOTIFY playTimeChanged)
-    Q_PROPERTY(int maxMeasureNumber READ maxMeasureNumber NOTIFY playTimeChanged)
-    Q_PROPERTY(int beatNumber READ beatNumber WRITE setBeatNumber NOTIFY playTimeChanged)
-    Q_PROPERTY(int maxBeatNumber READ maxBeatNumber NOTIFY playTimeChanged)
+    Q_PROPERTY(QDateTime playTime READ playTime WRITE setPlayTime NOTIFY playPositionChanged)
+    Q_PROPERTY(qreal playPosition READ playPosition WRITE setPlayPosition NOTIFY playPositionChanged)
+    Q_PROPERTY(int measureNumber READ measureNumber WRITE setMeasureNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int maxMeasureNumber READ maxMeasureNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int beatNumber READ beatNumber WRITE setBeatNumber NOTIFY playPositionChanged)
+    Q_PROPERTY(int maxBeatNumber READ maxBeatNumber NOTIFY playPositionChanged)
 
-    Q_PROPERTY(QVariant tempo READ tempo NOTIFY playTimeChanged)
+    Q_PROPERTY(QVariant tempo READ tempo NOTIFY tempoChanged)
+    Q_PROPERTY(qreal tempoMultiplier READ tempoMultiplier WRITE setTempoMultiplier NOTIFY tempoChanged)
 
 public:
     explicit PlaybackToolBarModel(QObject* parent = nullptr);
@@ -64,6 +65,7 @@ public:
     int maxBeatNumber() const;
 
     QVariant tempo() const;
+    qreal tempoMultiplier() const;
 
     Q_INVOKABLE void load() override;
 
@@ -73,12 +75,14 @@ public slots:
     void setPlayTime(const QDateTime& time);
     void setMeasureNumber(int measureNumber);
     void setBeatNumber(int beatNumber);
+    void setTempoMultiplier(qreal multiplier);
 
 signals:
     void isToolbarFloatingChanged(bool floating);
     void isPlayAllowedChanged();
     void maxPlayTimeChanged();
-    void playTimeChanged();
+    void playPositionChanged();
+    void tempoChanged();
 
 private:
     void setupConnections();
@@ -88,16 +92,13 @@ private:
 
     bool isAdditionalAction(const actions::ActionCode& actionCode) const;
 
-    ui::MenuItem makeActionWithDescriptionAsTitle(const actions::ActionCode& actionCode) const;
-
     QTime totalPlayTime() const;
-    uint64_t totalPlayTimeMilliseconds() const;
     notation::MeasureBeat measureBeat() const;
 
-    void updatePlayTime();
+    void updatePlayPosition();
     void doSetPlayTime(const QTime& time);
 
-    void rewind(uint64_t milliseconds);
+    void rewind(audio::msecs_t milliseconds);
     void rewindToBeat(const notation::MeasureBeat& beat);
 
     bool m_isToolbarFloating = false;

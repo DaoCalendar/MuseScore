@@ -21,19 +21,29 @@
  */
 
 #include "elementmap.h"
-#include "tupletmap.h"
-#include "tiemap.h"
-#include "slur.h"
-#include "chordrest.h"
 
-namespace Ms {
+#include "containers.h"
+
+#include "tupletmap.h"
+
+namespace mu::engraving {
+EngravingItem* ElementMap::findNew(EngravingItem* o) const
+{
+    return mu::value(*this, o, nullptr);
+}
+
+void ElementMap::add(EngravingItem* o, EngravingItem* n)
+{
+    insert_or_assign(o, n);
+}
+
 //---------------------------------------------------------
 //   findNew
 //---------------------------------------------------------
 
 Tuplet* TupletMap::findNew(Tuplet* o)
 {
-    foreach (const Tuplet2& t2, map) {
+    for (const Tuplet2& t2 : map) {
         if (t2.o == o) {
             return t2.n;
         }

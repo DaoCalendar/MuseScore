@@ -29,6 +29,7 @@
 #include "async/asyncable.h"
 #include "context/iglobalcontext.h"
 #include "actions/iactionsdispatcher.h"
+#include "project/inotationproject.h"
 
 namespace mu::notation {
 class NotationSwitchListModel : public QAbstractListModel, public async::Asyncable
@@ -48,27 +49,38 @@ public:
     Q_INVOKABLE void load();
     Q_INVOKABLE void setCurrentNotation(int index);
     Q_INVOKABLE void closeNotation(int index);
+    Q_INVOKABLE void closeOtherNotations(int index);
+    Q_INVOKABLE void closeAllNotations();
+
+    Q_INVOKABLE QVariantList contextMenuItems(int index) const;
+    Q_INVOKABLE void handleContextMenuItem(int index, const QString& itemId);
 
 signals:
     void currentNotationIndexChanged(int index);
 
 private:
-    IMasterNotationPtr masterNotation() const;
+    void onCurrentProjectChanged();
+    void onCurrentNotationChanged();
+
+    INotationPtr currentNotation() const;
+    IMasterNotationPtr currentMasterNotation() const;
 
     void loadNotations();
+    void listenProjectSavingStatusChanged();
     void listenNotationOpeningStatus(INotationPtr notation);
     void listenNotationTitleChanged(INotationPtr notation);
-    void listenNotationSavingStatus(IMasterNotationPtr masterNotation);
     bool isIndexValid(int index) const;
 
     bool isMasterNotation(const INotationPtr notation) const;
 
     enum Roles {
         RoleTitle = Qt::UserRole + 1,
-        RoleNeedSave
+        RoleNeedSave,
+        RoleIsCloud
     };
 
     QList<INotationPtr> m_notations;
+    std::unique_ptr<async::Asyncable> m_notationChangedReceiver;
 };
 }
 

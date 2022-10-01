@@ -30,11 +30,11 @@ import MuseScore.Shortcuts 1.0
 Dialog {
     id: root
 
-    signal applySequenceRequested(var newSequence)
+    signal applySequenceRequested(string newSequence, int conflictShortcutIndex)
 
-    function startEdit(sequence, allShortcuts) {
+    function startEdit(shortcut, allShortcuts) {
+        model.load(shortcut, allShortcuts)
         open()
-        model.load(sequence, allShortcuts)
         content.forceActiveFocus()
     }
 
@@ -47,6 +47,10 @@ Dialog {
 
     EditShortcutModel {
         id: model
+
+        onApplyNewSequenceRequested: function(newSequence, conflictShortcutIndex) {
+            root.applySequenceRequested(newSequence, conflictShortcutIndex)
+        }
     }
 
     Rectangle {
@@ -82,7 +86,7 @@ Dialog {
                     width: parent.width
                     horizontalAlignment: Qt.AlignLeft
 
-                    text: model.errorMessage
+                    text: model.conflictWarning
                 }
 
                 RowLayout {
@@ -94,7 +98,7 @@ Dialog {
                     StyledTextLabel {
                         Layout.alignment: Qt.AlignVCenter
 
-                        text: qsTrc("shortcuts", "Old shortcuts:")
+                        text: qsTrc("shortcuts", "Old shortcut:")
                     }
 
                     TextInputField {
@@ -124,7 +128,7 @@ Dialog {
 
                         hint: qsTrc("shortcuts", "Type to set shortcut")
                         readOnly: true
-                        currentText: model.inputedSequence
+                        currentText: model.newSequence
 
                         onActiveFocusChanged: {
                             if (activeFocus) {
@@ -141,41 +145,7 @@ Dialog {
 
                 readonly property int buttonWidth: 100
 
-                FlatButton {
-                    width: parent.buttonWidth
-
-                    text: qsTrc("global", "Clear")
-
-                    onClicked: {
-                        model.clear()
-                    }
-                }
-
                 Item { Layout.fillWidth: true }
-
-                FlatButton {
-                    width: parent.buttonWidth
-
-                    text: qsTrc("global", "Add")
-                    enabled: model.canApplySequence
-
-                    onClicked: {
-                        root.applySequenceRequested(model.unitedSequence())
-                        root.accept()
-                    }
-                }
-
-                FlatButton {
-                    width: parent.buttonWidth
-
-                    text: qsTrc("global", "Replace")
-                    enabled: model.canApplySequence
-
-                    onClicked: {
-                        root.applySequenceRequested(model.inputedSequence)
-                        root.accept()
-                    }
-                }
 
                 FlatButton {
                     width: parent.buttonWidth
@@ -186,14 +156,25 @@ Dialog {
                         root.reject()
                     }
                 }
+
+                FlatButton {
+                    width: parent.buttonWidth
+
+                    text: qsTrc("global", "Save")
+
+                    onClicked: {
+                        model.applyNewSequence()
+                        root.accept()
+                    }
+                }
             }
         }
 
-        Keys.onShortcutOverride: {
+        Keys.onShortcutOverride: function(event) {
             event.accepted = true
         }
 
-        Keys.onPressed: {
+        Keys.onPressed: function(event) {
             model.inputKey(event.key, event.modifiers)
         }
     }

@@ -27,7 +27,10 @@
 #include "libmscore/masterscore.h"
 #include "libmscore/engravingobject.h"
 
-namespace Ms {
+using namespace mu;
+using namespace mu::engraving;
+
+namespace mu::engraving {
 namespace PluginAPI {
 //---------------------------------------------------------
 //   ScoreElement
@@ -42,7 +45,7 @@ ScoreElement::~ScoreElement()
 
 QString ScoreElement::name() const
 {
-    return QString(e->name());
+    return QString(e->typeName());
 }
 
 int ScoreElement::type() const
@@ -59,7 +62,7 @@ int ScoreElement::type() const
 
 QString ScoreElement::userName() const
 {
-    return e->userName();
+    return e->translatedTypeUserName();
 }
 
 //---------------------------------------------------------
@@ -75,35 +78,34 @@ qreal ScoreElement::spatium() const
 //   ScoreElement::get
 //---------------------------------------------------------
 
-QVariant ScoreElement::get(Ms::Pid pid) const
+QVariant ScoreElement::get(mu::engraving::Pid pid) const
 {
     if (!e) {
         return QVariant();
     }
-    const QVariant val = e->getProperty(pid);
-    switch (propertyType(pid)) {
+    const PropertyValue val = e->getProperty(pid);
+    switch (val.type()) {
     case P_TYPE::FRACTION: {
         const Fraction f(val.value<Fraction>());
         return QVariant::fromValue(wrap(f));
     }
-    case P_TYPE::POINT_SP:
-    case P_TYPE::POINT_SP_MM:
-        return val.toPointF() / spatium();
-    case P_TYPE::SP_REAL:
+    case P_TYPE::POINT:
+        return val.value<PointF>().toQPointF() / spatium();
+    case P_TYPE::MILLIMETRE:
         return val.toReal() / spatium();
     case P_TYPE::SPATIUM:
         return val.value<Spatium>().val();
     default:
         break;
     }
-    return val;
+    return val.toQVariant();
 }
 
 //---------------------------------------------------------
 //   ScoreElement::set
 //---------------------------------------------------------
 
-void ScoreElement::set(Ms::Pid pid, QVariant val)
+void ScoreElement::set(mu::engraving::Pid pid, QVariant val)
 {
     if (!e) {
         return;
@@ -113,21 +115,17 @@ void ScoreElement::set(Ms::Pid pid, QVariant val)
     case P_TYPE::FRACTION: {
         FractionWrapper* f = val.value<FractionWrapper*>();
         if (!f) {
-            qWarning("ScoreElement::set: trying to assign value of wrong type to fractional property");
+            LOGW("ScoreElement::set: trying to assign value of wrong type to fractional property");
             return;
         }
-        val = QVariant::fromValue(f->fraction());
+        val = f->fraction().toString().toQString();
     }
     break;
-    case P_TYPE::POINT_SP:
-    case P_TYPE::POINT_SP_MM:
+    case P_TYPE::POINT:
         val = val.toPointF() * spatium();
         break;
-    case P_TYPE::SP_REAL:
+    case P_TYPE::MILLIMETRE:
         val = val.toReal() * spatium();
-        break;
-    case P_TYPE::SPATIUM:
-        val = QVariant::fromValue(Spatium(val.toReal()));
         break;
     default:
         break;
@@ -137,9 +135,9 @@ void ScoreElement::set(Ms::Pid pid, QVariant val)
     const PropertyFlags newFlags = (f == PropertyFlags::NOSTYLE) ? f : PropertyFlags::UNSTYLED;
 
     if (_ownership == Ownership::SCORE) {
-        e->undoChangeProperty(pid, val, newFlags);
+        e->undoChangeProperty(pid, PropertyValue::fromQVariant(val, propertyType(pid)), newFlags);
     } else { // not added to a score so no need (and dangerous) to deal with undo stack
-        e->setProperty(pid, val);
+        e->setProperty(pid, PropertyValue::fromQVariant(val, propertyType(pid)));
         e->setPropertyFlags(pid, newFlags);
     }
 }
@@ -147,11 +145,11 @@ void ScoreElement::set(Ms::Pid pid, QVariant val)
 //---------------------------------------------------------
 //   wrap
 ///   \cond PLUGIN_API \private \endcond
-///   Wraps Ms::ScoreElement choosing the correct wrapper
+///   Wraps mu::engraving::ScoreElement choosing the correct wrapper
 ///   type at runtime based on the actual element type.
 //---------------------------------------------------------
 
-ScoreElement* wrap(Ms::EngravingObject* se, Ownership own)
+ScoreElement* wrap(mu::engraving::EngravingObject* se, Ownership own)
 {
     if (!se) {
         return nullptr;
@@ -160,7 +158,7 @@ ScoreElement* wrap(Ms::EngravingObject* se, Ownership own)
         return wrap(toEngravingItem(se), own);
     }
 
-    using Ms::ElementType;
+    using mu::engraving::ElementType;
     switch (se->type()) {
     case ElementType::SCORE:
         return wrap<Score>(toScore(se), own);

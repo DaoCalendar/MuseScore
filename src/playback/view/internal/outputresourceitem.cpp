@@ -4,6 +4,7 @@
 
 #include "log.h"
 #include "translation.h"
+#include "stringutils.h"
 
 using namespace mu::playback;
 using namespace mu::audio;
@@ -43,7 +44,9 @@ void OutputResourceItem::requestAvailableResources()
                                 NO_FX_MENU_ITEM_ID(),
                                 m_currentFxParams.resourceMeta.id.empty());
 
-        result << buildSeparator();
+        if (!m_fxByVendorMap.empty()) {
+            result << buildSeparator();
+        }
 
         for (const auto& pair : m_fxByVendorMap) {
             const QString& vendor = QString::fromStdString(pair.first);
@@ -81,7 +84,7 @@ void OutputResourceItem::handleMenuItem(const QString& menuItemId)
 
     const AudioResourceId& newSelectedResourceId = menuItemId.toStdString();
 
-    for (auto& pair : m_fxByVendorMap) {
+    for (const auto& pair : m_fxByVendorMap) {
         for (const AudioResourceMeta& fxResourceMeta : pair.second) {
             if (newSelectedResourceId != fxResourceMeta.id) {
                 continue;
@@ -97,6 +100,16 @@ const AudioFxParams& OutputResourceItem::params() const
     return m_currentFxParams;
 }
 
+void OutputResourceItem::setParams(const audio::AudioFxParams& params)
+{
+    if (m_currentFxParams == params) {
+        return;
+    }
+
+    m_currentFxParams = params;
+    emit fxParamsChanged();
+}
+
 QString OutputResourceItem::title() const
 {
     return QString::fromStdString(m_currentFxParams.resourceMeta.id);
@@ -105,6 +118,11 @@ QString OutputResourceItem::title() const
 bool OutputResourceItem::isActive() const
 {
     return m_currentFxParams.active;
+}
+
+QString OutputResourceItem::id() const
+{
+    return QString::number(m_currentFxParams.chainOrder);
 }
 
 void OutputResourceItem::setIsActive(bool newIsActive)
@@ -133,7 +151,7 @@ void OutputResourceItem::updateCurrentFxParams(const AudioResourceMeta& newMeta)
     emit fxParamsChanged();
     emit isBlankChanged();
 
-    requestToLaunchNativeEditorView();
+    updateNativeEditorView();
 }
 
 void OutputResourceItem::updateAvailableFxVendorsMap(const audio::AudioResourceMetaList& availableFxResources)
@@ -143,6 +161,10 @@ void OutputResourceItem::updateAvailableFxVendorsMap(const audio::AudioResourceM
     for (const auto& meta : availableFxResources) {
         AudioResourceMetaList& fxResourceList = m_fxByVendorMap[meta.vendor];
         fxResourceList.push_back(meta);
+    }
+
+    for (auto& [vendor, fxResourceList] : m_fxByVendorMap) {
+        sortResourcesList(fxResourceList);
     }
 }
 

@@ -23,7 +23,10 @@
 #ifndef MU_NOTATION_INOTATIONACCESSIBILITY_H
 #define MU_NOTATION_INOTATIONACCESSIBILITY_H
 
-#include "retval.h"
+#include "types/retval.h"
+#include "notationtypes.h"
+
+#include "engraving/accessibility/accessibleroot.h"
 
 namespace mu::notation {
 class INotationAccessibility
@@ -32,6 +35,12 @@ public:
     virtual ~INotationAccessibility() = default;
 
     virtual ValCh<std::string> accessibilityInfo() const = 0;
+
+    virtual void setMapToScreenFunc(const mu::engraving::AccessibleMapToScreenFunc& func) = 0;
+
+    virtual void setEnabled(bool enabled) = 0;
+
+    virtual void setTriggeredCommand(const std::string& command) = 0;
 };
 
 using INotationAccessibilityPtr = std::shared_ptr<INotationAccessibility>;

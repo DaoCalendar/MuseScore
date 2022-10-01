@@ -20,35 +20,34 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "style/style.h"
-#include "io/xml.h"
+#include "containers.h"
+#include "rw/xml.h"
+#include "types/typesconv.h"
 
-#include "factory.h"
-#include "mscore.h"
-#include "staff.h"
-#include "part.h"
-#include "clef.h"
-#include "score.h"
-#include "bracket.h"
-#include "keysig.h"
-#include "segment.h"
-#include "measure.h"
-#include "stringdata.h"
-#include "stafftype.h"
-#include "undo.h"
-#include "cleflist.h"
-#include "timesig.h"
-#include "instrtemplate.h"
 #include "barline.h"
-#include "ottava.h"
-#include "harmony.h"
+#include "bracket.h"
 #include "bracketItem.h"
 #include "chord.h"
-#include "masterscore.h"
-#include "excerpt.h"
+#include "clef.h"
+#include "cleflist.h"
+#include "factory.h"
+#include "instrtemplate.h"
 #include "linkedobjects.h"
+#include "masterscore.h"
+#include "measure.h"
+#include "mscore.h"
+#include "note.h"
+#include "ottava.h"
+#include "part.h"
+#include "score.h"
+#include "segment.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "timesig.h"
 
 // #define DEBUG_CLEFS
+
+#include "log.h"
 
 using namespace mu;
 using namespace mu::engraving;
@@ -59,7 +58,7 @@ using namespace mu::engraving;
 #define DUMP_CLEFS(s)
 #endif
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Staff
 //---------------------------------------------------------
@@ -87,7 +86,7 @@ Staff::Staff(const Staff& staff)
 
 Staff::~Staff()
 {
-    qDeleteAll(brackets());
+    DeleteAll(brackets());
 }
 
 //---------------------------------------------------------
@@ -103,9 +102,9 @@ Staff* Staff::clone() const
 //   idx
 //---------------------------------------------------------
 
-int Staff::idx() const
+staff_idx_t Staff::idx() const
 {
-    return score()->staves().indexOf((Staff*)this, 0);
+    return mu::indexOf(score()->staves(), (Staff*)this);
 }
 
 //---------------------------------------------------------
@@ -127,13 +126,13 @@ void Staff::triggerLayout(const Fraction& tick)
 //    make sure index idx is valid
 //---------------------------------------------------------
 
-void Staff::fillBrackets(int idx)
+void Staff::fillBrackets(size_t idx)
 {
-    for (int i = _brackets.size(); i <= idx; ++i) {
+    for (size_t i = _brackets.size(); i <= idx; ++i) {
         BracketItem* bi = Factory::createBracketItem(score()->dummy());
         bi->setStaff(this);
         bi->setColumn(i);
-        _brackets.append(bi);
+        _brackets.push_back(bi);
     }
 }
 
@@ -144,8 +143,8 @@ void Staff::fillBrackets(int idx)
 
 void Staff::cleanBrackets()
 {
-    while (!_brackets.empty() && (_brackets.last()->bracketType() == BracketType::NO_BRACKET)) {
-        BracketItem* bi = _brackets.takeLast();
+    while (!_brackets.empty() && (_brackets.back()->bracketType() == BracketType::NO_BRACKET)) {
+        BracketItem* bi = mu::takeLast(_brackets);
         delete bi;
     }
 }
@@ -154,7 +153,7 @@ void Staff::cleanBrackets()
 //   bracket
 //---------------------------------------------------------
 
-BracketType Staff::bracketType(int idx) const
+BracketType Staff::bracketType(size_t idx) const
 {
     if (idx < _brackets.size()) {
         return _brackets[idx]->bracketType();
@@ -166,7 +165,7 @@ BracketType Staff::bracketType(int idx) const
 //   bracketSpan
 //---------------------------------------------------------
 
-int Staff::bracketSpan(int idx) const
+size_t Staff::bracketSpan(size_t idx) const
 {
     if (idx < _brackets.size()) {
         return _brackets[idx]->bracketSpan();
@@ -178,7 +177,7 @@ int Staff::bracketSpan(int idx) const
 //   setBracket
 //---------------------------------------------------------
 
-void Staff::setBracketType(int idx, BracketType val)
+void Staff::setBracketType(size_t idx, BracketType val)
 {
     fillBrackets(idx);
     _brackets[idx]->setBracketType(val);
@@ -189,13 +188,13 @@ void Staff::setBracketType(int idx, BracketType val)
 //   swapBracket
 //---------------------------------------------------------
 
-void Staff::swapBracket(int oldIdx, int newIdx)
+void Staff::swapBracket(size_t oldIdx, size_t newIdx)
 {
-    int idx = qMax(oldIdx, newIdx);
+    size_t idx = std::max(oldIdx, newIdx);
     fillBrackets(idx);
     _brackets[oldIdx]->setColumn(newIdx);
     _brackets[newIdx]->setColumn(oldIdx);
-    _brackets.swapItemsAt(oldIdx, newIdx);
+    mu::swapItemsAt(_brackets, oldIdx, newIdx);
     cleanBrackets();
 }
 
@@ -203,17 +202,17 @@ void Staff::swapBracket(int oldIdx, int newIdx)
 //   changeBracketColumn
 //---------------------------------------------------------
 
-void Staff::changeBracketColumn(int oldColumn, int newColumn)
+void Staff::changeBracketColumn(size_t oldColumn, size_t newColumn)
 {
-    int idx = qMax(oldColumn, newColumn);
+    size_t idx = std::max(oldColumn, newColumn);
     fillBrackets(idx);
     int step = newColumn > oldColumn ? 1 : -1;
-    for (int i = oldColumn; i != newColumn; i += step) {
-        int oldIdx = i;
-        int newIdx = i + step;
+    for (size_t i = oldColumn; i != newColumn; i += step) {
+        size_t oldIdx = i;
+        size_t newIdx = i + step;
         _brackets[oldIdx]->setColumn(newIdx);
         _brackets[newIdx]->setColumn(oldIdx);
-        _brackets.swapItemsAt(oldIdx, newIdx);
+        mu::swapItemsAt(_brackets, oldIdx, newIdx);
     }
     cleanBrackets();
 }
@@ -222,10 +221,8 @@ void Staff::changeBracketColumn(int oldColumn, int newColumn)
 //   setBracketSpan
 //---------------------------------------------------------
 
-void Staff::setBracketSpan(int idx, int val)
+void Staff::setBracketSpan(size_t idx, size_t val)
 {
-    Q_ASSERT(idx >= 0);
-    Q_ASSERT(val >= 0);
     fillBrackets(idx);
     _brackets[idx]->setBracketSpan(val);
 }
@@ -245,11 +242,11 @@ void Staff::addBracket(BracketItem* b)
         //
         for (Staff* s : score()->staves()) {
             if (s == this) {
-                s->_brackets.append(b);
+                s->_brackets.push_back(b);
             } else {
                 BracketItem* bi = Factory::createBracketItem(score()->dummy());
                 bi->setStaff(this);
-                s->_brackets.append(bi);
+                s->_brackets.push_back(bi);
             }
         }
     }
@@ -263,13 +260,13 @@ void Staff::addBracket(BracketItem* b)
 
 BracketType Staff::innerBracket() const
 {
-    int staffIdx = idx();
+    staff_idx_t staffIdx = idx();
 
     BracketType t = BracketType::NO_BRACKET;
-    int level = 1000;
-    for (int i = 0; i < score()->nstaves(); ++i) {
+    size_t level = 1000;
+    for (size_t i = 0; i < score()->nstaves(); ++i) {
         Staff* staff = score()->staff(i);
-        for (int k = 0; k < staff->brackets().size(); ++k) {
+        for (size_t k = 0; k < staff->brackets().size(); ++k) {
             const BracketItem* bi = staff->brackets().at(k);
             if (bi->bracketType() != BracketType::NO_BRACKET) {
                 if (i < staffIdx && ((i + bi->bracketSpan()) > staffIdx) && k < level) {
@@ -298,18 +295,18 @@ std::array<bool, VOICES> Staff::visibilityVoices() const
     return _visibilityVoices;
 }
 
-bool Staff::isVoiceVisible(int voice) const
+bool Staff::isVoiceVisible(voice_idx_t voice) const
 {
-    if (voice < 0 || voice >= VOICES) {
+    if (voice >= VOICES) {
         return false;
     }
 
     return _visibilityVoices[voice];
 }
 
-void Staff::setVoiceVisible(int voice, bool visible)
+void Staff::setVoiceVisible(voice_idx_t voice, bool visible)
 {
-    if (voice < 0 || voice >= VOICES) {
+    if (voice >= VOICES) {
         return;
     }
 
@@ -329,13 +326,8 @@ bool Staff::canDisableVoice() const
     return countOfVisibleVoices > 1;
 }
 
-void Staff::updateVisibilityVoices(Staff* masterStaff)
+void Staff::updateVisibilityVoices(Staff* masterStaff, const TracksMap& tracks)
 {
-    if (!score()->excerpt()) {
-        return;
-    }
-
-    auto tracks = score()->excerpt()->tracks();
     if (tracks.empty()) {
         _visibilityVoices = { true, true, true, true };
         return;
@@ -343,10 +335,10 @@ void Staff::updateVisibilityVoices(Staff* masterStaff)
 
     std::array<bool, VOICES> voices{ false, false, false, false };
 
-    int voiceIndex = 0;
-    for (int voice = 0; voice < VOICES; voice++) {
-        QList<int> masterStaffTracks = tracks.values(masterStaff->idx() * VOICES + voice % VOICES);
-        bool isVoiceVisible = masterStaffTracks.contains(idx() * VOICES + voiceIndex % VOICES);
+    voice_idx_t voiceIndex = 0;
+    for (voice_idx_t voice = 0; voice < VOICES; voice++) {
+        std::vector<track_idx_t> masterStaffTracks = mu::values(tracks, masterStaff->idx() * VOICES + voice % VOICES);
+        bool isVoiceVisible = mu::contains(masterStaffTracks, idx() * VOICES + voiceIndex % VOICES);
         if (isVoiceVisible) {
             voices[voice] = true;
             voiceIndex++;
@@ -362,29 +354,29 @@ void Staff::updateVisibilityVoices(Staff* masterStaff)
 
 void Staff::cleanupBrackets()
 {
-    int index = idx();
-    int n = score()->nstaves();
-    for (int i = 0; i < _brackets.size(); ++i) {
+    staff_idx_t index = idx();
+    size_t n = score()->nstaves();
+    for (size_t i = 0; i < _brackets.size(); ++i) {
         if (_brackets[i]->bracketType() == BracketType::NO_BRACKET) {
             continue;
         }
-        int span = _brackets[i]->bracketSpan();
+        size_t span = _brackets[i]->bracketSpan();
         if (span > (n - index)) {
             span = n - index;
             _brackets[i]->setBracketSpan(span);
         }
     }
-    for (int i = 0; i < _brackets.size(); ++i) {
+    for (size_t i = 0; i < _brackets.size(); ++i) {
         if (_brackets[i]->bracketType() == BracketType::NO_BRACKET) {
             continue;
         }
-        int span = _brackets[i]->bracketSpan();
+        size_t span = _brackets[i]->bracketSpan();
         if (span <= 1) {
             _brackets[i] = Factory::createBracketItem(score()->dummy());
             _brackets[i]->setStaff(this);
         } else {
             // delete all other brackets with same span
-            for (int k = i + 1; k < _brackets.size(); ++k) {
+            for (size_t k = i + 1; k < _brackets.size(); ++k) {
                 if (span == _brackets[k]->bracketSpan()) {
                     _brackets[k] = Factory::createBracketItem(score()->dummy());
                     _brackets[k]->setStaff(this);
@@ -398,11 +390,11 @@ void Staff::cleanupBrackets()
 //   bracketLevels
 //---------------------------------------------------------
 
-int Staff::bracketLevels() const
+size_t Staff::bracketLevels() const
 {
-    int columns = 0;
+    size_t columns = 0;
     for (auto bi : _brackets) {
-        columns = qMax(columns, bi->column());
+        columns = std::max(columns, bi->column());
     }
     return columns;
 }
@@ -411,7 +403,7 @@ int Staff::bracketLevels() const
 //   partName
 //---------------------------------------------------------
 
-QString Staff::partName() const
+String Staff::partName() const
 {
     return _part->partName();
 }
@@ -485,9 +477,9 @@ Fraction Staff::currentClefTick(const Fraction& tick) const
     return Fraction::fromTicks(clefs.currentClefTick(tick.ticks()));
 }
 
-QString Staff::staffName() const
+String Staff::staffName() const
 {
-    return Ms::ClefInfo::name(defaultClefType()._transposingClef);
+    return TConv::translatedUserName(clefType(Fraction())._transposingClef);
 }
 
 #ifndef NDEBUG
@@ -497,9 +489,9 @@ QString Staff::staffName() const
 
 void Staff::dumpClefs(const char* title) const
 {
-    qDebug("(%zd): %s", clefs.size(), title);
+    LOGD("(%zd): %s", clefs.size(), title);
     for (auto& i : clefs) {
-        qDebug("  %d: %d %d", i.first, int(i.second._concertClef), int(i.second._transposingClef));
+        LOGD("  %d: %d %d", i.first, int(i.second._concertClef), int(i.second._transposingClef));
     }
 }
 
@@ -509,9 +501,9 @@ void Staff::dumpClefs(const char* title) const
 
 void Staff::dumpKeys(const char* title) const
 {
-    qDebug("(%zd): %s", _keys.size(), title);
+    LOGD("(%zd): %s", _keys.size(), title);
     for (auto& i : _keys) {
-        qDebug("  %d: %d", i.first, int(i.second.key()));
+        LOGD("  %d: %d", i.first, int(i.second.key()));
     }
 }
 
@@ -521,9 +513,9 @@ void Staff::dumpKeys(const char* title) const
 
 void Staff::dumpTimeSigs(const char* title) const
 {
-    qDebug("size (%zd) staffIdx %d: %s", timesigs.size(), idx(), title);
+    LOGD("size (%zd) staffIdx %zu: %s", timesigs.size(), idx(), title);
     for (auto& i : timesigs) {
-        qDebug("  %d: %d/%d", i.first, i.second->sig().numerator(), i.second->sig().denominator());
+        LOGD("  %d: %d/%d", i.first, i.second->sig().numerator(), i.second->sig().denominator());
     }
 }
 
@@ -678,7 +670,9 @@ void Staff::addTimeSig(TimeSig* timesig)
 void Staff::removeTimeSig(TimeSig* timesig)
 {
     if (timesig->segment()->segmentType() == SegmentType::TimeSig) {
-        timesigs.erase(timesig->segment()->tick().ticks());
+        if (timesigs[timesig->segment()->tick().ticks()] == timesig) {
+            timesigs.erase(timesig->segment()->tick().ticks());
+        }
     }
 //      dumpTimeSigs("after removeTimeSig");
 }
@@ -762,20 +756,20 @@ Fraction Staff::currentKeyTick(const Fraction& tick) const
 
 void Staff::write(XmlWriter& xml) const
 {
-    xml.startObject(this, QString("id=\"%1\"").arg(idx() + 1));
+    xml.startElement(this, { { "id", idx() + 1 } });
 
     if (links()) {
         Score* s = masterScore();
         for (auto le : *links()) {
             Staff* staff = toStaff(le);
             if ((staff->score() == s) && (staff != this)) {
-                xml.tag("linkedTo", staff->idx() + 1);
+                xml.tag("linkedTo", static_cast<int>(staff->idx() + 1));
             }
         }
     }
 
     // for copy/paste we need to know the actual transposition
-    if (xml.clipboardmode()) {
+    if (xml.context()->clipboardmode()) {
         Interval v = part()->instrument()->transpose();     // TODO: tick?
         if (v.diatonic) {
             xml.tag("transposeDiatonic", v.diatonic);
@@ -789,11 +783,11 @@ void Staff::write(XmlWriter& xml) const
     ClefTypeList ct = _defaultClefType;
     if (ct._concertClef == ct._transposingClef) {
         if (ct._concertClef != ClefType::G) {
-            xml.tag("defaultClef", ClefInfo::tag(ct._concertClef));
+            xml.tag("defaultClef", TConv::toXml(ct._concertClef));
         }
     } else {
-        xml.tag("defaultConcertClef", ClefInfo::tag(ct._concertClef));
-        xml.tag("defaultTransposingClef", ClefInfo::tag(ct._transposingClef));
+        xml.tag("defaultConcertClef", TConv::toXml(ct._concertClef));
+        xml.tag("defaultTransposingClef", TConv::toXml(ct._transposingClef));
     }
 
     if (isLinesInvisible(Fraction(0, 1))) {
@@ -814,13 +808,16 @@ void Staff::write(XmlWriter& xml) const
     if (_mergeMatchingRests) {
         xml.tag("mergeMatchingRests", _mergeMatchingRests);
     }
+    if (!visible()) {
+        xml.tag("isStaffVisible", visible());
+    }
 
     for (const BracketItem* i : _brackets) {
         BracketType a = i->bracketType();
-        int b = i->bracketSpan();
-        int c = i->column();
+        size_t b = i->bracketSpan();
+        size_t c = i->column();
         if (a != BracketType::NO_BRACKET || b > 0) {
-            xml.tagE(QString("bracket type=\"%1\" span=\"%2\" col=\"%3\"").arg(static_cast<int>(a)).arg(b).arg(c));
+            xml.tag("bracket", { { "type", static_cast<int>(a) }, { "span", b }, { "col", c } });
         }
     }
 
@@ -833,7 +830,7 @@ void Staff::write(XmlWriter& xml) const
     writeProperty(xml, Pid::PLAYBACK_VOICE2);
     writeProperty(xml, Pid::PLAYBACK_VOICE3);
     writeProperty(xml, Pid::PLAYBACK_VOICE4);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -855,21 +852,18 @@ void Staff::read(XmlReader& e)
 
 bool Staff::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
     if (tag == "StaffType") {
         StaffType st;
         st.read(e);
         setStaffType(Fraction(0, 1), st);
     } else if (tag == "defaultClef") {           // sets both default transposing and concert clef
-        QString val(e.readElementText());
-        ClefType ct = Clef::clefType(val);
+        ClefType ct = TConv::fromXml(e.readAsciiText(), ClefType::G);
         setDefaultClefType(ClefTypeList(ct, ct));
     } else if (tag == "defaultConcertClef") {
-        QString val(e.readElementText());
-        setDefaultClefType(ClefTypeList(Clef::clefType(val), defaultClefType()._transposingClef));
+        setDefaultClefType(ClefTypeList(TConv::fromXml(e.readAsciiText(), ClefType::G), defaultClefType()._transposingClef));
     } else if (tag == "defaultTransposingClef") {
-        QString val(e.readElementText());
-        setDefaultClefType(ClefTypeList(defaultClefType()._concertClef, Clef::clefType(val)));
+        setDefaultClefType(ClefTypeList(defaultClefType()._concertClef, TConv::fromXml(e.readAsciiText(), ClefType::G)));
     } else if (tag == "small") {                // obsolete
         staffType(Fraction(0, 1))->setSmall(e.readInt());
     } else if (tag == "invisible") {
@@ -884,12 +878,14 @@ bool Staff::readProperties(XmlReader& e)
         _hideSystemBarLine = e.readInt();
     } else if (tag == "mergeMatchingRests") {
         _mergeMatchingRests = e.readInt();
+    } else if (tag == "isStaffVisible") {
+        setVisible(e.readBool());
     } else if (tag == "keylist") {
         _keys.read(e, score());
     } else if (tag == "bracket") {
         int col = e.intAttribute("col", -1);
         if (col == -1) {
-            col = _brackets.size();
+            col = static_cast<int>(_brackets.size());
         }
         setBracketType(col, BracketType(e.intAttribute("type", -1)));
         setBracketSpan(col, e.intAttribute("span", 0));
@@ -909,13 +905,13 @@ bool Staff::readProperties(XmlReader& e)
         int v = e.readInt() - 1;
         Staff* st = score()->masterScore()->staff(v);
         if (_links) {
-            qDebug("Staff::readProperties: multiple <linkedTo> tags");
+            LOGD("Staff::readProperties: multiple <linkedTo> tags");
             if (!st || isLinked(st)) {     // maybe we don't need actually to relink...
                 return true;
             }
             // not using unlink() here as it may delete _links
             // a pointer to which is stored also in XmlReader.
-            _links->removeOne(this);
+            _links->remove(this);
             _links = nullptr;
         }
         if (st && st != this) {
@@ -923,14 +919,14 @@ bool Staff::readProperties(XmlReader& e)
         } else if (!score()->isMaster() && !st) {
             // if it is a master score it is OK not to find
             // a staff which is going after the current one.
-            qDebug("staff %d not found in parent", v);
+            LOGD("staff %d not found in parent", v);
         }
     } else if (tag == "color") {
         staffType(Fraction(0, 1))->setColor(e.readColor());
     } else if (tag == "transposeDiatonic") {
-        e.setTransposeDiatonic(e.readInt());
+        e.context()->setTransposeDiatonic(static_cast<int8_t>(e.readInt()));
     } else if (tag == "transposeChromatic") {
-        e.setTransposeChromatic(e.readInt());
+        e.context()->setTransposeChromatic(static_cast<int8_t>(e.readInt()));
     } else if (tag == "playbackVoice1") {
         setPlaybackVoice(0, e.readInt());
     } else if (tag == "playbackVoice2") {
@@ -949,7 +945,7 @@ bool Staff::readProperties(XmlReader& e)
 //   height
 //---------------------------------------------------------
 
-qreal Staff::height() const
+double Staff::height() const
 {
     Fraction tick = Fraction(0, 1);
     return (lines(tick) - 1) * spatium(tick) * staffType(tick)->lineDistance().val();
@@ -959,12 +955,12 @@ qreal Staff::height() const
 //   spatium
 //---------------------------------------------------------
 
-qreal Staff::spatium(const Fraction& tick) const
+double Staff::spatium(const Fraction& tick) const
 {
     return score()->spatium() * staffMag(tick);
 }
 
-qreal Staff::spatium(const EngravingItem* e) const
+double Staff::spatium(const EngravingItem* e) const
 {
     return score()->spatium() * staffMag(e);
 }
@@ -973,17 +969,17 @@ qreal Staff::spatium(const EngravingItem* e) const
 //   mag
 //---------------------------------------------------------
 
-qreal Staff::staffMag(const StaffType* stt) const
+double Staff::staffMag(const StaffType* stt) const
 {
     return (stt->isSmall() ? score()->styleD(Sid::smallStaffMag) : 1.0) * stt->userMag();
 }
 
-qreal Staff::staffMag(const Fraction& tick) const
+double Staff::staffMag(const Fraction& tick) const
 {
     return staffMag(staffType(tick));
 }
 
-qreal Staff::staffMag(const EngravingItem* element) const
+double Staff::staffMag(const EngravingItem* element) const
 {
     return staffMag(staffTypeForElement(element));
 }
@@ -996,13 +992,14 @@ SwingParameters Staff::swing(const Fraction& tick) const
 {
     SwingParameters sp;
     int swingUnit = 0;
-    QString unit = score()->styleSt(Sid::swingUnit);
+    ByteArray ba = score()->styleSt(Sid::swingUnit).toAscii();
+    DurationType unit = TConv::fromXml(ba.constChar(), DurationType::V_INVALID);
     int swingRatio = score()->styleI(Sid::swingRatio);
-    if (unit == TDuration(TDuration::DurationType::V_EIGHTH).name()) {
-        swingUnit = MScore::division / 2;
-    } else if (unit == TDuration(TDuration::DurationType::V_16TH).name()) {
-        swingUnit = MScore::division / 4;
-    } else if (unit == TDuration(TDuration::DurationType::V_ZERO).name()) {
+    if (unit == DurationType::V_EIGHTH) {
+        swingUnit = Constants::division / 2;
+    } else if (unit == DurationType::V_16TH) {
+        swingUnit = Constants::division / 4;
+    } else if (unit == DurationType::V_ZERO) {
         swingUnit = 0;
     }
     sp.swingRatio = swingRatio;
@@ -1010,12 +1007,14 @@ SwingParameters Staff::swing(const Fraction& tick) const
     if (_swingList.empty()) {
         return sp;
     }
-    QMap<int, SwingParameters>::const_iterator i = _swingList.upperBound(tick.ticks());
-    if (i == _swingList.begin()) {
+
+    std::vector<int> ticks = mu::keys(_swingList);
+    auto it = std::upper_bound(ticks.cbegin(), ticks.cend(), tick.ticks());
+    if (it == ticks.cbegin()) {
         return sp;
     }
-    --i;
-    return i.value();
+    --it;
+    return _swingList.at(*it);
 }
 
 //---------------------------------------------------------
@@ -1027,28 +1026,30 @@ int Staff::capo(const Fraction& tick) const
     if (_capoList.empty()) {
         return 0;
     }
-    QMap<int, int>::const_iterator i = _capoList.upperBound(tick.ticks());
-    if (i == _capoList.begin()) {
+
+    std::vector<int> ticks = mu::keys(_capoList);
+    auto it = std::upper_bound(ticks.cbegin(), ticks.cend(), tick.ticks());
+    if (it == ticks.cbegin()) {
         return 0;
     }
-    --i;
-    return i.value();
+    --it;
+    return _capoList.at(*it);
 }
 
 //---------------------------------------------------------
 //   getNotes
 //---------------------------------------------------------
 
-QList<Note*> Staff::getNotes() const
+std::list<Note*> Staff::getNotes() const
 {
-    QList<Note*> list;
+    std::list<Note*> list;
 
-    int staffIdx = idx();
+    staff_idx_t staffIdx = idx();
 
     SegmentType st = SegmentType::ChordRest;
     for (Segment* s = score()->firstSegment(st); s; s = s->next1(st)) {
-        for (int voice = 0; voice < VOICES; ++voice) {
-            int track = voice + staffIdx * VOICES;
+        for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
+            track_idx_t track = voice + staffIdx * VOICES;
             EngravingItem* e = s->element(track);
             if (e && e->isChord()) {
                 addChord(list, toChord(e), voice);
@@ -1063,7 +1064,7 @@ QList<Note*> Staff::getNotes() const
 //   addChord
 //---------------------------------------------------------
 
-void Staff::addChord(QList<Note*>& list, Chord* chord, int voice) const
+void Staff::addChord(std::list<Note*>& list, Chord* chord, voice_idx_t voice) const
 {
     for (Chord* c : chord->graceNotes()) {
         addChord(list, c, voice);
@@ -1072,7 +1073,7 @@ void Staff::addChord(QList<Note*>& list, Chord* chord, int voice) const
         if (note->tieBack()) {
             continue;
         }
-        list.append(note);
+        list.push_back(note);
     }
 }
 
@@ -1080,17 +1081,19 @@ void Staff::addChord(QList<Note*>& list, Chord* chord, int voice) const
 //   channel
 //---------------------------------------------------------
 
-int Staff::channel(const Fraction& tick,  int voice) const
+int Staff::channel(const Fraction& tick, voice_idx_t voice) const
 {
     if (_channelList[voice].empty()) {
         return 0;
     }
-    QMap<int, int>::const_iterator i = _channelList[voice].upperBound(tick.ticks());
-    if (i == _channelList[voice].begin()) {
+
+    std::vector<int> ticks = mu::keys(_channelList[voice]);
+    auto it = std::upper_bound(ticks.cbegin(), ticks.cend(), tick.ticks());
+    if (it == ticks.cbegin()) {
         return 0;
     }
-    --i;
-    return i.value();
+    --it;
+    return _channelList[voice].at(*it);
 }
 
 //---------------------------------------------------------
@@ -1100,7 +1103,7 @@ int Staff::channel(const Fraction& tick,  int voice) const
 
 int Staff::middleLine(const Fraction& tick) const
 {
-    return lines(tick) - 1 - staffType(tick)->stepOffset();
+    return staffType(tick)->middleLine();
 }
 
 //---------------------------------------------------------
@@ -1110,7 +1113,7 @@ int Staff::middleLine(const Fraction& tick) const
 
 int Staff::bottomLine(const Fraction& tick) const
 {
-    return (lines(tick) - 1) * 2;
+    return staffType(tick)->bottomLine();
 }
 
 //---------------------------------------------------------
@@ -1144,14 +1147,14 @@ bool Staff::isPrimaryStaff() const
     if (!_links) {
         return true;
     }
-    QList<Staff*> s;
-    QList<Staff*> ss;
+    std::list<Staff*> s;
+    std::list<Staff*> ss;
     for (auto e : *_links) {
         Staff* staff = toStaff(e);
         if (staff->score() == score()) {
-            s.append(staff);
+            s.push_back(staff);
             if (!staff->isTabStaff(Fraction(0, 1))) {
-                ss.append(staff);
+                ss.push_back(staff);
             }
         }
     }
@@ -1183,10 +1186,22 @@ StaffType* Staff::staffType(const Fraction& tick)
 
 const StaffType* Staff::staffTypeForElement(const EngravingItem* e) const
 {
-    if (_staffTypeList.uniqueStaffType()) { // optimize if one staff type spans for the entire staff
+    if (_staffTypeList.uniqueStaffType()) {
+        // if one staff type spans for the entire staff, optimize by omitting a call to `tick()`
         return &_staffTypeList.staffType({ 0, 1 });
     }
     return &_staffTypeList.staffType(e->tick());
+}
+
+bool Staff::isStaffTypeStartFrom(const Fraction& tick) const
+{
+    return _staffTypeList.isStaffTypeStartFrom(tick);
+}
+
+void Staff::moveStaffType(const Fraction& from, const Fraction& to)
+{
+    _staffTypeList.moveStaffType(from, to);
+    staffTypeListChanged(from);
 }
 
 //---------------------------------------------------------
@@ -1231,7 +1246,7 @@ StaffType* Staff::setStaffType(const Fraction& tick, const StaffType& nst)
 
 void Staff::removeStaffType(const Fraction& tick)
 {
-    qreal old = spatium(tick);
+    double old = spatium(tick);
     const bool removed = _staffTypeList.removeStaffType(tick);
     if (!removed) {
         return;
@@ -1292,7 +1307,7 @@ void Staff::init(const Staff* s)
     _visibilityVoices = s->_visibilityVoices;
 }
 
-ID Staff::id() const
+const ID& Staff::id() const
 {
     return _id;
 }
@@ -1330,7 +1345,7 @@ void Staff::initFromStaffType(const StaffType* staffType)
 //   spatiumChanged
 //---------------------------------------------------------
 
-void Staff::spatiumChanged(qreal oldValue, qreal newValue)
+void Staff::spatiumChanged(double oldValue, double newValue)
 {
     _userDist = (_userDist / oldValue) * newValue;
 }
@@ -1390,7 +1405,7 @@ void Staff::setColor(const Fraction& tick, const mu::draw::Color& val)
 
 void Staff::updateOttava()
 {
-    int staffIdx = idx();
+    staff_idx_t staffIdx = idx();
     _pitchOffsets.clear();
     for (auto i : score()->spanner()) {
         const Spanner* s = i.second;
@@ -1446,7 +1461,7 @@ void Staff::insertTime(const Fraction& tick, const Fraction& len)
         m = m->prevMeasure();
         Segment* s = m->findSegment(SegmentType::Clef, tick);
         if (s) {
-            int track = idx() * VOICES;
+            track_idx_t track = idx() * VOICES;
             clef = toClef(s->element(track));
         }
     }
@@ -1480,23 +1495,23 @@ void Staff::insertTime(const Fraction& tick, const Fraction& len)
 //    return list of linked staves
 //---------------------------------------------------------
 
-QList<Staff*> Staff::staffList() const
+std::list<Staff*> Staff::staffList() const
 {
-    QList<Staff*> staffList;
+    std::list<Staff*> staffList;
     if (_links) {
         for (EngravingObject* e : *_links) {
-            staffList.append(toStaff(e));
+            staffList.push_back(toStaff(e));
         }
 //            staffList = _linkedStaves->staves();
     } else {
-        staffList.append(const_cast<Staff*>(this));
+        staffList.push_back(const_cast<Staff*>(this));
     }
     return staffList;
 }
 
 Staff* Staff::primaryStaff() const
 {
-    const Ms::LinkedObjects* linkedElements = links();
+    const LinkedObjects* linkedElements = links();
     if (!linkedElements) {
         return nullptr;
     }
@@ -1515,9 +1530,9 @@ Staff* Staff::primaryStaff() const
 //   rstaff
 //---------------------------------------------------------
 
-int Staff::rstaff() const
+staff_idx_t Staff::rstaff() const
 {
-    return _part->staves()->indexOf((Staff*)this, 0);
+    return mu::indexOf(_part->staves(), this);
 }
 
 //---------------------------------------------------------
@@ -1526,18 +1541,18 @@ int Staff::rstaff() const
 
 bool Staff::isTop() const
 {
-    if (_part->staves()->isEmpty()) {
+    if (_part->staves().empty()) {
         return false;
     }
 
-    return _part->staves()->front() == this;
+    return _part->staves().front() == this;
 }
 
 //---------------------------------------------------------
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Staff::getProperty(Pid id) const
+PropertyValue Staff::getProperty(Pid id) const
 {
     switch (id) {
     case Pid::SMALL:
@@ -1547,7 +1562,7 @@ QVariant Staff::getProperty(Pid id) const
     case Pid::STAFF_INVISIBLE:
         return staffType(Fraction(0, 1))->invisible();
     case Pid::STAFF_COLOR:
-        return QVariant::fromValue(staffType(Fraction(0, 1))->color());
+        return PropertyValue::fromValue(staffType(Fraction(0, 1))->color());
     case Pid::PLAYBACK_VOICE1:
         return playbackVoice(0);
     case Pid::PLAYBACK_VOICE2:
@@ -1567,8 +1582,8 @@ QVariant Staff::getProperty(Pid id) const
     case Pid::GENERATED:
         return false;
     default:
-        qDebug("unhandled id <%s>", propertyName(id));
-        return QVariant();
+        LOGD("unhandled id <%s>", propertyName(id));
+        return PropertyValue();
     }
 }
 
@@ -1576,17 +1591,17 @@ QVariant Staff::getProperty(Pid id) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Staff::setProperty(Pid id, const QVariant& v)
+bool Staff::setProperty(Pid id, const PropertyValue& v)
 {
     switch (id) {
     case Pid::SMALL: {
-        qreal _spatium = spatium(Fraction(0, 1));
+        double _spatium = spatium(Fraction(0, 1));
         staffType(Fraction(0, 1))->setSmall(v.toBool());
         setLocalSpatium(_spatium, spatium(Fraction(0, 1)), Fraction(0, 1));
         break;
     }
     case Pid::MAG: {
-        qreal _spatium = spatium(Fraction(0, 1));
+        double _spatium = spatium(Fraction(0, 1));
         staffType(Fraction(0, 1))->setUserMag(v.toReal());
         setLocalSpatium(_spatium, spatium(Fraction(0, 1)), Fraction(0, 1));
     }
@@ -1609,7 +1624,7 @@ bool Staff::setProperty(Pid id, const QVariant& v)
     case Pid::STAFF_BARLINE_SPAN: {
         setBarLineSpan(v.toInt());
         // update non-generated barlines
-        int track = idx() * VOICES;
+        track_idx_t track = idx() * VOICES;
         std::vector<EngravingItem*> blList;
         for (Measure* m = score()->firstMeasure(); m; m = m->nextMeasure()) {
             Segment* s = m->getSegmentR(SegmentType::EndBarLine, m->ticks());
@@ -1637,10 +1652,10 @@ bool Staff::setProperty(Pid id, const QVariant& v)
         setBarLineTo(v.toInt());
         break;
     case Pid::STAFF_USERDIST:
-        setUserDist(v.toReal());
+        setUserDist(v.value<Millimetre>());
         break;
     default:
-        qDebug("unhandled id <%s>", propertyName(id));
+        LOGD("unhandled id <%s>", propertyName(id));
         break;
     }
     triggerLayout();
@@ -1651,7 +1666,7 @@ bool Staff::setProperty(Pid id, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Staff::propertyDefault(Pid id) const
+PropertyValue Staff::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::SMALL:
@@ -1659,7 +1674,7 @@ QVariant Staff::propertyDefault(Pid id) const
     case Pid::MAG:
         return 1.0;
     case Pid::STAFF_COLOR:
-        return QVariant::fromValue(engravingConfiguration()->defaultColor());
+        return PropertyValue::fromValue(engravingConfiguration()->defaultColor());
     case Pid::PLAYBACK_VOICE1:
     case Pid::PLAYBACK_VOICE2:
     case Pid::PLAYBACK_VOICE3:
@@ -1671,10 +1686,10 @@ QVariant Staff::propertyDefault(Pid id) const
     case Pid::STAFF_BARLINE_SPAN_TO:
         return 0;
     case Pid::STAFF_USERDIST:
-        return qreal(0.0);
+        return Millimetre(0.0);
     default:
-        qDebug("unhandled id <%s>", propertyName(id));
-        return QVariant();
+        LOGD("unhandled id <%s>", propertyName(id));
+        return PropertyValue();
     }
 }
 
@@ -1687,16 +1702,16 @@ void Staff::setLocalSpatium(double oldVal, double newVal, Fraction tick)
     const int intEndTick = _staffTypeList.staffTypeRange(tick).second;
     const Fraction etick = (intEndTick == -1) ? score()->lastMeasure()->endTick() : Fraction::fromTicks(intEndTick);
 
-    int staffIdx = idx();
-    int startTrack = staffIdx * VOICES;
-    int endTrack = startTrack + VOICES;
+    staff_idx_t staffIdx = idx();
+    track_idx_t startTrack = staffIdx * VOICES;
+    track_idx_t endTrack = startTrack + VOICES;
     for (Segment* s = score()->tick2rightSegment(tick); s && s->tick() < etick; s = s->next1()) {
         for (EngravingItem* e : s->annotations()) {
             if (e->track() >= startTrack && e->track() < endTrack) {
                 e->localSpatiumChanged(oldVal, newVal);
             }
         }
-        for (int track = startTrack; track < endTrack; ++track) {
+        for (track_idx_t track = startTrack; track < endTrack; ++track) {
             if (s->element(track)) {
                 s->element(track)->localSpatiumChanged(oldVal, newVal);
             }
@@ -1765,7 +1780,7 @@ void Staff::setLines(const Fraction& tick, int val)
 //    distance between staff lines
 //---------------------------------------------------------
 
-qreal Staff::lineDistance(const Fraction& tick) const
+double Staff::lineDistance(const Fraction& tick) const
 {
     return staffType(tick)->lineDistance().val();
 }

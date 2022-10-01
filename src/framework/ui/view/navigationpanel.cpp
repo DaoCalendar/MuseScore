@@ -103,6 +103,11 @@ void NavigationPanel::onEvent(EventPtr e)
     AbstractNavigation::onEvent(e);
 }
 
+QWindow* NavigationPanel::window() const
+{
+    return AbstractNavigation::window();
+}
+
 void NavigationPanel::setDirection(QmlDirection direction)
 {
     if (m_direction == direction) {
@@ -141,11 +146,6 @@ const std::set<INavigationControl*>& NavigationPanel::controls() const
 mu::async::Notification NavigationPanel::controlsListChanged() const
 {
     return m_controlsListChanged;
-}
-
-PanelControlChannel NavigationPanel::activeRequested() const
-{
-    return m_forceActiveRequested;
 }
 
 INavigationSection* NavigationPanel::section() const
@@ -199,10 +199,6 @@ void NavigationPanel::addControl(NavigationControl* control)
 
     m_controls.insert(control);
 
-    control->activeRequested().onReceive(this, [this](INavigationControl* control) {
-        m_forceActiveRequested.send(this, control);
-    });
-
     if (m_controlsListChanged.isConnected()) {
         m_controlsListChanged.notify();
     }
@@ -216,9 +212,16 @@ void NavigationPanel::removeControl(NavigationControl* control)
     }
 
     m_controls.erase(control);
-    control->activeRequested().resetOnReceive(this);
 
     if (m_controlsListChanged.isConnected()) {
         m_controlsListChanged.notify();
+    }
+}
+
+void NavigationPanel::requestActive(INavigationControl* control, bool enableHighlight,
+                                    INavigation::ActivationType activationType)
+{
+    if (m_section) {
+        m_section->requestActive(this, control, enableHighlight, activationType);
     }
 }

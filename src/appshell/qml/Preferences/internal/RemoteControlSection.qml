@@ -28,7 +28,7 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "OSC remote control")
+    title: qsTrc("appshell/preferences", "OSC remote control")
 
     navigation.direction: NavigationPanel.Horizontal
 
@@ -39,7 +39,7 @@ BaseSection {
     signal portChanged(int port)
 
     Row {
-        spacing: 0
+        spacing: 12
 
         CheckBox {
             id: isOSCRemoteControlCheckBox
@@ -47,7 +47,7 @@ BaseSection {
             width: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Port number:")
+            text: qsTrc("appshell/preferences", "Port number:")
 
             navigation.name: "RemoteControlCheckBox"
             navigation.panel: root.navigation
@@ -75,7 +75,7 @@ BaseSection {
             navigation.panel: root.navigation
             navigation.column: 2
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 root.portChanged(newValue)
             }
         }

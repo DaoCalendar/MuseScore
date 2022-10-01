@@ -18,10 +18,11 @@
 #include "gpaudiotrack.h"
 #include "inoteproperty.h"
 
-namespace Ms {
+namespace mu::engraving {
 class GPDomModel
 {
 public:
+
     GPDomModel() = default;
     virtual ~GPDomModel() = default;
 
@@ -40,8 +41,6 @@ public:
     const std::vector<std::unique_ptr<GPMasterBar> >& masterBars() const { return _masterBars; }
 
 private:
-
-    friend class GP67DomFixer;
 
     std::unique_ptr<GPScore> _score;
     std::unique_ptr<GPMasterTracks> _masterTracks;

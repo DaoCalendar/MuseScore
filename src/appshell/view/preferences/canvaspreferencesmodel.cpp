@@ -22,7 +22,7 @@
 #include "canvaspreferencesmodel.h"
 
 #include "log.h"
-#include "translation.h"
+#include "types/translatablestring.h"
 
 using namespace mu::appshell;
 using namespace mu::notation;
@@ -40,10 +40,10 @@ void CanvasPreferencesModel::load()
 QVariantList CanvasPreferencesModel::zoomTypes() const
 {
     QVariantList types = {
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::Percentage) }, { "value", static_cast<int>(ZoomType::Percentage) } },
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::PageWidth) }, { "value", static_cast<int>(ZoomType::PageWidth) } },
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::WholePage) }, { "value", static_cast<int>(ZoomType::WholePage) } },
-        QVariantMap { { "title", zoomTypeTitle(ZoomType::TwoPages) }, { "value", static_cast<int>(ZoomType::TwoPages) } }
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::Percentage).qTranslated() }, { "value", static_cast<int>(ZoomType::Percentage) } },
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::PageWidth).qTranslated() }, { "value", static_cast<int>(ZoomType::PageWidth) } },
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::WholePage).qTranslated() }, { "value", static_cast<int>(ZoomType::WholePage) } },
+        QVariantMap { { "title", zoomTypeTitle(ZoomType::TwoPages).qTranslated() }, { "value", static_cast<int>(ZoomType::TwoPages) } }
     };
 
     return types;
@@ -73,6 +73,11 @@ int CanvasPreferencesModel::scrollPagesOrientation() const
 bool CanvasPreferencesModel::limitScrollArea() const
 {
     return notationConfiguration()->isLimitCanvasScrollArea();
+}
+
+int CanvasPreferencesModel::selectionProximity() const
+{
+    return notationConfiguration()->selectionProximity();
 }
 
 void CanvasPreferencesModel::setDefaultZoomType(int zoomType)
@@ -123,6 +128,16 @@ void CanvasPreferencesModel::setLimitScrollArea(bool limit)
 
     notationConfiguration()->setIsLimitCanvasScrollArea(limit);
     emit limitScrollAreaChanged();
+}
+
+void CanvasPreferencesModel::setSelectionProximity(int proximity)
+{
+    if (selectionProximity() == proximity) {
+        return;
+    }
+
+    notationConfiguration()->setSelectionProximity(proximity);
+    emit selectionProximityChanged(proximity);
 }
 
 void CanvasPreferencesModel::setupConnections()

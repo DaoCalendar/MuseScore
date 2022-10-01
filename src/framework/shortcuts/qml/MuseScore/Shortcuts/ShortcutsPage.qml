@@ -35,45 +35,50 @@ Item {
     property NavigationSection navigationSection: null
     property int navigationOrderStart: 0
 
+    property string shortcutCodeKey: ""
+
     ShortcutsModel {
         id: shortcutsModel
 
-        selection: shortcutsView.selection
+        selection: shortcutsView.sourceSelection
     }
 
     function apply() {
         return shortcutsModel.apply()
     }
 
+    function reset() {
+        shortcutsModel.reset()
+    }
+
     Component.onCompleted: {
         shortcutsModel.load()
+
+        topPanel.setSearchText(root.shortcutCodeKey)
     }
 
     QtObject {
         id: prv
 
-        readonly property int buttonWidth: 105
+        readonly property int buttonMinWidth: 104
     }
 
     EditShortcutDialog {
         id: editShortcutDialog
 
-        onApplySequenceRequested: {
-            shortcutsModel.applySequenceToCurrentShortcut(newSequence)
+        onApplySequenceRequested: function(newSequence, conflictShortcutIndex) {
+            shortcutsModel.applySequenceToCurrentShortcut(newSequence, conflictShortcutIndex)
         }
 
-        property bool canEditCurrentShortcut: Boolean(shortcutsModel.currentSequence)
+        property bool canEditCurrentShortcut: Boolean(shortcutsModel.currentShortcut)
 
         function startEditCurrentShortcut() {
-            editShortcutDialog.startEdit(shortcutsModel.currentSequence, shortcutsModel.shortcuts())
+            editShortcutDialog.startEdit(shortcutsModel.currentShortcut, shortcutsModel.shortcuts())
         }
     }
 
     ColumnLayout {
         anchors.fill: parent
-
-        //! NOTE: Added to prevent components clipping when navigating
-        anchors.margins: 2
 
         spacing: 20
 
@@ -86,7 +91,7 @@ Item {
             canEditCurrentShortcut: editShortcutDialog.canEditCurrentShortcut
             canClearCurrentShortcuts: shortcutsView.hasSelection
 
-            buttonWidth: prv.buttonWidth
+            buttonMinWidth: prv.buttonMinWidth
 
             navigation.section: root.navigationSection
             navigation.order: root.navigationOrderStart + 1
@@ -123,7 +128,7 @@ Item {
 
             canResetCurrentShortcut: shortcutsView.hasSelection
 
-            buttonWidth: prv.buttonWidth
+            buttonMinWidth: prv.buttonMinWidth
 
             navigation.section: root.navigationSection
             //! NOTE: 4 because ShortcutsList have two panels(header and content)

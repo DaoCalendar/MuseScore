@@ -23,15 +23,19 @@
 #ifndef __REPEATLIST_H__
 #define __REPEATLIST_H__
 
-#include <QList>
 #include <set>
+#include <vector>
 
-namespace Ms {
+#include "global/allocator.h"
+#include "types/string.h"
+
+namespace mu::engraving {
 class Score;
 class Measure;
 class Volta;
 class Jump;
 class RepeatListElement;
+using RepeatListElementList = std::vector<RepeatListElement*>;
 
 //---------------------------------------------------------
 //   RepeatSegment
@@ -39,14 +43,13 @@ class RepeatListElement;
 
 class RepeatSegment
 {
-private:
-    QList<Measure const*> measureList;
+    OBJECT_ALLOCATOR(engraving, RepeatSegment)
 public:
     int tick;           // start tick
     int utick;
-    qreal utime;
-    qreal timeOffset;
-    qreal pause;
+    double utime;
+    double timeOffset;
+    double pause;
     int playbackCount;
 
     RepeatSegment(int playbackCount);
@@ -58,33 +61,40 @@ public:
     int len() const;
     void popMeasure();
 
-    Measure const* firstMeasure() const { return measureList.empty() ? nullptr : measureList.front(); }
-    Measure const* lastMeasure() const { return measureList.empty() ? nullptr : measureList.back(); }
+    Measure const* firstMeasure() const { return m_measureList.empty() ? nullptr : m_measureList.front(); }
+    Measure const* lastMeasure() const { return m_measureList.empty() ? nullptr : m_measureList.back(); }
+
+    const std::vector<const Measure*>& measureList() const;
 
     friend class RepeatList;
+private:
+    std::vector<const Measure*> m_measureList;
 };
 
 //---------------------------------------------------------
 //   RepeatList
 //---------------------------------------------------------
 
-class RepeatList : public QList<RepeatSegment*>
+class RepeatList : public std::vector<RepeatSegment*>
 {
-    Score* _score;
+    OBJECT_ALLOCATOR(engraving, RepeatList)
+
+    Score* _score = nullptr;
     mutable unsigned idx1, idx2;     // cached values
 
     bool _expanded = false;
     bool _scoreChanged = true;
 
     std::set<std::pair<Jump const* const, int> > _jumpsTaken;     // take the jumps only once, so track them during unwind
-    QList<QList<RepeatListElement*>*> _rlElements;   // all elements of the score that influence the RepeatList
+    std::vector<RepeatListElementList> _rlElements;   // all elements of the score that influence the RepeatList
 
     void collectRepeatListElements();
-    std::pair<QList<QList<RepeatListElement*>*>::const_iterator, QList<RepeatListElement*>::const_iterator> findMarker(
-        QString label, QList<QList<RepeatListElement*>*>::const_iterator referenceSectionIt,
-        QList<RepeatListElement*>::const_iterator referenceRepeatListElementIt) const;
-    void performJump(QList<QList<RepeatListElement*>*>::const_iterator sectionIt,
-                     QList<RepeatListElement*>::const_iterator repeatListElementTargetIt, bool withRepeats, int* const playbackCount,
+    std::pair<std::vector<RepeatListElementList>::const_iterator, RepeatListElementList::const_iterator> findMarker(
+        String label, std::vector<RepeatListElementList>::const_iterator referenceSectionIt,
+        RepeatListElementList::const_iterator referenceRepeatListElementIt) const;
+
+    void performJump(std::vector<RepeatListElementList>::const_iterator sectionIt,
+                     RepeatListElementList::const_iterator repeatListElementTargetIt, bool withRepeats, int* const playbackCount,
                      Volta const** const activeVolta, RepeatListElement const** const startRepeatReference) const;
     void unwind();
     void flatten();
@@ -101,12 +111,12 @@ public:
 
     int utick2tick(int tick) const;
     int tick2utick(int tick) const;
-    int utime2utick(qreal secs) const;
-    qreal utick2utime(int) const;
+    int utime2utick(double secs) const;
+    double utick2utime(int) const;
     void updateTempo();
     int ticks() const;
 
-    QList<RepeatSegment*>::const_iterator findRepeatSegmentFromUTick(int utick) const;
+    std::vector<RepeatSegment*>::const_iterator findRepeatSegmentFromUTick(int utick) const;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

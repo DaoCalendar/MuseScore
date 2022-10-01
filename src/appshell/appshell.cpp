@@ -27,9 +27,13 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickWindow>
+#include <QStyleHints>
 #ifndef Q_OS_WASM
 #include <QThreadPool>
 #endif
+
+#include "view/internal/splashscreen.h"
+
 #include "view/dockwindow/docksetup.h"
 
 #include "modularity/ioc.h"
@@ -82,6 +86,18 @@ int AppShell::run(int argc, char** argv)
 #endif
 
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+
+    //! NOTE: For unknown reasons, Linux scaling for 1 is defined as 1.003 in fractional scaling.
+    //!       Because of this, some elements are drawn with a shift on the score.
+    //!       Let's make a Linux hack and round values above 0.75(see RoundPreferFloor)
+#ifdef Q_OS_LINUX
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor);
+#elif defined(Q_OS_WIN)
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
+
+    QGuiApplication::styleHints()->setMousePressAndHoldInterval(250);
+
     QApplication app(argc, argv);
     QCoreApplication::setApplicationName(appName);
     QCoreApplication::setOrganizationName("MuseScore");
@@ -116,6 +132,11 @@ int AppShell::run(int argc, char** argv)
     commandLine.parse(QCoreApplication::arguments());
     commandLine.apply();
     framework::IApplication::RunMode runMode = muapplication()->runMode();
+
+    SplashScreen splashScreen;
+    if (runMode == framework::IApplication::RunMode::Editor) {
+        splashScreen.show();
+    }
 
     // ====================================================
     // Setup modules: onInit
@@ -185,10 +206,21 @@ int AppShell::run(int argc, char** argv)
 #endif
 
         QObject::connect(engine, &QQmlApplicationEngine::objectCreated,
-                         &app, [url](QObject* obj, const QUrl& objUrl) {
+                         &app, [this, url](QObject* obj, const QUrl& objUrl) {
                 if (!obj && url == objUrl) {
                     LOGE() << "failed Qml load\n";
                     QCoreApplication::exit(-1);
+                }
+
+                if (url == objUrl) {
+                    // ====================================================
+                    // Setup modules: onDelayedInit
+                    // ====================================================
+
+                    globalModule.onDelayedInit();
+                    for (mu::modularity::IModuleSetup* m : m_modules) {
+                        m->onDelayedInit();
+                    }
                 }
             }, Qt::QueuedConnection);
 
@@ -208,15 +240,7 @@ int AppShell::run(int argc, char** argv)
 
         engine->load(url);
 
-        // ====================================================
-        // Setup modules: onDelayedInit
-        // ====================================================
-        QTimer::singleShot(5000, [this]() {
-                globalModule.onDelayedInit();
-                for (mu::modularity::IModuleSetup* m : m_modules) {
-                    m->onDelayedInit();
-                }
-            });
+        splashScreen.close();
     }
     }
 
@@ -267,7 +291,7 @@ int AppShell::run(int argc, char** argv)
 int AppShell::processConverter(const CommandLineController::ConverterTask& task)
 {
     Ret ret = make_ret(Ret::Code::Ok);
-    io::path stylePath = task.params[CommandLineController::ParamKey::StylePath].toString();
+    io::path_t stylePath = task.params[CommandLineController::ParamKey::StylePath].toString();
     bool forceMode = task.params[CommandLineController::ParamKey::ForceMode].toBool();
 
     switch (task.type) {
@@ -281,7 +305,7 @@ int AppShell::processConverter(const CommandLineController::ConverterTask& task)
         ret = converter()->fileConvert(task.inputFile, task.outputFile, stylePath, forceMode);
         break;
     case CommandLineController::ConvertType::ExportScoreMedia: {
-        io::path highlightConfigPath = task.params[CommandLineController::ParamKey::HighlightConfigPath].toString();
+        io::path_t highlightConfigPath = task.params[CommandLineController::ParamKey::HighlightConfigPath].toString();
         ret = converter()->exportScoreMedia(task.inputFile, task.outputFile, highlightConfigPath, stylePath, forceMode);
     } break;
     case CommandLineController::ConvertType::ExportScoreMeta:
@@ -296,6 +320,9 @@ int AppShell::processConverter(const CommandLineController::ConverterTask& task)
     case CommandLineController::ConvertType::ExportScoreTranspose: {
         std::string scoreTranspose = task.params[CommandLineController::ParamKey::ScoreTransposeOptions].toString().toStdString();
         ret = converter()->exportScoreTranspose(task.inputFile, task.outputFile, scoreTranspose, stylePath, forceMode);
+    } break;
+    case CommandLineController::ConvertType::ExportScoreVideo: {
+        ret = converter()->exportScoreVideo(task.inputFile, task.outputFile);
     } break;
     case CommandLineController::ConvertType::SourceUpdate: {
         std::string scoreSource = task.params[CommandLineController::ParamKey::ScoreSource].toString().toStdString();

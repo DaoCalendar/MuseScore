@@ -49,37 +49,28 @@ Item {
     implicitHeight: 30
     implicitWidth: parent.width
 
-    navigation.name: root.objectName != "" ? root.objectName : "IncrementalControl"
+    navigation.name: Boolean(root.objectName) ? root.objectName : "IncrementalControl"
 
     function increment() {
         var value = root.isIndeterminate ? 0.0 : currentValue
-        var newValue = value + step
+        var newValue = Math.min(value + step, root.maxValue)
 
-        if (newValue > root.maxValue)
+        if (newValue === value) {
             return
+        }
 
         root.valueEdited(+newValue.toFixed(decimals))
     }
 
     function decrement() {
         var value = root.isIndeterminate ? 0.0 : currentValue
-        var newValue = value - step
+        var newValue = Math.max(value - step, root.minValue)
 
-        if (newValue < root.minValue)
+        if (newValue === value) {
             return
+        }
 
         root.valueEdited(+newValue.toFixed(decimals))
-    }
-
-    Keys.onPressed: {
-        switch (event.key) {
-        case Qt.Key_Up:
-            increment()
-            break
-        case Qt.Key_Down:
-            decrement()
-            break
-        }
     }
 
     enum IconMode {
@@ -110,8 +101,23 @@ Item {
     TextInputField {
         id: textInputField
 
+        property int scrolled: 0
+
         anchors.top: parent.top
         anchors.bottom: parent.bottom
+
+        navigation.onNavigationEvent: function(event) {
+            switch (event.type) {
+            case NavigationEvent.Up:
+                root.increment()
+                event.accepted = true
+                break
+            case NavigationEvent.Down:
+                root.decrement()
+                event.accepted = true
+                break
+            }
+        }
 
         DoubleInputValidator {
             id: doubleInputValidator
@@ -128,19 +134,61 @@ Item {
 
         validator: root.decimals > 0 ? doubleInputValidator : intInputValidator
 
+        containsMouse: mouseArea.containsMouse || valueAdjustControl.containsMouse
+
         ValueAdjustControl {
             id: valueAdjustControl
 
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: textInputField.background.border.width
+            anchors.top: parent.top
             anchors.right: parent.right
+            anchors.bottom: parent.bottom
 
-            icon: IconCode.SMALL_ARROW_DOWN
+            radius: textInputField.background.radius - anchors.margins
 
-            onIncreaseButtonClicked: root.increment()
-            onDecreaseButtonClicked: root.decrement()
+            canIncrease: root.currentValue < root.maxValue
+            canDecrease: root.currentValue > root.minValue
+
+            onIncreaseButtonClicked: { root.increment() }
+            onDecreaseButtonClicked: { root.decrement() }
         }
 
-        onCurrentTextEdited: {
+        mouseArea.onWheel: function(wheel) {
+            if (!textInputField.activeFocus) {
+                wheel.accepted = false
+                return
+            }
+
+            let pixelY = wheel.pixelDelta.y
+            let angleY = wheel.angleDelta.y
+
+            // This is set below. For angleY, make sure it is <= 120,
+            // because in many actual mouse wheels, one scroll sets
+            // angleY to +/- 120.
+            let oneScroll = 0
+
+            if (pixelY !== 0) {
+                scrolled += pixelY
+                oneScroll = 60
+            } else if (angleY !== 0) {
+                scrolled += angleY
+                oneScroll = 120
+            }
+
+            if (scrolled >= oneScroll) {
+                root.increment()
+                scrolled = 0
+            } else if (scrolled <= -oneScroll) {
+                root.decrement()
+                scrolled = 0
+            }
+        }
+
+        mouseArea.onExited: {
+            scrolled = 0
+        }
+
+        onCurrentTextEdited: function(newTextValue) {
             var newVal = parseFloat(newTextValue)
 
             if (isNaN(newVal)) {

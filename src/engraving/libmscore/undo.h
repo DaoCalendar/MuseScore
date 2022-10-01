@@ -25,84 +25,78 @@
 
 /**
  \file
- Definition of undo-releated classes and structs.
+ Definition of undo-related classes and structs.
 */
+
+#include <map>
 
 #include "style/style.h"
 #include "compat/midi/midipatch.h"
 
-#include "spatium.h"
-#include "mscore.h"
-#include "sig.h"
-#include "tempo.h"
-#include "input.h"
-#include "key.h"
-#include "select.h"
-#include "instrument.h"
-#include "scoreorder.h"
-#include "pitchvalue.h"
-#include "timesig.h"
-#include "noteevent.h"
-#include "synthesizerstate.h"
-#include "dynamic.h"
-#include "staff.h"
-#include "stafftype.h"
-#include "cleflist.h"
-#include "note.h"
+#include "bend.h"
+#include "bracket.h"
 #include "chord.h"
 #include "drumset.h"
-#include "rest.h"
 #include "fret.h"
+#include "input.h"
+#include "instrchange.h"
+#include "instrument.h"
+#include "key.h"
+#include "keysig.h"
+#include "masterscore.h"
+#include "measure.h"
+#include "note.h"
+#include "noteevent.h"
+#include "part.h"
+#include "score.h"
+#include "scoreorder.h"
+#include "select.h"
+#include "spanner.h"
+#include "staff.h"
+#include "stafftype.h"
+#include "synthesizerstate.h"
+#include "text.h"
+#include "tremolo.h"
+#include "tremolobar.h"
 
-namespace Ms {
-class ElementList;
-class EngravingItem;
-class Instrument;
-class System;
-class Measure;
-class Segment;
-class Staff;
-class Part;
-class Volta;
-class Score;
-class Note;
+namespace mu::engraving {
+class Bend;
 class Chord;
 class ChordRest;
-class Harmony;
-class SlurTie;
-class MStaff;
-class MeasureBase;
-class Dynamic;
-class Selection;
-class Text;
-class Channel;
-class Tuplet;
-class KeySig;
-class TimeSig;
 class Clef;
-class Image;
-class Bend;
-class TremoloBar;
-class NoteEvent;
-class SlurSegment;
-class InstrumentChange;
-class Box;
-class Spanner;
-class BarLine;
-enum class ClefType : signed char;
-enum class PlayEventType : char;
-class Excerpt;
 class EditData;
+class EngravingItem;
+class Excerpt;
+class Harmony;
+class InstrChannel;
+class Instrument;
+class InstrumentChange;
+class KeySig;
+class MStaff;
+class Measure;
+class MeasureBase;
+class Note;
+class NoteEvent;
+class Part;
+class Score;
+class Segment;
+class Selection;
+class Spanner;
+class Staff;
+class Text;
+class TremoloBar;
 
-#define UNDO_NAME(a)  virtual const char* name() const override { return a; }
+enum class PlayEventType : char;
 
-//---------------------------------------------------------
-//   UndoCommand
-//---------------------------------------------------------
+#define UNDO_TYPE(t) CommandType type() const override { return t; }
+#define UNDO_NAME(a) const char* name() const override { return a; }
+#define UNDO_CHANGED_OBJECTS(...) std::vector<const EngravingObject*> objectItems() const override { return __VA_ARGS__; }
 
 class UndoCommand
 {
-    QList<UndoCommand*> childList;
+    OBJECT_ALLOCATOR(engraving, UndoCommand)
+
+    std::list<UndoCommand*> childList;
 
 protected:
     virtual void flip(EditData*) {}
@@ -122,15 +116,17 @@ public:
     virtual ~UndoCommand();
     virtual void undo(EditData*);
     virtual void redo(EditData*);
-    void appendChild(UndoCommand* cmd) { childList.append(cmd); }
-    UndoCommand* removeChild() { return childList.takeLast(); }
-    int childCount() const { return childList.size(); }
+    void appendChild(UndoCommand* cmd) { childList.push_back(cmd); }
+    UndoCommand* removeChild() { return mu::takeLast(childList); }
+    size_t childCount() const { return childList.size(); }
     void unwind();
-    const QList<UndoCommand*>& commands() const { return childList; }
+    const std::list<UndoCommand*>& commands() const { return childList; }
+    virtual std::vector<const EngravingObject*> objectItems() const { return {}; }
     virtual void cleanup(bool undo);
 // #ifndef QT_NO_DEBUG
     virtual const char* name() const { return "UndoCommand"; }
 // #endif
+    virtual CommandType type() const { return CommandType::Unknown; }
 
     virtual bool isFiltered(Filter, const EngravingItem* /* target */) const { return false; }
     bool hasFilteredChildren(Filter, const EngravingItem* target) const;
@@ -146,120 +142,131 @@ public:
 
 class UndoMacro : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, UndoMacro)
+public:
     struct SelectionInfo {
         std::vector<EngravingItem*> elements;
         Fraction tickStart;
         Fraction tickEnd;
-        int staffStart = -1;
-        int staffEnd = -1;
+        staff_idx_t staffStart = mu::nidx;
+        staff_idx_t staffEnd = mu::nidx;
 
-        bool isValid() const { return !elements.empty() || staffStart != -1; }
+        bool isValid() const { return !elements.empty() || staffStart != mu::nidx; }
     };
 
-    InputState undoInputState;
-    InputState redoInputState;
-    SelectionInfo undoSelectionInfo;
-    SelectionInfo redoSelectionInfo;
-
-    Score* score;
-
-    static void fillSelectionInfo(SelectionInfo&, const Selection&);
-    static void applySelectionInfo(const SelectionInfo&, Selection&);
-
-public:
     UndoMacro(Score* s);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    bool empty() const { return childCount() == 0; }
+    void undo(EditData*) override;
+    void redo(EditData*) override;
+    bool empty() const;
     void append(UndoMacro&& other);
+
+    const InputState& undoInputState() const;
+    const InputState& redoInputState() const;
+    const SelectionInfo& undoSelectionInfo() const;
+    const SelectionInfo& redoSelectionInfo() const;
+
+    struct ChangesInfo {
+        ElementTypeSet changedObjectTypes;
+        std::vector<const EngravingItem*> changedItems;
+        StyleIdSet changedStyleIdSet;
+        PropertyIdSet changedPropertyIdSet;
+    };
+
+    ChangesInfo changesInfo() const;
 
     static bool canRecordSelectedElement(const EngravingItem* e);
 
-    UNDO_NAME("UndoMacro");
-};
+    UNDO_NAME("UndoMacro")
 
-//---------------------------------------------------------
-//   UndoStack
-//---------------------------------------------------------
+private:
+    InputState m_undoInputState;
+    InputState m_redoInputState;
+    SelectionInfo m_undoSelectionInfo;
+    SelectionInfo m_redoSelectionInfo;
+
+    Score* m_score = nullptr;
+
+    static void fillSelectionInfo(SelectionInfo&, const Selection&);
+    static void applySelectionInfo(const SelectionInfo&, Selection&);
+};
 
 class UndoStack
 {
-    UndoMacro* curCmd;
-    QList<UndoMacro*> list;
+    UndoMacro* curCmd = nullptr;
+    std::vector<UndoMacro*> list;
     std::vector<int> stateList;
-    int nextState;
-    int cleanState;
-    int curIdx;
+    int nextState = 0;
+    int cleanState = 0;
+    size_t curIdx = 0;
+    bool isLocked = false;
 
-    void remove(int idx);
+    void remove(size_t idx);
 
 public:
     UndoStack();
     ~UndoStack();
 
+    bool locked() const;
+    void setLocked(bool val);
     bool active() const { return curCmd != 0; }
     void beginMacro(Score*);
     void endMacro(bool rollback);
     void push(UndoCommand*, EditData*);        // push & execute
     void push1(UndoCommand*);
     void pop();
-    void setClean();
     bool canUndo() const { return curIdx > 0; }
     bool canRedo() const { return curIdx < list.size(); }
-    int state() const { return stateList[curIdx]; }
-    bool isClean() const { return cleanState == state(); }
-    int getCurIdx() const { return curIdx; }
-    bool empty() const { return !canUndo() && !canRedo(); }
+    bool isClean() const { return cleanState == stateList[curIdx]; }
+    size_t getCurIdx() const { return curIdx; }
     UndoMacro* current() const { return curCmd; }
     UndoMacro* last() const { return curIdx > 0 ? list[curIdx - 1] : 0; }
     UndoMacro* prev() const { return curIdx > 1 ? list[curIdx - 2] : 0; }
     void undo(EditData*);
     void redo(EditData*);
-    void rollback();
     void reopen();
 
-    void mergeCommands(int startIdx);
+    void mergeCommands(size_t startIdx);
     void cleanRedoStack() { remove(curIdx); }
 };
 
-//---------------------------------------------------------
-//   InsertPart
-//---------------------------------------------------------
-
 class InsertPart : public UndoCommand
 {
-    Part* part;
-    int idx;
+    OBJECT_ALLOCATOR(engraving, InsertPart)
+
+    Part* part = nullptr;
+    int idx = 0;
 
 public:
     InsertPart(Part* p, int i);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("InsertPart")
-};
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   RemovePart
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::InsertPart)
+    UNDO_NAME("InsertPart")
+    UNDO_CHANGED_OBJECTS({ part })
+};
 
 class RemovePart : public UndoCommand
 {
-    Part* part;
-    int idx;
+    OBJECT_ALLOCATOR(engraving, RemovePart)
+
+    Part* part = nullptr;
+    staff_idx_t idx = mu::nidx;
 
 public:
-    RemovePart(Part*, int idx);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("RemovePart")
-};
+    RemovePart(Part*, staff_idx_t idx);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   SetSoloist
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::RemovePart)
+    UNDO_NAME("RemovePart")
+    UNDO_CHANGED_OBJECTS({ part })
+};
 
 class SetSoloist : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, SetSoloist)
+
     Part* part = nullptr;
     bool soloist = false;
 
@@ -267,335 +274,349 @@ public:
     SetSoloist(Part* p, bool b);
     void undo(EditData*) override;
     void redo(EditData*) override;
-    UNDO_NAME("SetSoloist")
-};
 
-//---------------------------------------------------------
-//   InsertStaff
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::SetSoloist)
+    UNDO_NAME("SetSoloist")
+    UNDO_CHANGED_OBJECTS({ part })
+};
 
 class InsertStaff : public UndoCommand
 {
-    Staff* staff;
-    int ridx;
+    OBJECT_ALLOCATOR(engraving, InsertStaff)
+
+    Staff* staff = nullptr;
+    staff_idx_t ridx = mu::nidx;
 
 public:
-    InsertStaff(Staff*, int idx);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("InsertStaff")
-};
+    InsertStaff(Staff*, staff_idx_t idx);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   RemoveStaff
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::InsertStaff)
+    UNDO_NAME("InsertStaff")
+    UNDO_CHANGED_OBJECTS({ staff })
+};
 
 class RemoveStaff : public UndoCommand
 {
-    Staff* staff;
-    int ridx;
+    OBJECT_ALLOCATOR(engraving, RemoveStaff)
+
+    Staff* staff = nullptr;
+    staff_idx_t ridx = mu::nidx;
 
 public:
     RemoveStaff(Staff*);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("RemoveStaff")
-};
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   InsertMStaff
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::RemoveStaff)
+    UNDO_NAME("RemoveStaff")
+    UNDO_CHANGED_OBJECTS({ staff })
+};
 
 class InsertMStaff : public UndoCommand
 {
-    Measure* measure;
-    MStaff* mstaff;
-    int idx;
+    OBJECT_ALLOCATOR(engraving, InsertMStaff)
+
+    Measure* measure = nullptr;
+    MStaff* mstaff = nullptr;
+    staff_idx_t idx = mu::nidx;
 
 public:
-    InsertMStaff(Measure*, MStaff*, int);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("InsertMStaff")
-};
+    InsertMStaff(Measure*, MStaff*, staff_idx_t);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   RemoveMStaff
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::InsertMStaff)
+    UNDO_NAME("InsertMStaff")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class RemoveMStaff : public UndoCommand
 {
-    Measure* measure;
-    MStaff* mstaff;
-    int idx;
+    OBJECT_ALLOCATOR(engraving, RemoveMStaff)
+
+    Measure* measure = nullptr;
+    MStaff* mstaff = nullptr;
+    int idx = 0;
 
 public:
     RemoveMStaff(Measure*, MStaff*, int);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("RemoveMStaff")
-};
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   InsertStaves
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::RemoveMStaff)
+    UNDO_NAME("RemoveMStaff")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class InsertStaves : public UndoCommand
 {
-    Measure* measure;
-    int a;
-    int b;
+    OBJECT_ALLOCATOR(engraving, InsertStaves)
+
+    Measure* measure = nullptr;
+    staff_idx_t a = mu::nidx;
+    staff_idx_t b = mu::nidx;
 
 public:
-    InsertStaves(Measure*, int, int);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("InsertStaves")
-};
+    InsertStaves(Measure*, staff_idx_t, staff_idx_t);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   RemoveStaves
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::InsertStaves)
+    UNDO_NAME("InsertStaves")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class RemoveStaves : public UndoCommand
 {
-    Measure* measure;
-    int a;
-    int b;
+    OBJECT_ALLOCATOR(engraving, RemoveStaves)
+
+    Measure* measure = nullptr;
+    staff_idx_t a = mu::nidx;
+    staff_idx_t b = mu::nidx;
 
 public:
-    RemoveStaves(Measure*, int, int);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("RemoveStaves")
-};
+    RemoveStaves(Measure*, staff_idx_t, staff_idx_t);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   SortStaves
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::RemoveStaves)
+    UNDO_NAME("RemoveStaves")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class SortStaves : public UndoCommand
 {
-    Score* score;
-    QList<int> list;
-    QList<int> rlist;
+    OBJECT_ALLOCATOR(engraving, SortStaves)
+
+    Score* score = nullptr;
+    std::vector<staff_idx_t> list;
+    std::vector<staff_idx_t> rlist;
 
 public:
-    SortStaves(Score*, QList<int>);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("SortStaves")
-};
+    SortStaves(Score*, const std::vector<staff_idx_t>&);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   MapExcerptTracks
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::SortStaves)
+    UNDO_NAME("SortStaves")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class MapExcerptTracks : public UndoCommand
 {
-    Score* score;
-    QList<int> list;
-    QList<int> rlist;
+    OBJECT_ALLOCATOR(engraving, MapExcerptTracks)
+
+    Score* score = nullptr;
+    std::vector<staff_idx_t> list;
+    std::vector<staff_idx_t> rlist;
 
 public:
-    MapExcerptTracks(Score*, QList<int>);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("MapExcerptTracks")
-};
+    MapExcerptTracks(Score*, const std::vector<staff_idx_t>&);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   ChangePitch
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::MapExcerptTracks)
+    UNDO_NAME("MapExcerptTracks")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangePitch : public UndoCommand
 {
-    Note* note;
-    int pitch;
-    int tpc1;
-    int tpc2;
+    OBJECT_ALLOCATOR(engraving, ChangePitch)
+
+    Note* note = nullptr;
+    int pitch = 0;
+    int tpc1 = 0;
+    int tpc2 = 0;
+
     void flip(EditData*) override;
 
 public:
     ChangePitch(Note* note, int pitch, int tpc1, int tpc2);
-    UNDO_NAME("ChangePitch")
-};
 
-//---------------------------------------------------------
-//   ChangeFretting
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangePitch)
+    UNDO_NAME("ChangePitch")
+    UNDO_CHANGED_OBJECTS({ note })
+};
 
 class ChangeFretting : public UndoCommand
 {
-    Note* note;
-    int pitch;
-    int string;
-    int fret;
-    int tpc1;
-    int tpc2;
+    OBJECT_ALLOCATOR(engraving, ChangeFretting)
+
+    Note* note = nullptr;
+    int pitch = 0;
+    int string = 0;
+    int fret = 0;
+    int tpc1 = 0;
+    int tpc2 = 0;
+
     void flip(EditData*) override;
 
 public:
     ChangeFretting(Note* note, int pitch, int string, int fret, int tpc1, int tpc2);
-    UNDO_NAME("ChangeFretting")
-};
 
-//---------------------------------------------------------
-//   ChangeKeySig
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeFretting)
+    UNDO_NAME("ChangeFretting")
+    UNDO_CHANGED_OBJECTS({ note })
+};
 
 class ChangeKeySig : public UndoCommand
 {
-    KeySig* keysig;
+    OBJECT_ALLOCATOR(engraving, ChangeKeySig)
+
+    KeySig* keysig = nullptr;
     KeySigEvent ks;
-    bool showCourtesy;
-    bool evtInStaff;
+    bool showCourtesy = false;
+    bool evtInStaff = false;
 
     void flip(EditData*) override;
 
 public:
     ChangeKeySig(KeySig* k, KeySigEvent newKeySig, bool sc, bool addEvtToStaff = true);
-    UNDO_NAME("ChangeKeySig")
-};
 
-//---------------------------------------------------------
-//   ChangeMeasureLen
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeKeySig)
+    UNDO_NAME("ChangeKeySig")
+    UNDO_CHANGED_OBJECTS({ keysig })
+};
 
 class ChangeMeasureLen : public UndoCommand
 {
-    Measure* measure;
+    OBJECT_ALLOCATOR(engraving, ChangeMeasureLen)
+
+    Measure* measure = nullptr;
     Fraction len;
+
     void flip(EditData*) override;
 
 public:
     ChangeMeasureLen(Measure*, Fraction);
-    UNDO_NAME("ChangeMeasureLen")
-};
 
-//---------------------------------------------------------
-//   ChangeElement
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeMeasureLen)
+    UNDO_NAME("ChangeMeasureLen")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class ChangeElement : public UndoCommand
 {
-    EngravingItem* oldElement;
-    EngravingItem* newElement;
+    OBJECT_ALLOCATOR(engraving, ChangeElement)
+
+    EngravingItem* oldElement = nullptr;
+    EngravingItem* newElement = nullptr;
+
     void flip(EditData*) override;
 
 public:
     ChangeElement(EngravingItem* oldElement, EngravingItem* newElement);
-    UNDO_NAME("ChangeElement")
-};
 
-//---------------------------------------------------------
-//   TransposeHarmony
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeElement)
+    UNDO_NAME("ChangeElement")
+    UNDO_CHANGED_OBJECTS({ oldElement, newElement })
+};
 
 class TransposeHarmony : public UndoCommand
 {
-    Harmony* harmony;
-    int rootTpc, baseTpc;
+    OBJECT_ALLOCATOR(engraving, TransposeHarmony)
+
+    Harmony* harmony = nullptr;
+    int rootTpc = 0;
+    int baseTpc = 0;
+
     void flip(EditData*) override;
 
 public:
     TransposeHarmony(Harmony*, int rootTpc, int baseTpc);
-    UNDO_NAME("TransposeHarmony")
-};
 
-//---------------------------------------------------------
-//   ExchangeVoice
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::TransposeHarmony)
+    UNDO_NAME("TransposeHarmony")
+    UNDO_CHANGED_OBJECTS({ harmony })
+};
 
 class ExchangeVoice : public UndoCommand
 {
-    Measure* measure;
-    int val1, val2;
-    int staff;
+    OBJECT_ALLOCATOR(engraving, ExchangeVoice)
+
+    Measure* measure = nullptr;
+    track_idx_t val1 = mu::nidx;
+    track_idx_t val2 = mu::nidx;
+    staff_idx_t staff = mu::nidx;
 
 public:
-    ExchangeVoice(Measure*, int val1, int val2, int staff);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("ExchangeVoice")
-};
+    ExchangeVoice(Measure*, track_idx_t val1, track_idx_t val2, staff_idx_t staff);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   CloneVoice
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ExchangeVoice)
+    UNDO_NAME("ExchangeVoice")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class CloneVoice : public UndoCommand
 {
-    Segment* sf;
+    OBJECT_ALLOCATOR(engraving, CloneVoice)
+
+    Segment* sf = nullptr;
     Fraction lTick;
-    Segment* d;               //Destination
-    int strack, dtrack;
-    int otrack;
-    bool linked;
+    Segment* d = nullptr;               //Destination
+    track_idx_t strack = mu::nidx;
+    track_idx_t dtrack = mu::nidx;
+    track_idx_t otrack;
+    bool linked = false;
     bool first = true;        //first redo
 
 public:
-    CloneVoice(Segment* sf, const Fraction& lTick, Segment* d, int strack, int dtrack, int otrack, bool linked = true);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("CloneVoice")
-};
+    CloneVoice(Segment* sf, const Fraction& lTick, Segment* d, track_idx_t strack, track_idx_t dtrack, track_idx_t otrack,
+               bool linked = true);
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
-//---------------------------------------------------------
-//   ChangeInstrumentShort
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::CloneVoice)
+    UNDO_NAME("CloneVoice")
+    UNDO_CHANGED_OBJECTS({ sf, d })
+};
 
 class ChangeInstrumentShort : public UndoCommand
 {
-    Part* part;
+    OBJECT_ALLOCATOR(engraving, ChangeInstrumentShort)
+
+    Part* part = nullptr;
     Fraction tick;
-    QList<StaffName> text;
+    std::list<StaffName> text;
+
     void flip(EditData*) override;
 
 public:
-    ChangeInstrumentShort(const Fraction&, Part*, QList<StaffName>);
-    UNDO_NAME("ChangeInstrumentShort")
-};
+    ChangeInstrumentShort(const Fraction&, Part*, std::list<StaffName>);
 
-//---------------------------------------------------------
-//   ChangeInstrumentLong
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeInstrumentShort)
+    UNDO_NAME("ChangeInstrumentShort")
+    UNDO_CHANGED_OBJECTS({ part })
+};
 
 class ChangeInstrumentLong : public UndoCommand
 {
-    Part* part;
+    OBJECT_ALLOCATOR(engraving, ChangeInstrumentLong)
+
+    Part* part = nullptr;
     Fraction tick;
-    QList<StaffName> text;
+    std::list<StaffName> text;
+
     void flip(EditData*) override;
 
 public:
-    const QList<StaffName>& longNames() const;
-    ChangeInstrumentLong(const Fraction&, Part*, QList<StaffName>);
+    ChangeInstrumentLong(const Fraction&, Part*, std::list<StaffName>);
+
+    UNDO_TYPE(CommandType::ChangeInstrumentLong)
     UNDO_NAME("ChangeInstrumentLong")
+    UNDO_CHANGED_OBJECTS({ part })
 };
-
-//---------------------------------------------------------
-//   ChangeBracketType
-//---------------------------------------------------------
-
-class ChangeBracketType : public UndoCommand
-{
-    Bracket* bracket;
-    BracketType type;
-    void flip(EditData*) override;
-
-public:
-    ChangeBracketType(Bracket*, BracketType type);
-    UNDO_NAME("ChangeBracketType")
-};
-
-//---------------------------------------------------------
-//   AddElement
-//---------------------------------------------------------
 
 class AddElement : public UndoCommand
 {
-    EngravingItem* element;
+    OBJECT_ALLOCATOR(engraving, AddElement)
+
+    EngravingItem* element = nullptr;
 
     void endUndoRedo(bool) const;
     void undo(EditData*) override;
@@ -604,81 +625,63 @@ class AddElement : public UndoCommand
 public:
     AddElement(EngravingItem*);
     EngravingItem* getElement() const { return element; }
-    virtual void cleanup(bool) override;
-    virtual const char* name() const override;
+    void cleanup(bool) override;
+    const char* name() const override;
 
     bool isFiltered(UndoCommand::Filter f, const EngravingItem* target) const override;
-};
 
-//---------------------------------------------------------
-//   RemoveElement
-//---------------------------------------------------------
+    std::vector<const EngravingObject*> objectItems() const override;
+
+    UNDO_TYPE(CommandType::AddElement)
+};
 
 class RemoveElement : public UndoCommand
 {
-    EngravingItem* element;
+    OBJECT_ALLOCATOR(engraving, RemoveElement)
+
+    EngravingItem* element = nullptr;
 
 public:
     RemoveElement(EngravingItem*);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    virtual void cleanup(bool) override;
-    virtual const char* name() const override;
+    void undo(EditData*) override;
+    void redo(EditData*) override;
+    void cleanup(bool) override;
+    const char* name() const override;
 
     bool isFiltered(UndoCommand::Filter f, const EngravingItem* target) const override;
+
+    UNDO_TYPE(CommandType::RemoveElement)
+    UNDO_CHANGED_OBJECTS({ element })
 };
-
-//---------------------------------------------------------
-//   EditText
-//---------------------------------------------------------
-
-class EditText : public UndoCommand
-{
-    Text* text;
-    QString oldText;
-    //int undoLevel;
-
-    void undoRedo();
-
-public:
-    EditText(Text* t, const QString& ot, int /*l*/)
-        : text(t), oldText(ot) /*, undoLevel(l)*/ {}
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
-    UNDO_NAME("EditText")
-};
-
-//---------------------------------------------------------
-//   ChangePatch
-//---------------------------------------------------------
 
 class ChangePatch : public UndoCommand
 {
-    Score* score;
-    Channel* channel;
+    OBJECT_ALLOCATOR(engraving, ChangePatch)
+
+    Score* score = nullptr;
+    InstrChannel* channel = nullptr;
     MidiPatch patch;
 
     void flip(EditData*) override;
 
 public:
-    ChangePatch(Score* s, Channel* c, const MidiPatch* pt)
+    ChangePatch(Score* s, InstrChannel* c, const MidiPatch* pt)
         : score(s), channel(c), patch(*pt) {}
     UNDO_NAME("ChangePatch")
+    UNDO_CHANGED_OBJECTS({ score })
 };
-
-//---------------------------------------------------------
-//   SetUserBankController
-//---------------------------------------------------------
 
 class SetUserBankController : public UndoCommand
 {
-    Channel* channel;
-    bool val;
+    OBJECT_ALLOCATOR(engraving, SetUserBankController)
+
+    InstrChannel* channel = nullptr;
+    bool val = false;
 
     void flip(EditData*) override;
 
 public:
-    SetUserBankController(Channel* c, bool v)
+    SetUserBankController(InstrChannel* c, bool v)
         : channel(c), val(v) {}
     UNDO_NAME("SetUserBankController")
 };
@@ -689,11 +692,13 @@ public:
 
 class ChangeStaff : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, ChangeStaff)
+
     Staff* staff = nullptr;
 
     bool visible = false;
     ClefTypeList clefType;
-    qreal userDist = 0;
+    double userDist = 0.0;
     Staff::HideMode hideMode = Staff::HideMode::AUTO;
     bool showIfEmpty = false;
     bool cutaway = false;
@@ -705,9 +710,12 @@ class ChangeStaff : public UndoCommand
 public:
     ChangeStaff(Staff*);
 
-    ChangeStaff(Staff*, bool _visible, ClefTypeList _clefType, qreal userDist, Staff::HideMode _hideMode, bool _showIfEmpty, bool _cutaway,
+    ChangeStaff(Staff*, bool _visible, ClefTypeList _clefType, double userDist, Staff::HideMode _hideMode, bool _showIfEmpty, bool _cutaway,
                 bool _hideSystemBarLine, bool _mergeRests);
+
+    UNDO_TYPE(CommandType::ChangeStaff)
     UNDO_NAME("ChangeStaff")
+    UNDO_CHANGED_OBJECTS({ staff })
 };
 
 //---------------------------------------------------------
@@ -716,7 +724,9 @@ public:
 
 class ChangeStaffType : public UndoCommand
 {
-    Staff* staff;
+    OBJECT_ALLOCATOR(engraving, ChangeStaffType)
+
+    Staff* staff = nullptr;
     StaffType staffType;
 
     void flip(EditData*) override;
@@ -724,134 +734,148 @@ class ChangeStaffType : public UndoCommand
 public:
     ChangeStaffType(Staff* s, const StaffType& t)
         : staff(s), staffType(t) {}
-    UNDO_NAME("ChangeStaffType")
-};
 
-//---------------------------------------------------------
-//   ChangePart
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeStaffType)
+    UNDO_NAME("ChangeStaffType")
+    UNDO_CHANGED_OBJECTS({ staff })
+};
 
 class ChangePart : public UndoCommand
 {
-    Part* part;
-    Instrument* instrument;
-    QString partName;
+    OBJECT_ALLOCATOR(engraving, ChangePart)
+
+    Part* part = nullptr;
+    Instrument* instrument = nullptr;
+    String partName;
 
     void flip(EditData*) override;
 
 public:
-    ChangePart(Part*, Instrument*, const QString& name);
-    UNDO_NAME("ChangePart")
-};
+    ChangePart(Part*, Instrument*, const String& name);
 
-//---------------------------------------------------------
-//   ChangeStyle
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangePart)
+    UNDO_NAME("ChangePart")
+    UNDO_CHANGED_OBJECTS({ part })
+};
 
 class ChangeStyle : public UndoCommand
 {
-    Score* score;
+    OBJECT_ALLOCATOR(engraving, ChangeStyle)
+
+    Score* score = nullptr;
     MStyle style;
     bool overlap = false;
+
     void flip(EditData*) override;
     void undo(EditData*) override;
 
 public:
     ChangeStyle(Score*, const MStyle&, const bool overlapOnly = false);
-    UNDO_NAME("ChangeStyle")
-};
 
-//---------------------------------------------------------
-//   ChangeStyleVal
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeStyle)
+    UNDO_NAME("ChangeStyle")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangeStyleVal : public UndoCommand
 {
-    Score* score;
+    OBJECT_ALLOCATOR(engraving, ChangeStyleVal)
+
+    Score* score = nullptr;
     Sid idx;
-    QVariant value;
+    PropertyValue value;
 
     void flip(EditData*) override;
 
 public:
-    ChangeStyleVal(Score* s, Sid i, const QVariant& v)
+    ChangeStyleVal(Score* s, Sid i, const PropertyValue& v)
         : score(s), idx(i), value(v) {}
-    UNDO_NAME("ChangeStyleVal")
-};
 
-//---------------------------------------------------------
-//   ChangePageNumberOffset
-//---------------------------------------------------------
+    Sid id() const { return idx; }
+
+    UNDO_TYPE(CommandType::ChangeStyleVal)
+    UNDO_NAME("ChangeStyleVal")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangePageNumberOffset : public UndoCommand
 {
-    Score* score;
-    int pageOffset;
+    OBJECT_ALLOCATOR(engraving, ChangePageNumberOffset)
+
+    Score* score = nullptr;
+    int pageOffset = 0;
 
     void flip(EditData*) override;
 
 public:
     ChangePageNumberOffset(Score* s, int po)
         : score(s), pageOffset(po) {}
-    UNDO_NAME("ChangePageNumberOffset")
-};
 
-//---------------------------------------------------------
-//   ChangeChordStaffMove
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeStyleVal)
+    UNDO_NAME("ChangePageNumberOffset")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangeChordStaffMove : public UndoCommand
 {
-    ChordRest* chordRest;
-    int staffMove;
+    OBJECT_ALLOCATOR(engraving, ChangeChordStaffMove)
+
+    ChordRest* chordRest = nullptr;
+    int staffMove = 0;
+
     void flip(EditData*) override;
 
 public:
     ChangeChordStaffMove(ChordRest* cr, int);
-    UNDO_NAME("ChangeChordStaffMove")
-};
 
-//---------------------------------------------------------
-//   ChangeVelocity
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeChordStaffMove)
+    UNDO_NAME("ChangeChordStaffMove")
+    UNDO_CHANGED_OBJECTS({ chordRest })
+};
 
 class ChangeVelocity : public UndoCommand
 {
-    Note* note;
-    Note::ValueType veloType;
-    int veloOffset;
+    OBJECT_ALLOCATOR(engraving, ChangeVelocity)
+
+    Note* note = nullptr;
+    VeloType veloType;
+    int veloOffset = 0;
+
     void flip(EditData*) override;
 
 public:
-    ChangeVelocity(Note*, Note::ValueType, int);
-    UNDO_NAME("ChangeVelocity")
-};
+    ChangeVelocity(Note*, VeloType, int);
 
-//---------------------------------------------------------
-//   ChangeMStaffProperties
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeVelocity)
+    UNDO_NAME("ChangeVelocity")
+    UNDO_CHANGED_OBJECTS({ note })
+};
 
 class ChangeMStaffProperties : public UndoCommand
 {
-    Measure* measure;
-    int staffIdx;
-    bool visible;
-    bool stemless;
+    OBJECT_ALLOCATOR(engraving, ChangeMStaffProperties)
+
+    Measure* measure = nullptr;
+    int staffIdx = 0;
+    bool visible = false;
+    bool stemless = false;
+
     void flip(EditData*) override;
 
 public:
     ChangeMStaffProperties(Measure*, int staffIdx, bool visible, bool stemless);
-    UNDO_NAME("ChangeMStaffProperties")
-};
 
-//---------------------------------------------------------
-//   InsertRemoveMeasures
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeMStaffProperties)
+    UNDO_NAME("ChangeMStaffProperties")
+    UNDO_CHANGED_OBJECTS({ measure })
+};
 
 class InsertRemoveMeasures : public UndoCommand
 {
-    MeasureBase* fm;
-    MeasureBase* lm;
+    OBJECT_ALLOCATOR(engraving, InsertRemoveMeasures)
+
+    MeasureBase* fm = nullptr;
+    MeasureBase* lm = nullptr;
 
     static std::vector<Clef*> getCourtesyClefs(Measure* m);
 
@@ -864,192 +888,144 @@ public:
         : fm(_fm), lm(_lm) {}
     virtual void undo(EditData*) override = 0;
     virtual void redo(EditData*) override = 0;
+    UNDO_CHANGED_OBJECTS({ fm, lm })
 };
-
-//---------------------------------------------------------
-//   RemoveMeasures
-//---------------------------------------------------------
 
 class RemoveMeasures : public InsertRemoveMeasures
 {
+    OBJECT_ALLOCATOR(engraving, RemoveMeasures)
 public:
     RemoveMeasures(MeasureBase* m1, MeasureBase* m2)
         : InsertRemoveMeasures(m1, m2) {}
-    virtual void undo(EditData*) override { insertMeasures(); }
-    virtual void redo(EditData*) override { removeMeasures(); }
+    void undo(EditData*) override { insertMeasures(); }
+    void redo(EditData*) override { removeMeasures(); }
+
+    UNDO_TYPE(CommandType::RemoveMeasures)
     UNDO_NAME("RemoveMeasures")
 };
 
-//---------------------------------------------------------
-//   InsertMeasures
-//---------------------------------------------------------
-
 class InsertMeasures : public InsertRemoveMeasures
 {
+    OBJECT_ALLOCATOR(engraving, InsertMeasures)
 public:
     InsertMeasures(MeasureBase* m1, MeasureBase* m2)
         : InsertRemoveMeasures(m1, m2) {}
-    virtual void redo(EditData*) override { insertMeasures(); }
-    virtual void undo(EditData*) override { removeMeasures(); }
+    void redo(EditData*) override { insertMeasures(); }
+    void undo(EditData*) override { removeMeasures(); }
+
+    UNDO_TYPE(CommandType::InsertMeasures)
     UNDO_NAME("InsertMeasures")
 };
 
-//---------------------------------------------------------
-//   AddExcerpt
-//---------------------------------------------------------
-
 class AddExcerpt : public UndoCommand
 {
-    Excerpt* excerpt;
+    OBJECT_ALLOCATOR(engraving, AddExcerpt)
+
+    Excerpt* excerpt = nullptr;
+    bool deleteExcerpt = false;
 
 public:
-    AddExcerpt(Excerpt* ex)
-        : excerpt(ex) {}
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
+    AddExcerpt(Excerpt* ex);
+    ~AddExcerpt() override;
+
+    void undo(EditData*) override;
+    void redo(EditData*) override;
+
+    UNDO_TYPE(CommandType::AddExcerpt)
     UNDO_NAME("AddExcerpt")
 };
 
-//---------------------------------------------------------
-//   RemoveExcerpt
-//---------------------------------------------------------
-
 class RemoveExcerpt : public UndoCommand
 {
-    Excerpt* excerpt;
-    int index;
+    OBJECT_ALLOCATOR(engraving, RemoveExcerpt)
+
+    Excerpt* excerpt = nullptr;
+    size_t index = mu::nidx;
+    bool deleteExcerpt = false;
 
 public:
     RemoveExcerpt(Excerpt* ex);
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
+    ~RemoveExcerpt() override;
+
+    void undo(EditData*) override;
+    void redo(EditData*) override;
+
+    UNDO_TYPE(CommandType::RemoveExcerpt)
     UNDO_NAME("RemoveExcerpt")
 };
 
-//---------------------------------------------------------
-//   SwapExcerpt
-//---------------------------------------------------------
-
 class SwapExcerpt : public UndoCommand
 {
-    MasterScore* score;
-    int pos1;
-    int pos2;
+    OBJECT_ALLOCATOR(engraving, SwapExcerpt)
+
+    MasterScore* score = nullptr;
+    int pos1 = 0;
+    int pos2 = 0;
 
     void flip(EditData*) override;
 
 public:
     SwapExcerpt(MasterScore* s, int p1, int p2)
         : score(s), pos1(p1), pos2(p2) {}
-    UNDO_NAME("SwapExcerpt")
-};
 
-//---------------------------------------------------------
-//   ChangeExcerptTitle
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::SwapExcerpt)
+    UNDO_NAME("SwapExcerpt")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangeExcerptTitle : public UndoCommand
 {
-    Excerpt* excerpt;
-    QString title;
+    OBJECT_ALLOCATOR(engraving, ChangeExcerptTitle)
+
+    Excerpt* excerpt = nullptr;
+    String title;
 
     void flip(EditData*) override;
 
 public:
-    ChangeExcerptTitle(Excerpt* x, const QString& t)
+    ChangeExcerptTitle(Excerpt* x, const String& t)
         : excerpt(x), title(t) {}
+
+    UNDO_TYPE(CommandType::ChangeExcerptTitle)
     UNDO_NAME("ChangeExcerptTitle")
 };
 
-//---------------------------------------------------------
-//   ChangeBend
-//---------------------------------------------------------
-
-class ChangeBend : public UndoCommand
-{
-    Bend* bend;
-    QList<PitchValue> points;
-
-    void flip(EditData*) override;
-
-public:
-    ChangeBend(Bend* b, QList<PitchValue> p)
-        : bend(b), points(p) {}
-    UNDO_NAME("ChangeBend")
-};
-
-//---------------------------------------------------------
-//   ChangeTremoloBar
-//---------------------------------------------------------
-
-class ChangeTremoloBar : public UndoCommand
-{
-    TremoloBar* bend;
-    QList<PitchValue> points;
-
-    void flip(EditData*) override;
-
-public:
-    ChangeTremoloBar(TremoloBar* b, QList<PitchValue> p)
-        : bend(b), points(p) {}
-    UNDO_NAME("ChangeTremoloBar")
-};
-
-//---------------------------------------------------------
-//   ChangeNoteEvents
-//---------------------------------------------------------
-
-class ChangeNoteEvents : public UndoCommand
-{
-    //Chord* chord;
-    QList<NoteEvent*> events;
-
-    void flip(EditData*) override;
-
-public:
-    ChangeNoteEvents(Chord* /*n*/, const QList<NoteEvent*>& l)
-        : /*chord(n),*/ events(l) {}
-    UNDO_NAME("ChangeNoteEvents")
-};
-
-//---------------------------------------------------------
-//   ChangeNoteEventList
-//---------------------------------------------------------
-
 class ChangeNoteEventList : public UndoCommand
 {
-    Ms::Note* note;
+    OBJECT_ALLOCATOR(engraving, ChangeNoteEventList)
+
+    Note* note = nullptr;
     NoteEventList newEvents;
     PlayEventType newPetype;
 
     void flip(EditData*) override;
 
 public:
-    ChangeNoteEventList(Ms::Note* n, NoteEventList& ne)
+    ChangeNoteEventList(Note* n, NoteEventList& ne)
         : note(n), newEvents(ne), newPetype(PlayEventType::User) {}
     UNDO_NAME("ChangeNoteEventList")
+    UNDO_CHANGED_OBJECTS({ note });
 };
-
-//---------------------------------------------------------
-//   ChangeChordPlayEventType
-//---------------------------------------------------------
 
 class ChangeChordPlayEventType : public UndoCommand
 {
-    Ms::Chord* chord;
-    Ms::PlayEventType petype;
-    QList<NoteEventList> events;
+    OBJECT_ALLOCATOR(engraving, ChangeChordPlayEventType)
+
+    Chord* chord = nullptr;
+    PlayEventType petype;
+    std::vector<NoteEventList> events;
 
     void flip(EditData*) override;
 
 public:
-    ChangeChordPlayEventType(Chord* c, Ms::PlayEventType pet)
+    ChangeChordPlayEventType(Chord* c, PlayEventType pet)
         : chord(c), petype(pet)
     {
         events = c->getNoteEventLists();
     }
 
     UNDO_NAME("ChangeChordPlayEventType")
+    UNDO_CHANGED_OBJECTS({ chord });
 };
 
 //---------------------------------------------------------
@@ -1059,228 +1035,221 @@ public:
 
 class ChangeInstrument : public UndoCommand
 {
-    InstrumentChange* is;
-    Instrument* instrument;
+    OBJECT_ALLOCATOR(engraving, ChangeInstrument)
+
+    InstrumentChange* is = nullptr;
+    Instrument* instrument = nullptr;
 
     void flip(EditData*) override;
 
 public:
     ChangeInstrument(InstrumentChange* _is, Instrument* i)
         : is(_is), instrument(i) {}
+
+    UNDO_TYPE(CommandType::ChangeInstrument)
     UNDO_NAME("ChangeInstrument")
+    UNDO_CHANGED_OBJECTS({ is })
 };
 
-extern void updateNoteLines(Segment*, int track);
-
-//---------------------------------------------------------
-//   SwapCR
-//---------------------------------------------------------
+extern void updateNoteLines(Segment*, track_idx_t track);
 
 class SwapCR : public UndoCommand
 {
-    ChordRest* cr1;
-    ChordRest* cr2;
+    OBJECT_ALLOCATOR(engraving, SwapCR)
+
+    ChordRest* cr1 = nullptr;
+    ChordRest* cr2 = nullptr;
 
     void flip(EditData*) override;
 
 public:
     SwapCR(ChordRest* a, ChordRest* b)
         : cr1(a), cr2(b) {}
-    UNDO_NAME("SwapCR")
-};
 
-//---------------------------------------------------------
-//   ChangeClefType
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::SwapCR)
+    UNDO_NAME("SwapCR")
+    UNDO_CHANGED_OBJECTS({ cr1, cr2 })
+};
 
 class ChangeClefType : public UndoCommand
 {
-    Clef* clef;
+    OBJECT_ALLOCATOR(engraving, ChangeClefType)
+
+    Clef* clef = nullptr;
     ClefType concertClef;
     ClefType transposingClef;
+
     void flip(EditData*) override;
 
 public:
     ChangeClefType(Clef*, ClefType cl, ClefType tc);
-    UNDO_NAME("ChangeClef")
-};
 
-//---------------------------------------------------------
-//   ChangeProperty
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeClefType)
+    UNDO_NAME("ChangeClef")
+    UNDO_CHANGED_OBJECTS({ clef })
+};
 
 class ChangeProperty : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, ChangeProperty)
 protected:
-    EngravingObject* element;
+    EngravingObject* element = nullptr;
     Pid id;
-    QVariant property;
+    PropertyValue property;
     PropertyFlags flags;
 
     void flip(EditData*) override;
 
 public:
-    ChangeProperty(EngravingObject* e, Pid i, const QVariant& v, PropertyFlags ps = PropertyFlags::NOSTYLE)
+    ChangeProperty(EngravingObject* e, Pid i, const PropertyValue& v, PropertyFlags ps = PropertyFlags::NOSTYLE)
         : element(e), id(i), property(v), flags(ps) {}
+
     Pid getId() const { return id; }
     EngravingObject* getElement() const { return element; }
-    QVariant data() const { return property; }
+    PropertyValue data() const { return property; }
+
+    UNDO_TYPE(CommandType::ChangeProperty)
     UNDO_NAME("ChangeProperty")
+
+    std::vector<const EngravingObject*> objectItems() const override;
 
     bool isFiltered(UndoCommand::Filter f, const EngravingItem* target) const override
     {
-        return f == UndoCommand::Filter::ChangePropertyLinked && target->linkList().contains(element);
+        return f == UndoCommand::Filter::ChangePropertyLinked && mu::contains(target->linkList(), element);
     }
 };
 
-//---------------------------------------------------------
-//   ChangeBracketProperty
-//---------------------------------------------------------
-
 class ChangeBracketProperty : public ChangeProperty
 {
-    Staff* staff;
-    int level;
+    OBJECT_ALLOCATOR(engraving, ChangeBracketProperty)
+
+    Staff* staff = nullptr;
+    size_t level = 0;
 
     void flip(EditData*) override;
 
 public:
-    ChangeBracketProperty(Staff* s, int l, Pid i, const QVariant& v, PropertyFlags ps = PropertyFlags::NOSTYLE)
+    ChangeBracketProperty(Staff* s, size_t l, Pid i, const PropertyValue& v, PropertyFlags ps = PropertyFlags::NOSTYLE)
         : ChangeProperty(nullptr, i, v, ps), staff(s), level(l) {}
     UNDO_NAME("ChangeBracketProperty")
+    UNDO_CHANGED_OBJECTS({ staff })
 };
-
-//---------------------------------------------------------
-//   ChangeTextLineProperty
-//---------------------------------------------------------
 
 class ChangeTextLineProperty : public ChangeProperty
 {
+    OBJECT_ALLOCATOR(engraving, ChangeTextLineProperty)
+
     void flip(EditData*) override;
 
 public:
-    ChangeTextLineProperty(EngravingObject* e, QVariant v)
+    ChangeTextLineProperty(EngravingObject* e, PropertyValue v)
         : ChangeProperty(e, Pid::SYSTEM_FLAG, v, PropertyFlags::NOSTYLE) {}
     UNDO_NAME("ChangeTextLineProperty")
 };
 
-//---------------------------------------------------------
-//   ChangeMetaText
-//---------------------------------------------------------
-
 class ChangeMetaText : public UndoCommand
 {
-    Score* score;
-    QString id;
-    QString text;
+    OBJECT_ALLOCATOR(engraving, ChangeMetaText)
+
+    Score* score = nullptr;
+    String id;
+    String text;
 
     void flip(EditData*) override;
 
 public:
-    ChangeMetaText(Score* s, const QString& i, const QString& t)
+    ChangeMetaText(Score* s, const String& i, const String& t)
         : score(s), id(i), text(t) {}
+
+    UNDO_TYPE(CommandType::ChangeMetaInfo)
     UNDO_NAME("ChangeMetaText")
+    UNDO_CHANGED_OBJECTS({ score })
 };
-
-//---------------------------------------------------------
-//   ChangeSynthesizerState
-//---------------------------------------------------------
-
-class ChangeSynthesizerState : public UndoCommand
-{
-    Score* score;
-    SynthesizerState state;
-
-    void flip(EditData*) override;
-
-public:
-    ChangeSynthesizerState(Score* s, const SynthesizerState& st)
-        : score(s), state(st) {}
-    UNDO_NAME("ChangeSynthesizerState")
-};
-
-//---------------------------------------------------------
-//   RemoveBracket
-//---------------------------------------------------------
 
 class RemoveBracket : public UndoCommand
 {
-    Staff* staff;
-    int level;
-    BracketType type;
-    int span;
+    OBJECT_ALLOCATOR(engraving, RemoveBracket)
 
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
+    Staff* staff = nullptr;
+    size_t level = 0;
+    BracketType bracketType = BracketType::NORMAL;
+    size_t span = 0;
+
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
 public:
-    RemoveBracket(Staff* s, int l, BracketType t, int sp)
-        : staff(s), level(l), type(t), span(sp) {}
-    UNDO_NAME("RemoveBracket")
-};
+    RemoveBracket(Staff* s, size_t l, BracketType t, size_t sp)
+        : staff(s), level(l), bracketType(t), span(sp) {}
 
-//---------------------------------------------------------
-//   AddBracket
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::RemoveBracket)
+    UNDO_NAME("RemoveBracket")
+    UNDO_CHANGED_OBJECTS({ staff })
+};
 
 class AddBracket : public UndoCommand
 {
-    Staff* staff;
-    int level;
-    BracketType type;
-    int span;
+    OBJECT_ALLOCATOR(engraving, AddBracket)
 
-    virtual void undo(EditData*) override;
-    virtual void redo(EditData*) override;
+    Staff* staff = nullptr;
+    int level = 0;
+    BracketType bracketType = BracketType::NORMAL;
+    size_t span = 0;
+
+    void undo(EditData*) override;
+    void redo(EditData*) override;
 
 public:
-    AddBracket(Staff* s, int l, BracketType t, int sp)
-        : staff(s), level(l), type(t), span(sp) {}
-    UNDO_NAME("AddBracket")
-};
+    AddBracket(Staff* s, int l, BracketType t, size_t sp)
+        : staff(s), level(l), bracketType(t), span(sp) {}
 
-//---------------------------------------------------------
-//   ChangeSpannerElements
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::AddBracket)
+    UNDO_NAME("AddBracket")
+    UNDO_CHANGED_OBJECTS({ staff })
+};
 
 class ChangeSpannerElements : public UndoCommand
 {
-    Spanner* spanner;
-    EngravingItem* startElement;
-    EngravingItem* endElement;
+    OBJECT_ALLOCATOR(engraving, ChangeSpannerElements)
+
+    Spanner* spanner = nullptr;
+    EngravingItem* startElement = nullptr;
+    EngravingItem* endElement = nullptr;
 
     void flip(EditData*) override;
 
 public:
     ChangeSpannerElements(Spanner* s, EngravingItem* se, EngravingItem* ee)
         : spanner(s), startElement(se), endElement(ee) {}
-    UNDO_NAME("ChangeSpannerElements")
-};
 
-//---------------------------------------------------------
-//   ChangeParent
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeSpannerElements)
+    UNDO_NAME("ChangeSpannerElements")
+    UNDO_CHANGED_OBJECTS({ spanner })
+};
 
 class ChangeParent : public UndoCommand
 {
-    EngravingItem* element;
-    EngravingItem* parent;
-    int staffIdx;
+    OBJECT_ALLOCATOR(engraving, ChangeParent)
+
+    EngravingItem* element = nullptr;
+    EngravingItem* parent = nullptr;
+    staff_idx_t staffIdx = mu::nidx;
 
     void flip(EditData*) override;
 
 public:
-    ChangeParent(EngravingItem* e, EngravingItem* p, int si)
+    ChangeParent(EngravingItem* e, EngravingItem* p, staff_idx_t si)
         : element(e), parent(p), staffIdx(si) {}
-    UNDO_NAME("ChangeParent")
-};
 
-//---------------------------------------------------------
-//   ChangeMMRest
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeParent)
+    UNDO_NAME("ChangeParent")
+    UNDO_CHANGED_OBJECTS({ element })
+};
 
 class ChangeMMRest : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, ChangeMMRest)
+
     Measure* m;
     Measure* mmrest;
 
@@ -1289,34 +1258,36 @@ class ChangeMMRest : public UndoCommand
 public:
     ChangeMMRest(Measure* _m, Measure* _mmr)
         : m(_m), mmrest(_mmr) {}
-    UNDO_NAME("ChangeMMRest")
-};
 
-//---------------------------------------------------------
-//   ChangeMeasureRepeatCount
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeMMRest)
+    UNDO_NAME("ChangeMMRest")
+    UNDO_CHANGED_OBJECTS({ m, mmrest })
+};
 
 class ChangeMeasureRepeatCount : public UndoCommand
 {
-    Measure* m;
-    int count;
-    int staffIdx;
+    OBJECT_ALLOCATOR(engraving, ChangeMeasureRepeatCount)
+
+    Measure* m = nullptr;
+    int count = 0;
+    staff_idx_t staffIdx = mu::nidx;
 
     void flip(EditData*) override;
 
 public:
-    ChangeMeasureRepeatCount(Measure* _m, int _count, int _staffIdx)
+    ChangeMeasureRepeatCount(Measure* _m, int _count, staff_idx_t _staffIdx)
         : m(_m), count(_count), staffIdx(_staffIdx) {}
-    UNDO_NAME("ChangeMeasureRepeatCount")
-};
 
-//---------------------------------------------------------
-//   InsertTime
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeMeasureRepeatCount)
+    UNDO_NAME("ChangeMeasureRepeatCount")
+    UNDO_CHANGED_OBJECTS({ m })
+};
 
 class InsertTime : public UndoCommand
 {
-    Score* score;
+    OBJECT_ALLOCATOR(engraving, InsertTime)
+
+    Score* score = nullptr;
     Fraction tick;
     Fraction len;
 
@@ -1326,16 +1297,17 @@ class InsertTime : public UndoCommand
 public:
     InsertTime(Score* _score, const Fraction& _tick, const Fraction& _len)
         : score(_score), tick(_tick), len(_len) {}
-    UNDO_NAME("InsertTime")
-};
 
-//---------------------------------------------------------
-//   InsertTimeUnmanagedSpanner
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::InsertTime)
+    UNDO_NAME("InsertTime")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class InsertTimeUnmanagedSpanner : public UndoCommand
 {
-    Score* score;
+    OBJECT_ALLOCATOR(engraving, InsertTimeUnmanagedSpanner)
+
+    Score* score = nullptr;
     Fraction tick;
     Fraction len;
 
@@ -1344,17 +1316,18 @@ class InsertTimeUnmanagedSpanner : public UndoCommand
 public:
     InsertTimeUnmanagedSpanner(Score* s, const Fraction& _tick, const Fraction& _len)
         : score(s), tick(_tick), len(_len) {}
-    UNDO_NAME("InsertTimeUnmanagedSpanner")
-};
 
-//---------------------------------------------------------
-//   ChangeNoteEvent
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::InsertTimeUnmanagedSpanner)
+    UNDO_NAME("InsertTimeUnmanagedSpanner")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangeNoteEvent : public UndoCommand
 {
-    Note* note;
-    NoteEvent* oldEvent;
+    OBJECT_ALLOCATOR(engraving, ChangeNoteEvent)
+
+    Note* note = nullptr;
+    NoteEvent* oldEvent = nullptr;
     NoteEvent newEvent;
     PlayEventType newPetype;
 
@@ -1364,14 +1337,13 @@ public:
     ChangeNoteEvent(Note* n, NoteEvent* oe, const NoteEvent& ne)
         : note(n), oldEvent(oe), newEvent(ne), newPetype(PlayEventType::User) {}
     UNDO_NAME("ChangeNoteEvent")
+    UNDO_CHANGED_OBJECTS({ note })
 };
-
-//---------------------------------------------------------
-//   LinkUnlink
-//---------------------------------------------------------
 
 class LinkUnlink : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, LinkUnlink)
+
     bool mustDelete  { false };
 
 protected:
@@ -1386,76 +1358,75 @@ public:
     ~LinkUnlink();
 };
 
-//---------------------------------------------------------
-//   Unlink
-//---------------------------------------------------------
-
 class Unlink : public LinkUnlink
 {
+    OBJECT_ALLOCATOR(engraving, Unlink)
 public:
     Unlink(EngravingObject*);
-    virtual void undo(EditData*) override { link(); }
-    virtual void redo(EditData*) override { unlink(); }
+    void undo(EditData*) override { link(); }
+    void redo(EditData*) override { unlink(); }
+
+    UNDO_TYPE(CommandType::Unlink)
     UNDO_NAME("Unlink")
 };
 
-//---------------------------------------------------------
-//   Link
-//---------------------------------------------------------
-
 class Link : public LinkUnlink
 {
+    OBJECT_ALLOCATOR(engraving, Link)
 public:
     Link(EngravingObject*, EngravingObject*);
-    virtual void undo(EditData*) override { unlink(); }
-    virtual void redo(EditData*) override { link(); }
+
+    void undo(EditData*) override { unlink(); }
+    void redo(EditData*) override { link(); }
+
+    UNDO_TYPE(CommandType::Link)
     UNDO_NAME("Link")
 
     bool isFiltered(UndoCommand::Filter f, const EngravingItem* target) const override;
 };
 
-//---------------------------------------------------------
-//   ChangeStartEndSpanner
-//---------------------------------------------------------
-
 class ChangeStartEndSpanner : public UndoCommand
 {
-    Spanner* spanner;
-    EngravingItem* start;
-    EngravingItem* end;
+    OBJECT_ALLOCATOR(engraving, ChangeStartEndSpanner)
+
+    Spanner* spanner = nullptr;
+    EngravingItem* start = nullptr;
+    EngravingItem* end = nullptr;
 
     void flip(EditData*) override;
 
 public:
     ChangeStartEndSpanner(Spanner* sp, EngravingItem* s, EngravingItem* e)
         : spanner(sp), start(s), end(e) {}
-    UNDO_NAME("ChangeStartEndSpanner")
-};
 
-//---------------------------------------------------------
-//   ChangeMetaTags
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeStartEndSpanner)
+    UNDO_NAME("ChangeStartEndSpanner")
+    UNDO_CHANGED_OBJECTS({ spanner })
+};
 
 class ChangeMetaTags : public UndoCommand
 {
-    Score* score;
-    QMap<QString, QString> metaTags;
+    OBJECT_ALLOCATOR(engraving, ChangeMetaTags)
+
+    Score* score = nullptr;
+    std::map<String, String> metaTags;
 
     void flip(EditData*) override;
 
 public:
-    ChangeMetaTags(Score* s, const QMap<QString, QString>& m)
+    ChangeMetaTags(Score* s, const std::map<String, String>& m)
         : score(s), metaTags(m) {}
-    UNDO_NAME("ChangeMetaTags")
-};
 
-//---------------------------------------------------------
-//   ChangeDrumset
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::ChangeMetaInfo)
+    UNDO_NAME("ChangeMetaTags")
+    UNDO_CHANGED_OBJECTS({ score })
+};
 
 class ChangeDrumset : public UndoCommand
 {
-    Instrument* instrument;
+    OBJECT_ALLOCATOR(engraving, ChangeDrumset)
+
+    Instrument* instrument = nullptr;
     Drumset drumset;
 
     void flip(EditData*) override;
@@ -1463,19 +1434,19 @@ class ChangeDrumset : public UndoCommand
 public:
     ChangeDrumset(Instrument* i, const Drumset* d)
         : instrument(i), drumset(*d) {}
+
+    UNDO_TYPE(CommandType::ChangeDrumset)
     UNDO_NAME("ChangeDrumset")
 };
 
-//---------------------------------------------------------
-//   FretDot
-//---------------------------------------------------------
-
 class FretDot : public UndoCommand
 {
-    FretDiagram* diagram;
-    int string;
-    int fret;
-    bool add;
+    OBJECT_ALLOCATOR(engraving, FretDot)
+
+    FretDiagram* diagram = nullptr;
+    int string = 0;
+    int fret = 0;
+    bool add = 0;
     FretDotType dtype;
     FretUndoData undoData;
 
@@ -1485,17 +1456,18 @@ class FretDot : public UndoCommand
 public:
     FretDot(FretDiagram* d, int _string, int _fret, bool _add = false, FretDotType _dtype = FretDotType::NORMAL)
         : diagram(d), string(_string), fret(_fret), add(_add), dtype(_dtype) {}
-    UNDO_NAME("FretDot")
-};
 
-//---------------------------------------------------------
-//   FretMarker
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::FretDot)
+    UNDO_NAME("FretDot")
+    UNDO_CHANGED_OBJECTS({ diagram })
+};
 
 class FretMarker : public UndoCommand
 {
-    FretDiagram* diagram;
-    int string;
+    OBJECT_ALLOCATOR(engraving, FretMarker)
+
+    FretDiagram* diagram = nullptr;
+    int string = 0;
     FretMarkerType mtype;
     FretUndoData undoData;
 
@@ -1505,19 +1477,20 @@ class FretMarker : public UndoCommand
 public:
     FretMarker(FretDiagram* d, int _string, FretMarkerType _mtype)
         : diagram(d), string(_string), mtype(_mtype) {}
-    UNDO_NAME("FretMarker")
-};
 
-//---------------------------------------------------------
-//   FretBarre
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::FretMarker)
+    UNDO_NAME("FretMarker")
+    UNDO_CHANGED_OBJECTS({ diagram })
+};
 
 class FretBarre : public UndoCommand
 {
-    FretDiagram* diagram;
-    int string;
-    int fret;
-    bool add;
+    OBJECT_ALLOCATOR(engraving, FretBarre)
+
+    FretDiagram* diagram = nullptr;
+    int string = 0;
+    int fret = 0;
+    bool add = 0;
     FretUndoData undoData;
 
     void redo(EditData*) override;
@@ -1526,16 +1499,17 @@ class FretBarre : public UndoCommand
 public:
     FretBarre(FretDiagram* d, int _string, int _fret, bool _add = false)
         : diagram(d), string(_string), fret(_fret), add(_add) {}
-    UNDO_NAME("FretBarre")
-};
 
-//---------------------------------------------------------
-//   FretClear
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::FretBarre)
+    UNDO_NAME("FretBarre")
+    UNDO_CHANGED_OBJECTS({ diagram })
+};
 
 class FretClear : public UndoCommand
 {
-    FretDiagram* diagram;
+    OBJECT_ALLOCATOR(engraving, FretClear)
+
+    FretDiagram* diagram = nullptr;
     FretUndoData undoData;
 
     void redo(EditData*) override;
@@ -1544,15 +1518,16 @@ class FretClear : public UndoCommand
 public:
     FretClear(FretDiagram* d)
         : diagram(d) {}
-    UNDO_NAME("FretClear")
-};
 
-//---------------------------------------------------------
-//   MoveTremolo
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::FretClear)
+    UNDO_NAME("FretClear")
+    UNDO_CHANGED_OBJECTS({ diagram })
+};
 
 class MoveTremolo : public UndoCommand
 {
+    OBJECT_ALLOCATOR(engraving, MoveTremolo)
+
     Score* score { nullptr };
     Fraction chord1Tick;
     Fraction chord2Tick;
@@ -1568,23 +1543,27 @@ class MoveTremolo : public UndoCommand
 public:
     MoveTremolo(Score* s, Fraction c1, Fraction c2, Tremolo* tr, int t)
         : score(s), chord1Tick(c1), chord2Tick(c2), trem(tr), track(t) {}
-    UNDO_NAME("MoveTremolo")
-};
 
-//---------------------------------------------------------
-//   ChangeScoreOrder
-//---------------------------------------------------------
+    UNDO_TYPE(CommandType::MoveTremolo)
+    UNDO_NAME("MoveTremolo")
+    UNDO_CHANGED_OBJECTS({ trem })
+};
 
 class ChangeScoreOrder : public UndoCommand
 {
-    Score* score;
+    OBJECT_ALLOCATOR(engraving, ChangeScoreOrder)
+
+    Score* score = nullptr;
     ScoreOrder order;
     void flip(EditData*) override;
 
 public:
     ChangeScoreOrder(Score* sc, ScoreOrder so)
         : score(sc), order(so) {}
+
+    UNDO_TYPE(CommandType::ChangeScoreOrder)
     UNDO_NAME("ChangeScoreOrder")
+    UNDO_CHANGED_OBJECTS({ score })
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

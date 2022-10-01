@@ -59,7 +59,7 @@ inline ActionCodeList allMidiActions()
         "pad-rest",
         "tie",
         "pad-dot",
-        "pad-dotdot",
+        "pad-dot2",
         "realtime-advance"
     };
 }
@@ -95,9 +95,10 @@ QVariantMap MidiDeviceMappingModel::midiMappingToObject(const MidiControlsMappin
 
     QVariantMap obj;
 
-    obj[TITLE_KEY] = action.title;
+    obj[TITLE_KEY] = !action.description.isEmpty() ? action.description.qTranslated() : action.title.qTranslated();
     obj[ICON_KEY] = static_cast<int>(action.iconCode);
-    obj[STATUS_KEY] = midiMapping.isValid() ? qtrc("shortcuts", "Active") : qtrc("shortcuts", "Inactive");
+    obj[ENABLED_KEY] = midiMapping.isValid();
+    obj[STATUS_KEY] = midiMapping.isValid() ? midiMapping.event.name().toQString() : qtrc("shortcuts", "Inactive");
     obj[MAPPED_TYPE_KEY] = static_cast<int>(midiMapping.event.type);
     obj[MAPPED_VALUE_KEY] = midiMapping.event.value;
 
@@ -148,6 +149,10 @@ void MidiDeviceMappingModel::load()
         }
     }
 
+    midiRemote()->midiMappingsChanged().onNotify(this, [this](){
+        load();
+    });
+
     endResetModel();
 }
 
@@ -164,6 +169,11 @@ bool MidiDeviceMappingModel::apply()
     }
 
     return ret;
+}
+
+void MidiDeviceMappingModel::reset()
+{
+    midiRemote()->resetMidiMappings();
 }
 
 bool MidiDeviceMappingModel::useRemoteControl() const

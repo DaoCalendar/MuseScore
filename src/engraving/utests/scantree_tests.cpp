@@ -28,10 +28,10 @@
 
 #include "log.h"
 
-static const QString ALL_ELEMENTS_DATA_DIR("all_elements_data/");
-
+using namespace mu;
 using namespace mu::engraving;
-using namespace Ms;
+
+static const String ALL_ELEMENTS_DATA_DIR("all_elements_data/");
 
 //---------------------------------------------------------
 //   TestTreeModel
@@ -41,25 +41,25 @@ using namespace Ms;
 ///   it appears in.
 //---------------------------------------------------------
 
-class ScanTreeTests : public ::testing::Test
+class Engraving_ScanTreeTests : public ::testing::Test
 {
 public:
-    void tstTree(QString file);
+    void tstTree(String file);
     void traverseTree(EngravingObject* element);
 };
 
-static QString elementToText(EngravingObject* element)
+static String elementToText(EngravingObject* element)
 {
     if (element == nullptr) {
-        return "nullptr";
+        return u"nullptr";
     }
     if (element->isEngravingItem()) {
         return toEngravingItem(element)->accessibleInfo();
     }
-    return element->userName();
+    return element->translatedTypeUserName();
 }
 
-void ScanTreeTests::tstTree(QString file)
+void Engraving_ScanTreeTests::tstTree(String file)
 {
     MasterScore* score = ScoreRW::readScore(ALL_ELEMENTS_DATA_DIR + file);
     traverseTree(score);
@@ -70,18 +70,18 @@ void ScanTreeTests::tstTree(QString file)
 //   correct, then recursively checks all children.
 //---------------------------------------------------------
 
-void ScanTreeTests::traverseTree(EngravingObject* element)
+void Engraving_ScanTreeTests::traverseTree(EngravingObject* element)
 {
-    for (int i = 0; i < element->scanChildCount(); ++i) {
-        EngravingObject* child = element->scanChild(i);
+    EngravingObjectList children = element->scanChildren();
+    for (EngravingObject* child : children) {
         // child should never be nullptr
         if (!child) {
             LOGD() << "EngravingItem returned nullptr in treeChild()!";
             LOGD() << "EngravingItem: " << elementToText(element);
-            LOGD() << "Number of children: " << element->scanChildCount();
+            LOGD() << "Number of children: " << children.size();
             LOGD() << "Children: ";
-            for (int i = 0; i < element->scanChildCount(); i++) {
-                LOGD() << element->scanChild(i);
+            for (EngravingObject* child2 : children) {
+                LOGD() << child2;
             }
         }
         EXPECT_TRUE(child);
@@ -99,22 +99,22 @@ void ScanTreeTests::traverseTree(EngravingObject* element)
     }
 }
 
-TEST_F(ScanTreeTests, tstTreeElements)
+TEST_F(Engraving_ScanTreeTests, tstTreeElements)
 {
-    tstTree("layout_elements.mscx");
+    tstTree(u"layout_elements.mscx");
 }
 
-TEST_F(ScanTreeTests, tstTreeTablature)
+TEST_F(Engraving_ScanTreeTests, tstTreeTablature)
 {
-    tstTree("layout_elements_tab.mscx");
+    tstTree(u"layout_elements_tab.mscx");
 }
 
-TEST_F(ScanTreeTests, tstTreeMoonlight)
+TEST_F(Engraving_ScanTreeTests, tstTreeMoonlight)
 {
-    tstTree("moonlight.mscx");
+    tstTree(u"moonlight.mscx");
 }
 
-TEST_F(ScanTreeTests, DISABLED_tstTreeGoldberg) // too long
+TEST_F(Engraving_ScanTreeTests, DISABLED_tstTreeGoldberg) // too long
 {
-    tstTree("goldberg.mscx");
+    tstTree(u"goldberg.mscx");
 }

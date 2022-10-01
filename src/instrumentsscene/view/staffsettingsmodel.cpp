@@ -42,51 +42,17 @@ void StaffSettingsModel::load(const QString& staffId)
 
     m_staffId = staffId;
     m_config = notationParts()->staffConfig(m_staffId);
-
     m_type = staff->staffType()->type();
 
     m_voicesVisibility.clear();
-    for (const QVariant& voice: staff->visibilityVoices()) {
-        m_voicesVisibility << voice.toBool();
+    for (const bool& voice : staff->visibilityVoices()) {
+        m_voicesVisibility << voice;
     }
 
-    emit voicesChanged();
     emit cutawayEnabledChanged();
     emit isSmallStaffChanged();
-}
-
-QVariantList StaffSettingsModel::allStaffTypes() const
-{
-    QVariantList result;
-
-    for (notation::StaffType type: notation::allStaffTypes()) {
-        QVariantMap obj;
-
-        obj["text"] = staffTypeToString(type);
-        obj["value"] = static_cast<int>(type);
-
-        result << obj;
-    }
-
-    return result;
-}
-
-QString StaffSettingsModel::staffType() const
-{
-    return staffTypeToString(m_type);
-}
-
-void StaffSettingsModel::setStaffType(int type)
-{
-    auto type_ = static_cast<StaffType>(type);
-
-    if (m_type == type_ || !notationParts()) {
-        return;
-    }
-
-    m_type = type_;
-    notationParts()->setStaffType(m_staffId, m_type);
-
+    emit voicesChanged();
+    emit allStaffTypesChanged();
     emit staffTypeChanged();
 }
 
@@ -106,6 +72,79 @@ QVariantList StaffSettingsModel::voices() const
     return result;
 }
 
+QVariantList StaffSettingsModel::allStaffTypes() const
+{
+    QVariantList result;
+
+    const Staff* staff = notationParts()->staff(m_staffId);
+    if (!staff) {
+        return result;
+    }
+
+    const Part* part = staff->part();
+    if (!part) {
+        return result;
+    }
+
+    int maxLines = 0;
+    bool isPercussion = false;
+
+    if (const Instrument* instrument = part->instrument()) {
+        if (const StringData* stringData = instrument->stringData()) {
+            maxLines = stringData->frettedStrings();
+        }
+
+        isPercussion = instrument->useDrumset();
+    }
+
+    auto isTypeAllowed = [maxLines, isPercussion](const mu::engraving::StaffType& type) {
+        switch (type.group()) {
+        case mu::engraving::StaffGroup::PERCUSSION: return isPercussion;
+        case mu::engraving::StaffGroup::TAB: return type.lines() <= maxLines;
+        case mu::engraving::StaffGroup::STANDARD: return true;
+        }
+
+        return false;
+    };
+
+    for (const mu::engraving::StaffType& type : mu::engraving::StaffType::presets()) {
+        if (isTypeAllowed(type)) {
+            QVariantMap obj;
+
+            obj["text"] = staffTypeToString(type.type());
+            obj["value"] = static_cast<int>(type.type());
+
+            result << obj;
+        }
+    }
+
+    return result;
+}
+
+bool StaffSettingsModel::isMainScore() const
+{
+    return currentNotation() == currentMasterNotation();
+}
+
+int StaffSettingsModel::staffType() const
+{
+    return static_cast<int>(m_type);
+}
+
+void StaffSettingsModel::setStaffType(int type)
+{
+    auto type_ = static_cast<StaffTypeId>(type);
+
+    if (m_type == type_ || !notationParts()) {
+        return;
+    }
+
+    m_type = type_;
+    notationParts()->setStaffType(m_staffId, m_type);
+
+    emit staffTypeChanged();
+}
+
 void StaffSettingsModel::setVoiceVisible(int voiceIndex, bool visible)
 {
     if (m_voicesVisibility[voiceIndex] == visible || !notationParts()) {
@@ -117,11 +156,6 @@ void StaffSettingsModel::setVoiceVisible(int voiceIndex, bool visible)
         m_voicesVisibility[voiceIndex] = visible;
         emit voiceVisibilityChanged(voiceIndex, visible);
     }
-}
-
-bool StaffSettingsModel::isMainScore() const
-{
-    return currentNotation() == currentMasterNotation();
 }
 
 INotationPtr StaffSettingsModel::currentNotation() const
@@ -136,16 +170,16 @@ INotationPtr StaffSettingsModel::currentMasterNotation() const
 
 bool StaffSettingsModel::isSmallStaff() const
 {
-    return m_config.isSmall;
+    return m_config.staffType.isSmall();
 }
 
 void StaffSettingsModel::setIsSmallStaff(bool value)
 {
-    if (m_config.isSmall == value || !notationParts()) {
+    if (m_config.staffType.isSmall() == value || !notationParts()) {
         return;
     }
 
-    m_config.isSmall = value;
+    m_config.staffType.setSmall(value);
     notationParts()->setStaffConfig(m_staffId, m_config);
 
     emit isSmallStaffChanged();
@@ -180,7 +214,10 @@ void StaffSettingsModel::createLinkedStaff()
     }
 
     Staff* linkedStaff = sourceStaff->clone();
-    masterNotationParts()->appendLinkedStaff(linkedStaff, sourceStaff->id(), sourceStaff->part()->id());
+    if (!masterNotationParts()->appendLinkedStaff(linkedStaff, sourceStaff->id(), sourceStaff->part()->id())) {
+        linkedStaff->unlink();
+        delete linkedStaff;
+    }
 }
 
 INotationPartsPtr StaffSettingsModel::notationParts() const

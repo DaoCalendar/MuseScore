@@ -26,14 +26,16 @@
 #include "sig.h"
 #include "measure.h"
 
+#include "log.h"
+
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   dots
 //---------------------------------------------------------
 
-static int getDots(int base, int rest, char* dots)
+static int getDots(int base, int rest, int* dots)
 {
     if (base < 16) {
         return rest;
@@ -86,8 +88,8 @@ void TDuration::setVal(int ticks)
         _val = DurationType::V_MEASURE;
     } else {
         TDuration dt;
-        for (int i = 0; i < int(TDuration::DurationType::V_ZERO); ++i) {
-            dt.setType(TDuration::DurationType(i));
+        for (int i = 0; i < int(DurationType::V_ZERO); ++i) {
+            dt.setType(DurationType(i));
             int t = dt.ticks().ticks();
             if (ticks / t) {
                 int remain = ticks % t;
@@ -101,7 +103,7 @@ void TDuration::setVal(int ticks)
                 return;
             }
         }
-        qDebug("2: no duration type for ticks %d", ticks);
+        LOGD("2: no duration type for ticks %d", ticks);
         _val = DurationType::V_QUARTER;           // fallback default value
     }
 }
@@ -156,41 +158,12 @@ Fraction TDuration::ticks() const
 }
 
 //---------------------------------------------------------
-//   name
-//---------------------------------------------------------
-
-QString TDuration::name() const
-{
-    switch (_val) {
-    case DurationType::V_QUARTER:   return "quarter";
-    case DurationType::V_EIGHTH:    return "eighth";
-    case DurationType::V_1024TH:    return "1024th";
-    case DurationType::V_512TH:     return "512th";
-    case DurationType::V_256TH:     return "256th";
-    case DurationType::V_128TH:     return "128th";
-    case DurationType::V_64TH:      return "64th";
-    case DurationType::V_32ND:      return "32nd";
-    case DurationType::V_16TH:      return "16th";
-    case DurationType::V_HALF:      return "half";
-    case DurationType::V_WHOLE:     return "whole";
-    case DurationType::V_MEASURE:   return "measure";
-    case DurationType::V_BREVE:     return "breve";
-    case DurationType::V_LONG:      return "long";
-    default:
-        qDebug("TDuration::name(): invalid duration type %d", static_cast<int>(_val));
-    // fall through
-    case DurationType::V_ZERO:
-    case DurationType::V_INVALID:   return "";
-    }
-}
-
-//---------------------------------------------------------
 //   headType
 //---------------------------------------------------------
 
-NoteHead::Type TDuration::headType() const
+NoteHeadType TDuration::headType() const
 {
-    NoteHead::Type headType = NoteHead::Type::HEAD_WHOLE;
+    NoteHeadType headType = NoteHeadType::HEAD_WHOLE;
     switch (_val) {
     case DurationType::V_1024TH:
     case DurationType::V_512TH:
@@ -201,25 +174,25 @@ NoteHead::Type TDuration::headType() const
     case DurationType::V_16TH:
     case DurationType::V_EIGHTH:
     case DurationType::V_QUARTER:
-        headType = NoteHead::Type::HEAD_QUARTER;
+        headType = NoteHeadType::HEAD_QUARTER;
         break;
     case DurationType::V_HALF:
-        headType = NoteHead::Type::HEAD_HALF;
+        headType = NoteHeadType::HEAD_HALF;
         break;
     case DurationType::V_MEASURE:
     case DurationType::V_WHOLE:
-        headType = NoteHead::Type::HEAD_WHOLE;
+        headType = NoteHeadType::HEAD_WHOLE;
         break;
     case DurationType::V_BREVE:
-        headType = NoteHead::Type::HEAD_BREVIS;
+        headType = NoteHeadType::HEAD_BREVIS;
         break;
     case DurationType::V_LONG:
-        headType = NoteHead::Type::HEAD_BREVIS;
+        headType = NoteHeadType::HEAD_BREVIS;
         break;
     default:
     case DurationType::V_INVALID:
     case DurationType::V_ZERO:
-        headType = NoteHead::Type::HEAD_QUARTER;
+        headType = NoteHeadType::HEAD_QUARTER;
         break;
     }
     return headType;
@@ -231,7 +204,7 @@ NoteHead::Type TDuration::headType() const
 
 int TDuration::hooks() const
 {
-    static const int table[] = {
+    static constexpr int table[] = {
         // V_LONG, V_BREVE, V_WHOLE, V_HALF, V_QUARTER, V_EIGHTH, V_16TH,
         0,      0,       0,       0,      0,         1,        2,
         // V_32ND, V_64TH, V_128TH, V_256TH, V_512TH, V_1024TH,
@@ -263,57 +236,6 @@ bool TDuration::hasStem() const
         return true;
     default:
         return false;
-    }
-}
-
-//---------------------------------------------------------
-//   setVal
-//---------------------------------------------------------
-
-TDuration::TDuration(const QString& s)
-{
-    setType(s);
-    _dots = 0;
-}
-
-//---------------------------------------------------------
-//   setType
-//---------------------------------------------------------
-
-void TDuration::setType(const QString& s)
-{
-    if (s == "quarter") {
-        _val = DurationType::V_QUARTER;
-    } else if (s == "eighth") {
-        _val = DurationType::V_EIGHTH;
-    } else if (s == "1024th") {
-        _val = DurationType::V_1024TH;
-    } else if (s == "512th") {
-        _val = DurationType::V_512TH;
-    } else if (s == "256th") {
-        _val = DurationType::V_256TH;
-    } else if (s == "128th") {
-        _val = DurationType::V_128TH;
-    } else if (s == "64th") {
-        _val = DurationType::V_64TH;
-    } else if (s == "32nd") {
-        _val = DurationType::V_32ND;
-    } else if (s == "16th") {
-        _val = DurationType::V_16TH;
-    } else if (s == "half") {
-        _val = DurationType::V_HALF;
-    } else if (s == "whole") {
-        _val = DurationType::V_WHOLE;
-    } else if (s == "breve") {
-        _val = DurationType::V_BREVE;
-    } else if (s == "long") {
-        _val = DurationType::V_LONG;
-    } else if (s == "measure") {
-        _val = DurationType::V_MEASURE;
-    } else {
-        // _val = V_INVALID;
-        _val = DurationType::V_QUARTER;
-        qDebug("TDuration::setType(%s): unknown, assume \"quarter\"", qPrintable(s));
     }
 }
 
@@ -474,8 +396,8 @@ Fraction TDuration::fraction() const
     }
 
     //dots multiplier is (2^(n + 1) - 1)/(2^n) where n is the number of dots
-    int dotN = (1 << (_dots + 1)) - 1;
-    int dotD = 1 << _dots;
+    int dotN = (1 << (static_cast<char>(_dots) + 1)) - 1;
+    int dotD = 1 << static_cast<char>(_dots);
 
     return Fraction(z * dotN, n * dotD);
 }
@@ -484,12 +406,12 @@ Fraction TDuration::fraction() const
 TDuration::TDuration(const Fraction& l, bool truncate, int maxDots, DurationType maxType)
 {
 #ifdef NDEBUG
-    Q_UNUSED(truncate);
+    UNUSED(truncate);
 #endif
     setType(maxType);   // use maxType to avoid testing all types if you know that l is smaller than a certain DurationType
     setDots(maxDots);
     truncateToFraction(l, maxDots);
-    Q_ASSERT(truncate || (fraction() - l).numerator() == 0);   // check for exact fit
+    assert(truncate || (fraction() - l).numerator() == 0);   // check for exact fit
 }
 
 //---------------------------------------------------------
@@ -506,7 +428,7 @@ void TDuration::truncateToFraction(const Fraction& l, int maxDots)
     // that wasn't enough so now change type too
     for (shiftType(1); isValid(); shiftType(1)) {
         if (setDotsToFitFraction(l, maxDots)) {
-            return;       // duration fits fits in l
+            return;       // duration fits in l
         }
     }
 }
@@ -572,7 +494,7 @@ std::vector<TDuration> toDurationList(Fraction l, bool useDots, int maxDots, boo
     }
 
     if (printRestRemains && l.numerator() != 0) {
-        qDebug("toDurationList:: rest remains %d/%d", l.numerator(), l.denominator());
+        LOGD("toDurationList:: rest remains %d/%d", l.numerator(), l.denominator());
     }
 
     return dList;
@@ -591,7 +513,7 @@ std::vector<TDuration> toRhythmicDurationList(const Fraction& l, bool isRest, Fr
     if (msr->isAnacrusis()) {
         rtickStart = Fraction::fromTicks(nominal.ticksPerMeasure()) - rtickStart;
     } else if (isRest && l == msr->ticks()) {
-        TDuration d = TDuration(TDuration::DurationType::V_MEASURE);
+        TDuration d = TDuration(DurationType::V_MEASURE);
         dList.push_back(d);
         return dList;
     }
@@ -755,11 +677,11 @@ bool forceRhythmicSplit(bool isRest, BeatType startBeat, BeatType endBeat,
 {
     // Assumption: Notes were split at measure boundary before this function was
     // called. (Necessary because timeSig might be different in next measure.)
-    Q_ASSERT(strongestBeatCrossed != BeatType::DOWNBEAT);
+    assert(strongestBeatCrossed != BeatType::DOWNBEAT);
     // Assumption: compound notes have already been split where they enter a compound beat.
     // (Necessary because the split beat is not always the strongest beat in this case.)
-    Q_ASSERT(!nominal.isCompound() || strongestBeatCrossed >= BeatType::COMPOUND_SUBBEAT
-             || (startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED));
+    assert(!nominal.isCompound() || strongestBeatCrossed >= BeatType::COMPOUND_SUBBEAT
+           || (startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED));
 
     // SPECIAL CASES
 
@@ -796,12 +718,12 @@ bool forceRhythmicSplitCompound(bool isRest, BeatType startBeat, BeatType endBea
     switch (strongestBeatCrossed) {
     case BeatType::COMPOUND_STRESSED:
         // Assumption: compound notes have already been split where they enter a compound beat.
-        Q_ASSERT(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
+        assert(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
         // Notes are guaranteed to and start on a compound beat so we can pretend we have a simple measure.
         return forceRhythmicSplitSimple(isRest, startBeat, endBeat, dUnitsCrossed / 3, BeatType::SIMPLE_STRESSED);
     case BeatType::COMPOUND_UNSTRESSED:
         // Same assumption as before
-        Q_ASSERT(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
+        assert(startBeat <= BeatType::COMPOUND_UNSTRESSED && endBeat <= BeatType::COMPOUND_UNSTRESSED);
         // No further conditions since note are guaranteed to start and end on a compound beat.
         return false;
     case BeatType::COMPOUND_SUBBEAT:
@@ -859,50 +781,6 @@ bool forceRhythmicSplitSimple(bool isRest, BeatType startBeat, BeatType endBeat,
     default:         // BeatType::SUBBEAT
         return false;
     }
-}
-
-//---------------------------------------------------------
-//   print
-//---------------------------------------------------------
-
-QString TDuration::durationTypeUserName() const
-{
-    QString s = QObject::tr("Custom");
-    switch (_val) {
-    case DurationType::V_LONG:      s = QObject::tr("Longa");
-        break;
-    case DurationType::V_BREVE:     s = QObject::tr("Breve");
-        break;
-    case DurationType::V_WHOLE:     s = QObject::tr("Whole");
-        break;
-    case DurationType::V_HALF:      s = QObject::tr("Half");
-        break;
-    case DurationType::V_QUARTER:   s = QObject::tr("Quarter");
-        break;
-    case DurationType::V_EIGHTH:    s = QObject::tr("Eighth");
-        break;
-    case DurationType::V_16TH:      s = QObject::tr("16th");
-        break;
-    case DurationType::V_32ND:      s = QObject::tr("32nd");
-        break;
-    case DurationType::V_64TH:      s = QObject::tr("64th");
-        break;
-    case DurationType::V_128TH:     s = QObject::tr("128th");
-        break;
-    case DurationType::V_256TH:     s = QObject::tr("256th");
-        break;
-    case DurationType::V_512TH:     s = QObject::tr("512th");
-        break;
-    case DurationType::V_1024TH:    s = QObject::tr("1024th");
-        break;
-    case DurationType::V_ZERO:      s = QObject::tr("Zero");
-        break;
-    case DurationType::V_MEASURE:   s = QObject::tr("Measure");
-        break;
-    case DurationType::V_INVALID:   s = QObject::tr("Invalid");
-        break;
-    }
-    return s;
 }
 
 //---------------------------------------------------------

@@ -27,13 +27,16 @@
 using namespace mu::iex::audioexport;
 using namespace mu::framework;
 
-mu::Ret Mp3Writer::write(notation::INotationPtr notation, io::Device& destinationDevice, const Options& options)
+mu::Ret Mp3Writer::write(notation::INotationPtr, QIODevice& destinationDevice, const Options&)
 {
-    UNUSED(notation)
-    UNUSED(destinationDevice)
-    UNUSED(options)
+    static const audio::SoundTrackFormat format {
+        audio::SoundTrackType::MP3,
+        static_cast<audio::sample_rate_t>(configuration()->exportSampleRate()),
+        2 /* audioChannelsNumber */,
+        configuration()->exportMp3Bitrate()
+    };
 
-    NOT_IMPLEMENTED;
+    doWriteAndWait(destinationDevice, format);
 
-    return make_ret(Ret::Code::NotImplemented);
+    return make_ret(Ret::Code::Ok);
 }

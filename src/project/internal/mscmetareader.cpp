@@ -23,20 +23,20 @@
 
 #include <sstream>
 
-#include <QBuffer>
+#include "io/buffer.h"
 
 #include "stringutils.h"
-#include "framework/global/xmlreader.h"
-#include "engraving/infrastructure/io/mscreader.h"
+#include "global/deprecated/xmlreader.h"
+#include "engraving/infrastructure/mscreader.h"
 
 #include "log.h"
 
+using namespace mu::io;
 using namespace mu::project;
 using namespace mu::framework;
-using namespace mu::system;
 using namespace mu::engraving;
 
-mu::RetVal<ProjectMeta> MscMetaReader::readMeta(const io::path& filePath) const
+mu::RetVal<ProjectMeta> MscMetaReader::readMeta(const io::path_t& filePath) const
 {
     RetVal<ProjectMeta> meta;
 
@@ -48,29 +48,27 @@ mu::RetVal<ProjectMeta> MscMetaReader::readMeta(const io::path& filePath) const
 
     MscReader::Params params;
     params.filePath = filePath.toQString();
-    params.mode = mcsIoModeBySuffix(io::suffix(filePath));
-    IF_ASSERT_FAILED(params.mode != MscIoMode::Unknown) {
+    params.mode = mscIoModeBySuffix(io::suffix(filePath));
+    if (params.mode == MscIoMode::Unknown) {
         return make_ret(Ret::Code::InternalError);
     }
 
     MscReader msczReader(params);
-    msczReader.open();
+    if (!msczReader.open()) {
+        return make_ret(Ret::Code::InternalError);
+    }
 
     // Read score meta
-    QByteArray scoreData = msczReader.readScoreFile();
-    framework::XmlReader xmlReader(scoreData);
+    ByteArray scoreData = msczReader.readScoreFile();
+    framework::XmlReader xmlReader(scoreData.toQByteArray());
     doReadMeta(xmlReader, meta.val);
 
     // Read thumbnail
-    QByteArray thumbnailData = msczReader.readThumbnailFile();
-    if (thumbnailData.isEmpty()) {
+    ByteArray thumbnailData = msczReader.readThumbnailFile();
+    if (thumbnailData.empty()) {
         LOGD() << "Can't find thumbnail";
     } else {
-        meta.val.thumbnail.loadFromData(thumbnailData, "PNG");
-    }
-
-    if (meta.val.fileName.empty()) {
-        meta.val.fileName = io::basename(filePath);
+        meta.val.thumbnail.loadFromData(thumbnailData.toQByteArray(), "PNG");
     }
 
     meta.val.filePath = filePath;
@@ -87,7 +85,7 @@ MscMetaReader::RawMeta MscMetaReader::doReadBox(framework::XmlReader& xmlReader)
             bool isTitle = false;
             bool isSubtitle = false;
             bool isComposer = false;
-            bool isLiricist = false;
+            bool isLyricist = false;
             while (xmlReader.readNextStartElement()) {
                 std::string tag(xmlReader.tagName());
 
@@ -101,7 +99,7 @@ MscMetaReader::RawMeta MscMetaReader::doReadBox(framework::XmlReader& xmlReader)
                     } else if (val == "subtitle") {
                         isSubtitle = true;
                     } else if (val == "lyricist") {
-                        isLiricist = true;
+                        isLyricist = true;
                     } else {
                         xmlReader.skipCurrentElement();
                     }
@@ -112,7 +110,7 @@ MscMetaReader::RawMeta MscMetaReader::doReadBox(framework::XmlReader& xmlReader)
                         meta.subtitleStyle = readText(xmlReader);
                     } else if (isComposer) {
                         meta.composerStyle = readText(xmlReader);
-                    } else if (isLiricist) {
+                    } else if (isLyricist) {
                         meta.lyricistStyle = readText(xmlReader);
                     } else {
                         xmlReader.skipCurrentElement();
@@ -124,7 +122,7 @@ MscMetaReader::RawMeta MscMetaReader::doReadBox(framework::XmlReader& xmlReader)
                         meta.subtitleStyleHtml = readText(xmlReader);
                     } else if (isComposer) {
                         meta.composerStyleHtml = readText(xmlReader);
-                    } else if (isLiricist) {
+                    } else if (isLyricist) {
                         meta.lyricistStyleHtml = readText(xmlReader);
                     } else {
                         xmlReader.skipCurrentElement();
@@ -323,13 +321,13 @@ std::string MscMetaReader::cutXmlTags(const std::string& str) const
     return fin;
 }
 
-QString MscMetaReader::readText(XmlReader& xmlReader) const
+QString MscMetaReader::readText(mu::framework::XmlReader& xmlReader) const
 {
     std::string str = xmlReader.readString(framework::XmlReader::IncludeChildElements);
     return formatFromXml(str);
 }
 
-QString MscMetaReader::readMetaTagText(XmlReader& xmlReader) const
+QString MscMetaReader::readMetaTagText(mu::framework::XmlReader& xmlReader) const
 {
     return QString::fromStdString(xmlReader.readString());
 }

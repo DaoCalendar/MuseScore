@@ -25,7 +25,7 @@
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle">Repeats</metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -76,7 +76,7 @@
           </Channel>
         </Instrument>
       </Part>
-    <Part>
+    <Part id="2">
       <Staff id="2">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -143,7 +143,7 @@
         <linkedMain/>
         <Text>
           <linkedMain/>
-          <style>Title</style>
+          <style>title</style>
           <text>Clef-Key-TS test case
 </text>
           </Text>
@@ -231,8 +231,8 @@
               </next>
             </Spanner>
           <Beam>
-            <l1>23</l1>
-            <l2>23</l2>
+            <l1>44</l1>
+            <l2>44</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -269,8 +269,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>24</l1>
-            <l2>19</l2>
+            <l1>44</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -434,8 +434,8 @@
               </next>
             </Spanner>
           <Beam>
-            <l1>23</l1>
-            <l2>23</l2>
+            <l1>44</l1>
+            <l2>44</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -472,8 +472,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>24</l1>
-            <l2>19</l2>
+            <l1>44</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -540,10 +540,6 @@
         </Measure>
       <Measure>
         <voice>
-          <TimeSig>
-            <sigN>3</sigN>
-            <sigD>4</sigD>
-            </TimeSig>
           <Spanner type="HairPin">
             <prev>
               <location>
@@ -576,8 +572,8 @@
             <accidental>1</accidental>
             </KeySig>
           <Beam>
-            <l1>12</l1>
-            <l2>13</l2>
+            <l1>30</l1>
+            <l2>32</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -605,10 +601,6 @@
               <tpc>18</tpc>
               </Note>
             </Chord>
-          <Beam>
-            <l1>15</l1>
-            <l2>16</l2>
-            </Beam>
           <Chord>
             <durationType>eighth</durationType>
             <Note>
@@ -623,6 +615,10 @@
               <tpc>18</tpc>
               </Note>
             </Chord>
+          <Beam>
+            <l1>32</l1>
+            <l2>32</l2>
+            </Beam>
           <Chord>
             <durationType>eighth</durationType>
             <Note>
@@ -639,10 +635,6 @@
               <tpc>16</tpc>
               </Note>
             </Chord>
-          <Beam>
-            <l1>16</l1>
-            <l2>16</l2>
-            </Beam>
           <Chord>
             <durationType>eighth</durationType>
             <Note>
@@ -669,8 +661,8 @@
       <Measure>
         <voice>
           <Beam>
-            <l1>19</l1>
-            <l2>20</l2>
+            <l1>38</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <dots>1</dots>
@@ -714,6 +706,10 @@
           <KeySig>
             <accidental>-1</accidental>
             </KeySig>
+          <TimeSig>
+            <sigN>3</sigN>
+            <sigD>4</sigD>
+            </TimeSig>
           <Chord>
             <dots>1</dots>
             <durationType>quarter</durationType>
@@ -776,8 +772,8 @@
               </next>
             </Spanner>
           <Beam>
-            <l1>23</l1>
-            <l2>23</l2>
+            <l1>44</l1>
+            <l2>44</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -814,8 +810,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>24</l1>
-            <l2>19</l2>
+            <l1>44</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -1104,11 +1100,6 @@
         </Measure>
       <Measure>
         <voice>
-          <TimeSig>
-            <linkedMain/>
-            <sigN>3</sigN>
-            <sigD>4</sigD>
-            </TimeSig>
           <Chord>
             <linkedMain/>
             <durationType>half</durationType>
@@ -1119,8 +1110,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>-4</l1>
-            <l2>-3</l2>
+            <l1>-8</l1>
+            <l2>-6</l2>
             </Beam>
           <Chord>
             <linkedMain/>
@@ -1238,6 +1229,11 @@
             <linkedMain/>
             <accidental>-1</accidental>
             </KeySig>
+          <TimeSig>
+            <linkedMain/>
+            <sigN>3</sigN>
+            <sigD>4</sigD>
+            </TimeSig>
           <Chord>
             <linkedMain/>
             <dots>1</dots>
@@ -1349,7 +1345,7 @@
       <showFrames>1</showFrames>
       <showMargins>0</showMargins>
       <metaTag name="partName">TestPart</metaTag>
-      <Part>
+      <Part id="2">
         <Staff id="1">
           <linkedTo>2</linkedTo>
           <StaffType group="pitched">
@@ -1425,12 +1421,12 @@
                 <staves>-1</staves>
                 </location>
               </linked>
-            <style>Title</style>
+            <style>title</style>
             <text>Clef-Key-TS test case
 </text>
             </Text>
           <Text>
-            <style>Instrument Name (Part)</style>
+            <style>instrument_excerpt</style>
             <text>TestPart</text>
             </Text>
           </VBox>
@@ -1645,12 +1641,6 @@
           </Measure>
         <Measure>
           <voice>
-            <TimeSig>
-              <linked>
-                </linked>
-              <sigN>3</sigN>
-              <sigD>4</sigD>
-              </TimeSig>
             <Chord>
               <linked>
                 </linked>
@@ -1663,8 +1653,8 @@
                 </Note>
               </Chord>
             <Beam>
-              <l1>-4</l1>
-              <l2>-3</l2>
+              <l1>-8</l1>
+              <l2>-6</l2>
               </Beam>
             <Chord>
               <linked>
@@ -1801,6 +1791,12 @@
                 </linked>
               <accidental>-1</accidental>
               </KeySig>
+            <TimeSig>
+              <linked>
+                </linked>
+              <sigN>3</sigN>
+              <sigD>4</sigD>
+              </TimeSig>
             <Chord>
               <linked>
                 </linked>

@@ -61,10 +61,14 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/inotationwriter.h
     ${CMAKE_CURRENT_LIST_DIR}/inotationwritersregister.h
     ${CMAKE_CURRENT_LIST_DIR}/iprojectaudiosettings.h
+    ${CMAKE_CURRENT_LIST_DIR}/iprojectviewsettings.h
     ${CMAKE_CURRENT_LIST_DIR}/iprojectfilescontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/iprojectconfiguration.h
     ${CMAKE_CURRENT_LIST_DIR}/irecentprojectsprovider.h
     ${CMAKE_CURRENT_LIST_DIR}/imscmetareader.h
+    ${CMAKE_CURRENT_LIST_DIR}/iprojectautosaver.h
+    ${CMAKE_CURRENT_LIST_DIR}/iprojectrwregister.h
+    ${CMAKE_CURRENT_LIST_DIR}/iprojectwriter.h
 
     ${CMAKE_CURRENT_LIST_DIR}/internal/iplatformrecentfilescontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/iprojectmigrator.h
@@ -74,14 +78,16 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectcreator.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectaudiosettings.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectaudiosettings.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectviewsettings.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectviewsettings.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationreadersregister.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationreadersregister.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationwritersregister.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/notationwritersregister.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectautosaver.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectautosaver.h
-    ${CMAKE_CURRENT_LIST_DIR}/internal/projectfilescontroller.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/internal/projectfilescontroller.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectactionscontroller.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectactionscontroller.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectuiactions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectuiactions.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectconfiguration.cpp
@@ -91,6 +97,9 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/iexportprojectscenario.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/exportprojectscenario.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/exportprojectscenario.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/isaveprojectscenario.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/saveprojectscenario.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/saveprojectscenario.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/recentprojectsprovider.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/recentprojectsprovider.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/mscmetareader.cpp
@@ -100,11 +109,17 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/internal/templatesrepository.h
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectmigrator.cpp
     ${CMAKE_CURRENT_LIST_DIR}/internal/projectmigrator.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectfileinfoprovider.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectfileinfoprovider.h
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectrwregister.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/internal/projectrwregister.h
 
     ${PLATFORM_SRC}
 
     ${CMAKE_CURRENT_LIST_DIR}/view/exportdialogmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/exportdialogmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/exportprogressmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/exportprogressmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/recentprojectsmodel.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/recentprojectsmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/newscoremodel.cpp
@@ -117,9 +132,15 @@ set(MODULE_SRC
     ${CMAKE_CURRENT_LIST_DIR}/view/templatesmodel.h
     ${CMAKE_CURRENT_LIST_DIR}/view/templatepaintview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/view/templatepaintview.h
-
+    ${CMAKE_CURRENT_LIST_DIR}/view/projectpropertiesmodel.h
+    ${CMAKE_CURRENT_LIST_DIR}/view/projectpropertiesmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/audiogenerationsettingsmodel.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/view/audiogenerationsettingsmodel.h
     )
 
-set(MODULE_LINK notation)
+set(MODULE_LINK
+    uicomponents
+    notation
+)
 
 include(${PROJECT_SOURCE_DIR}/build/module.cmake)

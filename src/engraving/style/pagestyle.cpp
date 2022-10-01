@@ -21,10 +21,10 @@
  */
 #include "pagestyle.h"
 
-namespace Ms {
-QSet<Sid> pageStyles()
+namespace mu::engraving {
+const std::set<Sid>& pageStyles()
 {
-    static const QSet<Sid> styles {
+    static const std::set<Sid> styles {
         Sid::pageWidth,
         Sid::pageHeight,
         Sid::pagePrintableWidth,

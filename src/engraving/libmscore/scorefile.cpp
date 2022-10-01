@@ -21,56 +21,47 @@
  */
 
 #include <cmath>
-#include <QDir>
-#include <QBuffer>
-#include <QRegularExpression>
 
-#include "style/defaultstyle.h"
+#include "io/file.h"
+#include "io/fileinfo.h"
+
+#include "style/style.h"
 
 #include "compat/writescorehook.h"
-#include "io/xml.h"
+#include "rw/xml.h"
+#include "rw/writecontext.h"
 #include "rw/staffrw.h"
 
-#include "score.h"
-#include "engravingitem.h"
-#include "measure.h"
-#include "segment.h"
-#include "slur.h"
+#include "audio.h"
 #include "chordrest.h"
-#include "chord.h"
-#include "tuplet.h"
-#include "beam.h"
-#include "revisions.h"
+#include "engravingitem.h"
+#include "excerpt.h"
+#include "factory.h"
+#include "keysig.h"
+#include "masterscore.h"
+#include "measure.h"
+#include "mscore.h"
 #include "page.h"
 #include "part.h"
-#include "staff.h"
-#include "system.h"
-#include "keysig.h"
-#include "clef.h"
-#include "text.h"
-#include "ottava.h"
-#include "volta.h"
-#include "excerpt.h"
-#include "mscore.h"
-#include "stafftype.h"
+#include "rest.h"
+#include "score.h"
 #include "scoreorder.h"
-#include "utils.h"
+#include "segment.h"
 #include "sig.h"
+#include "staff.h"
+#include "timesig.h"
 #include "undo.h"
-#include "imageStore.h"
-#include "audio.h"
-#include "barline.h"
-#include "masterscore.h"
-#include "factory.h"
+#include "utils.h"
 
 #include "log.h"
 #include "config.h"
 
 using namespace mu;
+using namespace mu::io;
 using namespace mu::engraving;
 using namespace mu::engraving::rw;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   write
 //---------------------------------------------------------
@@ -81,17 +72,17 @@ void Score::write(XmlWriter& xml, bool selectionOnly, compat::WriteScoreHook& ho
     // then some layout information is missing:
     // relayout with all parts set visible
 
-    QList<Part*> hiddenParts;
+    std::list<Part*> hiddenParts;
     bool unhide = false;
     if (styleB(Sid::createMultiMeasureRests)) {
-        for (Part* part : qAsConst(_parts)) {
+        for (Part* part : _parts) {
             if (!part->show()) {
                 if (!unhide) {
                     startCmd();
                     unhide = true;
                 }
                 part->undoChangeProperty(Pid::VISIBLE, true);
-                hiddenParts.append(part);
+                hiddenParts.push_back(part);
             }
         }
     }
@@ -102,17 +93,19 @@ void Score::write(XmlWriter& xml, bool selectionOnly, compat::WriteScoreHook& ho
         }
     }
 
-    xml.startObject(this);
+    xml.startElement(this);
 
     if (excerpt()) {
         Excerpt* e = excerpt();
-        QMultiMap<int, int> trackList = e->tracks();
-        QMapIterator<int, int> i(trackList);
-        if (!(trackList.size() == e->nstaves() * VOICES) && !trackList.isEmpty()) {
-            while (i.hasNext()) {
-                i.next();
-                xml.tagE(QString("Tracklist sTrack=\"%1\" dstTrack=\"%2\"").arg(i.key()).arg(i.value()));
+        const TracksMap& tracks = e->tracksMapping();
+        if (!(tracks.size() == e->nstaves() * VOICES) && !tracks.empty()) {
+            for (auto it = tracks.begin(); it != tracks.end(); ++it) {
+                xml.tag("Tracklist", { { "sTrack", it->first }, { "dstTrack", it->second } });
             }
+        }
+
+        if (e->initialPartId().isValid()) {
+            xml.tag("initialPartId", e->initialPartId().toUint64());
         }
     }
 
@@ -123,21 +116,20 @@ void Score::write(XmlWriter& xml, bool selectionOnly, compat::WriteScoreHook& ho
         xml.tag("layoutMode", "system");
     }
 
-    if (_audio && xml.isMsczMode()) {
+    if (_audio && xml.context()->isMsczMode()) {
         xml.tag("playMode", int(_playMode));
         _audio->write(xml);
     }
 
     for (int i = 0; i < 32; ++i) {
         if (!_layerTags[i].isEmpty()) {
-            xml.tag(QString("LayerTag id=\"%1\" tag=\"%2\"").arg(i).arg(_layerTags[i]),
-                    _layerTagComments[i]);
+            xml.tag("LayerTag", { { "id", i }, { "tag", _layerTags[i] } }, _layerTagComments[i]);
         }
     }
-    int n = _layer.size();
-    for (int i = 1; i < n; ++i) {         // don’t save default variant
-        const Layer& l = _layer[i];
-        xml.tagE(QString("Layer name=\"%1\" mask=\"%2\"").arg(l.name).arg(l.tags));
+    size_t n = _layer.size();
+    for (size_t i = 1; i < n; ++i) {         // don’t save default variant
+        const Layer& l = _layer.at(i);
+        xml.tag("Layer",  { { "name", l.name }, { "mask", l.tags } });
     }
     xml.tag("currentLayer", _currentLayer);
 
@@ -148,23 +140,25 @@ void Score::write(XmlWriter& xml, bool selectionOnly, compat::WriteScoreHook& ho
     if (pageNumberOffset()) {
         xml.tag("page-offset", pageNumberOffset());
     }
-    xml.tag("Division", MScore::division);
-    xml.setCurTrack(-1);
+    xml.tag("Division", Constants::division);
+    xml.context()->setCurTrack(mu::nidx);
 
     hook.onWriteStyle302(this, xml);
 
-    xml.tag("showInvisible",   _showInvisible);
+    xml.tag("showInvisible", _showInvisible);
     xml.tag("showUnprintable", _showUnprintable);
-    xml.tag("showFrames",      _showFrames);
-    xml.tag("showMargins",     _showPageborders);
+    xml.tag("showFrames", _showFrames);
+    xml.tag("showMargins", _showPageborders);
     xml.tag("markIrregularMeasures", _markIrregularMeasures, true);
 
-    QMapIterator<QString, QString> i(_metaTags);
-    while (i.hasNext()) {
-        i.next();
+    if (_isOpen) {
+        xml.tag("open", _isOpen);
+    }
+
+    for (const auto& t : _metaTags) {
         // do not output "platform" and "creationDate" in test and save template mode
-        if ((!MScore::testMode && !MScore::saveTemplateMode) || (i.key() != "platform" && i.key() != "creationDate")) {
-            xml.tag(QString("metaTag name=\"%1\"").arg(i.key().toHtmlEscaped()), i.value());
+        if ((!MScore::testMode && !MScore::saveTemplateMode) || (t.first != "platform" && t.first != "creationDate")) {
+            xml.tag("metaTag", { { "name", t.first.toXmlEscaped() } }, t.second);
         }
     }
 
@@ -174,9 +168,22 @@ void Score::write(XmlWriter& xml, bool selectionOnly, compat::WriteScoreHook& ho
         order.write(xml);
     }
 
-    xml.setCurTrack(0);
-    int staffStart;
-    int staffEnd;
+    if (!systemObjectStaves.empty()) {
+        // write which staves currently have system objects above them
+        xml.startElement("SystemObjects");
+        for (Staff* s : systemObjectStaves) {
+            // TODO: when we add more granularity to system object display, construct this string per staff
+            String sysObjForStaff = u"barNumbers=\"false\"";
+            // for now, everything except bar numbers is shown on system object staves
+            // (also, the code to display bar numbers on system staves other than the first currently does not exist!)
+            xml.tag("Instance", { { "staffId", s->idx() + 1 }, { "barNumbers", "false" } });
+        }
+        xml.endElement();
+    }
+
+    xml.context()->setCurTrack(0);
+    staff_idx_t staffStart;
+    staff_idx_t staffEnd;
     MeasureBase* measureStart;
     MeasureBase* measureEnd;
 
@@ -208,25 +215,25 @@ void Score::write(XmlWriter& xml, bool selectionOnly, compat::WriteScoreHook& ho
 
     // Let's decide: write midi mapping to a file or not
     masterScore()->checkMidiMapping();
-    for (const Part* part : qAsConst(_parts)) {
+    for (const Part* part : _parts) {
         if (!selectionOnly || ((staffIdx(part) >= staffStart) && (staffEnd >= staffIdx(part) + part->nstaves()))) {
             part->write(xml);
         }
     }
 
-    xml.setCurTrack(0);
-    xml.setTrackDiff(-staffStart * VOICES);
+    xml.context()->setCurTrack(0);
+    xml.context()->setTrackDiff(-static_cast<int>(staffStart * VOICES));
     if (measureStart) {
-        for (int staffIdx = staffStart; staffIdx < staffEnd; ++staffIdx) {
+        for (staff_idx_t staffIdx = staffStart; staffIdx < staffEnd; ++staffIdx) {
             const Staff* st = staff(staffIdx);
             StaffRW::writeStaff(st, xml, measureStart, measureEnd, staffStart, staffIdx, selectionOnly);
         }
     }
-    xml.setCurTrack(-1);
+    xml.context()->setCurTrack(mu::nidx);
 
     hook.onWriteExcerpts302(this, xml, selectionOnly);
 
-    xml.endObject();
+    xml.endElement();
 
     if (unhide) {
         endCmd(true);
@@ -248,7 +255,7 @@ void Score::linkMeasures(Score* score)
             mbMaster = mbMaster->next();
         }
         if (!mbMaster) {
-            qDebug("Measures in MasterScore and Score are not in sync.");
+            LOGD("Measures in MasterScore and Score are not in sync.");
             break;
         }
         mb->linkTo(mbMaster);
@@ -268,13 +275,13 @@ std::shared_ptr<mu::draw::Pixmap> Score::createThumbnail()
 
     Page* page = pages().at(0);
     RectF fr = page->abbox();
-    qreal mag = 256.0 / qMax(fr.width(), fr.height());
+    double mag = 256.0 / std::max(fr.width(), fr.height());
     int w = int(fr.width() * mag);
     int h = int(fr.height() * mag);
 
     int dpm = lrint(DPMM * 1000.0);
 
-    auto pixmap = imageProvider()->createPixmap(w, h, dpm, mu::draw::Color::white);
+    auto pixmap = imageProvider()->createPixmap(w, h, dpm, configuration()->thumbnailBackgroundColor());
 
     double pr = MScore::pixelRatio;
     MScore::pixelRatio = 1.0;
@@ -300,20 +307,22 @@ std::shared_ptr<mu::draw::Pixmap> Score::createThumbnail()
 //   loadStyle
 //---------------------------------------------------------
 
-bool Score::loadStyle(const QString& fn, bool ign, const bool overlap)
+bool Score::loadStyle(const String& fn, bool ign, const bool overlap)
 {
-    QFile f(fn);
-    if (f.open(QIODevice::ReadOnly)) {
+    TRACEFUNC;
+
+    File f(fn);
+    if (f.open(IODevice::ReadOnly)) {
         MStyle st = style();
         if (st.read(&f, ign)) {
             undo(new ChangeStyle(this, st, overlap));
             return true;
         } else {
-            MScore::lastError = QObject::tr("The style file is not compatible with this version of MuseScore.");
+            LOGE() << "The style file is not compatible with this version of MuseScore.";
             return false;
         }
     }
-    MScore::lastError = strerror(errno);
+
     return false;
 }
 
@@ -321,23 +330,23 @@ bool Score::loadStyle(const QString& fn, bool ign, const bool overlap)
 //   saveStyle
 //---------------------------------------------------------
 
-bool Score::saveStyle(const QString& name)
+bool Score::saveStyle(const String& name)
 {
-    QString ext(".mss");
-    QFileInfo info(name);
+    String ext(u".mss");
+    FileInfo info(name);
 
     if (info.suffix().isEmpty()) {
-        info.setFile(info.filePath() + ext);
+        info = FileInfo(info.filePath() + ext);
     }
-    QFile f(info.filePath());
-    if (!f.open(QIODevice::WriteOnly)) {
-        MScore::lastError = tr("Open Style File %1 failed: %2").arg(info.filePath(), f.errorString());
+    File f(info.filePath());
+    if (!f.open(IODevice::WriteOnly)) {
+        LOGE() << "Failed open style file: " << info.filePath();
         return false;
     }
 
     bool ok = style().write(&f);
     if (!ok) {
-        MScore::lastError = QObject::tr("Write Style failed: %1").arg(f.errorString());
+        LOGE() << "Failed write style file: " << info.filePath();
         return false;
     }
 
@@ -349,33 +358,33 @@ bool Score::saveStyle(const QString& name)
 //    return true on success
 //---------------------------------------------------------
 
-//! FIXME
-//extern QString revision;
-static QString revision;
-
-bool Score::writeScore(QIODevice* f, bool msczFormat, bool onlySelection, compat::WriteScoreHook& hook)
+bool Score::writeScore(io::IODevice* f, bool msczFormat, bool onlySelection, compat::WriteScoreHook& hook)
 {
-    XmlWriter xml(this, f);
-    xml.setIsMsczMode(msczFormat);
-    xml.writeHeader();
+    WriteContext ctx;
+    return writeScore(f, msczFormat, onlySelection, hook, ctx);
+}
 
-    xml.startObject("museScore version=\"" MSC_VERSION "\"");
+bool Score::writeScore(io::IODevice* f, bool msczFormat, bool onlySelection, compat::WriteScoreHook& hook, WriteContext& ctx)
+{
+    XmlWriter xml(f);
+    xml.context()->setIsMsczMode(msczFormat);
+    xml.setContext(&ctx);
+    xml.startDocument();
+
+    xml.startElement("museScore", { { "version", MSC_VERSION } });
 
     if (!MScore::testMode) {
         xml.tag("programVersion", VERSION);
-        xml.tag("programRevision", revision);
+        xml.tag("programRevision", MUSESCORE_REVISION);
     }
     write(xml, onlySelection, hook);
 
-    xml.endObject();
+    xml.endElement();
 
-    if (isMaster()) {
-        masterScore()->revisions()->write(xml);
-    }
     if (!onlySelection) {
         //update version values for i.e. plugin access
-        _mscoreVersion = VERSION;
-        _mscoreRevision = revision.toInt(0, 16);
+        _mscoreVersion = String::fromAscii(VERSION);
+        _mscoreRevision = AsciiStringView(MUSESCORE_REVISION).toInt(nullptr, 16);
         _mscVersion = MSCVERSION;
     }
     return true;
@@ -392,9 +401,9 @@ void Score::print(mu::draw::Painter* painter, int pageNo)
     Page* page = pages().at(pageNo);
     RectF fr  = page->abbox();
 
-    QList<EngravingItem*> ell = page->items(fr);
-    std::stable_sort(ell.begin(), ell.end(), elementLessThan);
-    for (const EngravingItem* e : qAsConst(ell)) {
+    std::vector<EngravingItem*> ell = page->items(fr);
+    std::sort(ell.begin(), ell.end(), elementLessThan);
+    for (const EngravingItem* e : ell) {
         if (!e->visible()) {
             continue;
         }
@@ -414,35 +423,35 @@ void Score::print(mu::draw::Painter* painter, int pageNo)
 //    Returns true if <voice> tag was written.
 //---------------------------------------------------------
 
-static bool writeVoiceMove(XmlWriter& xml, Segment* seg, const Fraction& startTick, int track, int* lastTrackWrittenPtr)
+static bool writeVoiceMove(XmlWriter& xml, Segment* seg, const Fraction& startTick, track_idx_t track, int* lastTrackWrittenPtr)
 {
     bool voiceTagWritten = false;
     int& lastTrackWritten = *lastTrackWrittenPtr;
-    if ((lastTrackWritten < track) && !xml.clipboardmode()) {
-        while (lastTrackWritten < (track - 1)) {
-            xml.tagE("voice");
+    if ((lastTrackWritten < static_cast<int>(track)) && !xml.context()->clipboardmode()) {
+        while (lastTrackWritten < (static_cast < int > (track) - 1)) {
+            xml.tag("voice");
             ++lastTrackWritten;
         }
-        xml.startObject("voice");
-        xml.setCurTick(startTick);
-        xml.setCurTrack(track);
+        xml.startElement("voice");
+        xml.context()->setCurTick(startTick);
+        xml.context()->setCurTrack(track);
         ++lastTrackWritten;
         voiceTagWritten = true;
     }
 
-    if ((xml.curTick() != seg->tick()) || (track != xml.curTrack())) {
+    if ((xml.context()->curTick() != seg->tick()) || (track != xml.context()->curTrack())) {
         Location curr = Location::absolute();
         Location dest = Location::absolute();
-        curr.setFrac(xml.curTick());
+        curr.setFrac(xml.context()->curTick());
         dest.setFrac(seg->tick());
-        curr.setTrack(xml.curTrack());
-        dest.setTrack(track);
+        curr.setTrack(static_cast<int>(xml.context()->curTrack()));
+        dest.setTrack(static_cast<int>(track));
 
         dest.toRelative(curr);
         dest.write(xml);
 
-        xml.setCurTick(seg->tick());
-        xml.setCurTrack(track);
+        xml.context()->setCurTick(seg->tick());
+        xml.context()->setCurTrack(track);
     }
 
     return voiceTagWritten;
@@ -454,12 +463,12 @@ static bool writeVoiceMove(XmlWriter& xml, Segment* seg, const Fraction& startTi
 //          can be zero
 //---------------------------------------------------------
 
-void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
+void Score::writeSegments(XmlWriter& xml, track_idx_t strack, track_idx_t etrack,
                           Segment* sseg, Segment* eseg, bool writeSystemElements, bool forceTimeSig)
 {
-    Fraction startTick = xml.curTick();
+    Fraction startTick = xml.context()->curTick();
     Fraction endTick   = eseg ? eseg->tick() : lastMeasure()->endTick();
-    bool clip          = xml.clipboardmode();
+    bool clip          = xml.context()->clipboardmode();
 
     // in clipboard mode, ls might be in an mmrest
     // since we are traversing regular measures,
@@ -472,7 +481,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
             if (lm) {
                 eseg = lm->nextMeasure() ? lm->nextMeasure()->first() : nullptr;
             } else {
-                qDebug("writeSegments: no measure for end segment in mmrest");
+                LOGD("writeSegments: no measure for end segment in mmrest");
             }
         }
         if (fm && fm->isMMRest()) {
@@ -483,23 +492,23 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
         }
     }
 
-    QList<Spanner*> spanners;
+    std::list<Spanner*> spanners;
     auto sl = spannerMap().findOverlapping(sseg->tick().ticks(), endTick.ticks());
     for (auto i : sl) {
         Spanner* s = i.value;
-        if (s->generated() || !xml.canWrite(s)) {
+        if (s->generated() || !xml.context()->canWrite(s)) {
             continue;
         }
         // don't write voltas to clipboard
-        if (clip && s->isVolta()) {
+        if (clip && s->isVolta() && s->systemFlag()) {
             continue;
         }
         spanners.push_back(s);
     }
 
-    int lastTrackWritten = strack - 1;   // for counting necessary <voice> tags
-    for (int track = strack; track < etrack; ++track) {
-        if (!xml.canWriteVoice(track)) {
+    int lastTrackWritten = static_cast<int>(strack - 1);   // for counting necessary <voice> tags
+    for (track_idx_t track = strack; track < etrack; ++track) {
+        if (!xml.context()->canWriteVoice(track)) {
             continue;
         }
 
@@ -522,21 +531,39 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
             // special case: - barline span > 1
             //               - part (excerpt) staff starts after
             //                 barline element
-            bool needMove = (segment->tick() != xml.curTick() || (track > lastTrackWritten));
+            bool needMove = (segment->tick() != xml.context()->curTick() || (static_cast<int>(track) > lastTrackWritten));
             if ((segment->isEndBarLineType()) && !e && writeSystemElements && ((track % VOICES) == 0)) {
                 // search barline:
-                for (int idx = track - VOICES; idx >= 0; idx -= VOICES) {
+                for (int idx = static_cast<int>(track - VOICES); idx >= 0; idx -= static_cast<int>(VOICES)) {
                     if (segment->element(idx)) {
-                        int oDiff = xml.trackDiff();
-                        xml.setTrackDiff(idx);                      // staffIdx should be zero
+                        int oDiff = xml.context()->trackDiff();
+                        xml.context()->setTrackDiff(idx);                      // staffIdx should be zero
                         segment->element(idx)->write(xml);
-                        xml.setTrackDiff(oDiff);
+                        xml.context()->setTrackDiff(oDiff);
                         break;
                     }
                 }
             }
             for (EngravingItem* e1 : segment->annotations()) {
-                if (e1->track() != track || e1->generated() || (e1->systemFlag() && !writeSystemElements)) {
+                if (e1->generated()) {
+                    continue;
+                }
+                bool writeSystem = writeSystemElements;
+                if (!writeSystem) {
+                    ElementType et = e1->type();
+                    if ((et == ElementType::REHEARSAL_MARK)
+                        || (et == ElementType::SYSTEM_TEXT)
+                        || (et == ElementType::TRIPLET_FEEL)
+                        || (et == ElementType::PLAYTECH_ANNOTATION)
+                        || (et == ElementType::JUMP)
+                        || (et == ElementType::MARKER)
+                        || (et == ElementType::TEMPO_TEXT)
+                        || (et == ElementType::VOLTA)
+                        || (et == ElementType::GRADUAL_TEMPO_CHANGE)) {
+                        writeSystem = (e1->track() == track); // always show these on appropriate staves
+                    }
+                }
+                if (e1->track() != track || (e1->systemFlag() && !writeSystem)) {
                     continue;
                 }
                 if (needMove) {
@@ -579,7 +606,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
                 }
             }
 
-            if (!e || !xml.canWrite(e)) {
+            if (!e || !xml.context()->canWrite(e)) {
                 continue;
             }
             if (e->generated()) {
@@ -642,7 +669,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
             for (Spanner* s : spanners) {
                 if ((s->tick2() == endTick)
                     && !s->isSlur()
-                    && (s->track2() == track || (s->track2() == -1 && s->track() == track))
+                    && (s->track2() == track || (s->track2() == mu::nidx && s->track() == track))
                     && (!clip || s->tick() >= sseg->tick())
                     ) {
                     s->writeSpannerEnd(xml, lastMeasure(), track, endTick);
@@ -651,7 +678,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
         }
 
         if (voiceTagWritten) {
-            xml.endObject();       // </voice>
+            xml.endElement();       // </voice>
         }
     }
 }

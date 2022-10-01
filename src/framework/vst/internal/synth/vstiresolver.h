@@ -39,15 +39,12 @@ class VstiResolver : public audio::synth::ISynthResolver::IResolver
     INJECT(vst, IVstPluginsRegister, pluginsRegister)
 public:
     audio::synth::ISynthesizerPtr resolveSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const override;
+    bool hasCompatibleResources(const audio::PlaybackSetupData& setup) const override;
     audio::AudioResourceMetaList resolveResources() const override;
     void refresh() override;
 
 private:
     VstSynthPtr createSynth(const audio::TrackId trackId, const audio::AudioInputParams& params) const;
-
-    using SynthPair = std::pair<audio::AudioResourceId, VstSynthPtr>;
-
-    mutable std::map<audio::TrackId, SynthPair> m_synthMap;
 };
 }
 

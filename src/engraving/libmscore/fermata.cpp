@@ -21,21 +21,27 @@
  */
 
 #include "fermata.h"
-#include "io/xml.h"
-#include "score.h"
+
+#include "rw/xml.h"
+#include "types/symnames.h"
+#include "types/translatablestring.h"
+
+#include "chord.h"
 #include "chordrest.h"
-#include "system.h"
 #include "measure.h"
+#include "note.h"
+#include "page.h"
+#include "score.h"
 #include "staff.h"
 #include "stafftype.h"
-#include "undo.h"
-#include "page.h"
-#include "barline.h"
-#include "symnames.h"
+#include "system.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   fermataStyle
 //---------------------------------------------------------
@@ -52,7 +58,7 @@ static const ElementStyle fermataStyle {
 Fermata::Fermata(EngravingItem* parent)
     : EngravingItem(ElementType::FERMATA, parent, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
 {
-    setPlacement(Placement::ABOVE);
+    setPlacement(PlacementV::ABOVE);
     _symId         = SymId::noSym;
     _timeStretch   = 1.0;
     setPlay(true);
@@ -78,10 +84,10 @@ void Fermata::read(XmlReader& e)
 
 bool Fermata::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (tag == "subtype") {
-        QString s = e.readElementText();
+        AsciiStringView s = e.readAsciiText();
         SymId id = SymNames::symIdByName(s);
         setSymId(id);
     } else if (tag == "play") {
@@ -107,11 +113,11 @@ bool Fermata::readProperties(XmlReader& e)
 
 void Fermata::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
-        qDebug("%s not written", name());
+    if (!xml.context()->canWrite(this)) {
+        LOGD("%s not written", typeName());
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
     xml.tag("subtype", SymNames::nameForSymId(_symId));
     writeProperty(xml, Pid::TIME_STRETCH);
     writeProperty(xml, Pid::PLAY);
@@ -120,7 +126,7 @@ void Fermata::write(XmlWriter& xml) const
         writeProperty(xml, Pid::OFFSET);
     }
     EngravingItem::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -129,21 +135,21 @@ void Fermata::write(XmlWriter& xml) const
 
 int Fermata::subtype() const
 {
-    QString s = SymNames::nameForSymId(_symId);
-    if (s.endsWith("Below")) {
-        return int(SymNames::symIdByName(s.left(s.size() - 5) + "Above"));
+    String s = String::fromAscii(SymNames::nameForSymId(_symId).ascii());
+    if (s.endsWith(u"Below")) {
+        return int(SymNames::symIdByName(s.left(s.size() - 5) + u"Above"));
     } else {
         return int(_symId);
     }
 }
 
 //---------------------------------------------------------
-//   userName
+//   typeUserName
 //---------------------------------------------------------
 
-QString Fermata::userName() const
+TranslatableString Fermata::typeUserName() const
 {
-    return SymNames::translatedUserNameForSymId(symId());
+    return TranslatableString("engraving/sym", SymNames::userNameForSymId(symId()));
 }
 
 //---------------------------------------------------------
@@ -163,8 +169,8 @@ void Fermata::draw(mu::draw::Painter* painter) const
 
 ChordRest* Fermata::chordRest() const
 {
-    if (parent() && parent()->isChordRest()) {
-        return toChordRest(parent());
+    if (explicitParent() && explicitParent()->isChordRest()) {
+        return toChordRest(explicitParent());
     }
     return 0;
 }
@@ -176,7 +182,7 @@ ChordRest* Fermata::chordRest() const
 Measure* Fermata::measure() const
 {
     Segment* s = segment();
-    return toMeasure(s ? s->parent() : 0);
+    return toMeasure(s ? s->explicitParent() : 0);
 }
 
 //---------------------------------------------------------
@@ -186,7 +192,7 @@ Measure* Fermata::measure() const
 System* Fermata::system() const
 {
     Measure* m = measure();
-    return toSystem(m ? m->parent() : 0);
+    return toSystem(m ? m->explicitParent() : 0);
 }
 
 //---------------------------------------------------------
@@ -196,7 +202,7 @@ System* Fermata::system() const
 Page* Fermata::page() const
 {
     System* s = system();
-    return toPage(s ? s->parent() : 0);
+    return toPage(s ? s->explicitParent() : 0);
 }
 
 //---------------------------------------------------------
@@ -207,6 +213,14 @@ Page* Fermata::page() const
 
 void Fermata::layout()
 {
+    const StaffType* stType = staffType();
+
+    _skipDraw = false;
+    if (stType && stType->isHiddenElementOnTab(score(), Sid::fermataShowTabCommon, Sid::fermataShowTabSimple)) {
+        _skipDraw = true;
+        return;
+    }
+
     Segment* s = segment();
     setPos(PointF());
     if (!s) {            // for use in palette
@@ -222,21 +236,24 @@ void Fermata::layout()
     EngravingItem* e = s->element(track());
     if (e) {
         if (e->isChord()) {
-            rxpos() += score()->noteHeadWidth() * staff()->staffMag(Fraction(0, 1)) * .5;
+            Chord* chord = toChord(e);
+            Note* note = chord->up() ? chord->downNote() : chord->upNote();
+            double offset = chord->xpos() + note->xpos() + note->headWidth() / 2;
+            movePosX(offset);
         } else {
-            rxpos() += e->x() + e->width() * staff()->staffMag(Fraction(0, 1)) * .5;
+            movePosX(e->x() - e->shape().left() + e->width() * staff()->staffMag(Fraction(0, 1)) * .5);
         }
     }
 
-    QString name = SymNames::nameForSymId(_symId);
+    String name = String::fromAscii(SymNames::nameForSymId(_symId).ascii());
     if (placeAbove()) {
-        if (name.endsWith("Below")) {
-            _symId = SymNames::symIdByName(name.left(name.size() - 5) + "Above");
+        if (name.endsWith(u"Below")) {
+            _symId = SymNames::symIdByName(name.left(name.size() - 5) + u"Above");
         }
     } else {
-        rypos() += staff()->height();
-        if (name.endsWith("Above")) {
-            _symId = SymNames::symIdByName(name.left(name.size() - 5) + "Below");
+        movePosY(staff()->height());
+        if (name.endsWith(u"Above")) {
+            _symId = SymNames::symIdByName(name.left(name.size() - 5) + u"Below");
         }
     }
     RectF b(symBbox(_symId));
@@ -248,10 +265,10 @@ void Fermata::layout()
 //   dragAnchorLines
 //---------------------------------------------------------
 
-QVector<mu::LineF> Fermata::dragAnchorLines() const
+std::vector<LineF> Fermata::dragAnchorLines() const
 {
-    QVector<LineF> result;
-    result << LineF(canvasPos(), parentItem()->canvasPos());
+    std::vector<LineF> result;
+    result.push_back(LineF(canvasPos(), parentItem()->canvasPos()));
     return result;
 }
 
@@ -259,11 +276,11 @@ QVector<mu::LineF> Fermata::dragAnchorLines() const
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Fermata::getProperty(Pid propertyId) const
+PropertyValue Fermata::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::SYMBOL:
-        return QVariant::fromValue(_symId);
+        return PropertyValue::fromValue(_symId);
     case Pid::TIME_STRETCH:
         return timeStretch();
     case Pid::PLAY:
@@ -277,19 +294,19 @@ QVariant Fermata::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Fermata::setProperty(Pid propertyId, const QVariant& v)
+bool Fermata::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::SYMBOL:
         setSymId(v.value<SymId>());
         break;
     case Pid::PLACEMENT: {
-        Placement p = Placement(v.toInt());
+        PlacementV p = v.value<PlacementV>();
         if (p != placement()) {
-            QString s = SymNames::nameForSymId(_symId);
+            String s = String::fromAscii(SymNames::nameForSymId(_symId).ascii());
             bool up = placeAbove();
-            if (s.endsWith(up ? "Above" : "Below")) {
-                QString s2 = s.left(s.size() - 5) + (up ? "Below" : "Above");
+            if (s.endsWith(up ? u"Above" : u"Below")) {
+                String s2 = s.left(s.size() - 5) + (up ? u"Below" : u"Above");
                 _symId = SymNames::symIdByName(s2);
             }
             setPlacement(p);
@@ -301,7 +318,7 @@ bool Fermata::setProperty(Pid propertyId, const QVariant& v)
         break;
     case Pid::TIME_STRETCH:
         setTimeStretch(v.toDouble());
-        score()->fixTicks();
+        score()->setUpTempoMap();
         break;
     default:
         return EngravingItem::setProperty(propertyId, v);
@@ -314,11 +331,11 @@ bool Fermata::setProperty(Pid propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Fermata::propertyDefault(Pid propertyId) const
+PropertyValue Fermata::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::PLACEMENT:
-        return int(track() & 1 ? Placement::BELOW : Placement::ABOVE);
+        return track() & 1 ? PlacementV::BELOW : PlacementV::ABOVE;
     case Pid::TIME_STRETCH:
         return 1.0;           // articulationList[int(articulationType())].timeStretch;
     case Pid::PLAY:
@@ -347,18 +364,6 @@ void Fermata::resetProperty(Pid id)
 }
 
 //---------------------------------------------------------
-//   propertyId
-//---------------------------------------------------------
-
-Pid Fermata::propertyId(const QStringRef& xmlName) const
-{
-    if (xmlName == "subtype") {
-        return Pid::SYMBOL;
-    }
-    return EngravingItem::propertyId(xmlName);
-}
-
-//---------------------------------------------------------
 //   getPropertyStyle
 //---------------------------------------------------------
 
@@ -374,17 +379,63 @@ Sid Fermata::getPropertyStyle(Pid pid) const
 //   mag
 //---------------------------------------------------------
 
-qreal Fermata::mag() const
+double Fermata::mag() const
 {
     return staff() ? staff()->staffMag(tick()) * score()->styleD(Sid::articulationMag) : 1.0;
+}
+
+FermataType Fermata::fermataType() const
+{
+    static const std::unordered_map<SymId, FermataType> FERMATA_TYPES = {
+        { SymId::fermataAbove, FermataType::Normal },
+        { SymId::fermataBelow, FermataType::Normal },
+        { SymId::fermataLongAbove, FermataType::Long },
+        { SymId::fermataLongBelow, FermataType::Long },
+        { SymId::fermataLongHenzeAbove, FermataType::LongHenze },
+        { SymId::fermataLongHenzeBelow, FermataType::LongHenze },
+        { SymId::fermataVeryLongAbove, FermataType::VeryLong },
+        { SymId::fermataVeryLongBelow, FermataType::VeryLong },
+        { SymId::fermataShortHenzeAbove, FermataType::ShortHenze },
+        { SymId::fermataShortHenzeBelow, FermataType::ShortHenze },
+        { SymId::fermataVeryShortAbove, FermataType::VeryShort },
+        { SymId::fermataVeryShortBelow, FermataType::VeryShort },
+        { SymId::fermataShortAbove, FermataType::Short },
+        { SymId::fermataShortBelow, FermataType::Short },
+    };
+
+    auto search = FERMATA_TYPES.find(symId());
+
+    if (search != FERMATA_TYPES.cend()) {
+        return search->second;
+    }
+
+    return FermataType::Undefined;
 }
 
 //---------------------------------------------------------
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Fermata::accessibleInfo() const
+String Fermata::accessibleInfo() const
 {
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), userName());
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), translatedTypeUserName());
+}
+
+void Fermata::added()
+{
+    IF_ASSERT_FAILED(score()) {
+        return;
+    }
+
+    score()->setUpTempoMap();
+}
+
+void Fermata::removed()
+{
+    IF_ASSERT_FAILED(score()) {
+        return;
+    }
+
+    score()->setUpTempoMap();
 }
 }

@@ -23,9 +23,11 @@
 #ifndef __BSYMBOL_H__
 #define __BSYMBOL_H__
 
+#include <vector>
+
 #include "engravingitem.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   @@ BSymbol
 ///    base class for Symbol and Image
@@ -33,14 +35,15 @@ namespace Ms {
 
 class BSymbol : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, BSymbol)
 public:
 
-    Segment* segment() const { return (Segment*)parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
+    void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all=true) override;
 
     BSymbol& operator=(const BSymbol&) = delete;
 
@@ -57,11 +60,11 @@ public:
     Align align() const { return _align; }
     void setAlign(Align a) { _align = a; }
 
-    const QList<EngravingItem*>& leafs() const { return _leafs; }
-    QList<EngravingItem*>& leafs() { return _leafs; }
+    const std::vector<EngravingItem*>& leafs() const { return _leafs; }
+    std::vector<EngravingItem*>& leafs() { return _leafs; }
     mu::PointF pagePos() const override;
     mu::PointF canvasPos() const override;
-    QVector<mu::LineF> dragAnchorLines() const override;
+    std::vector<mu::LineF> dragAnchorLines() const override;
 
 protected:
     BSymbol(const ElementType& type, EngravingItem* parent, ElementFlags f = ElementFlag::NOTHING);
@@ -69,8 +72,8 @@ protected:
 
 private:
 
-    QList<EngravingItem*> _leafs;
+    std::vector<EngravingItem*> _leafs;
     Align _align;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

@@ -24,59 +24,26 @@
  File handling: loading and saving.
  */
 
+#include "rw/xml.h"
 #include "style/style.h"
-#include "io/xml.h"
 
-#include "engravingitem.h"
-#include "note.h"
-#include "chord.h"
-#include "rest.h"
-#include "sig.h"
-#include "clef.h"
-#include "key.h"
-#include "score.h"
-#include "page.h"
-#include "dynamic.h"
-#include "tempo.h"
-#include "select.h"
-#include "staff.h"
-#include "part.h"
-#include "utils.h"
 #include "barline.h"
-#include "slur.h"
-#include "hairpin.h"
-#include "ottava.h"
-#include "textline.h"
-#include "pedal.h"
-#include "trill.h"
-#include "volta.h"
-#include "timesig.h"
-#include "box.h"
+#include "engravingitem.h"
 #include "excerpt.h"
-#include "system.h"
-#include "tuplet.h"
-#include "keysig.h"
-#include "measure.h"
-#include "undo.h"
-#include "repeatlist.h"
-#include "beam.h"
-#include "stafftype.h"
-#include "revisions.h"
-#include "lyrics.h"
-#include "segment.h"
-#include "tempotext.h"
-#include "image.h"
-#include "tiemap.h"
-#include "tie.h"
-#include "measurebase.h"
-#include "chordlist.h"
-#include "mscore.h"
-
 #include "masterscore.h"
+#include "measure.h"
+#include "measurebase.h"
+#include "part.h"
+#include "repeatlist.h"
+#include "score.h"
+#include "segment.h"
+#include "undo.h"
+
+#include "log.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 static void removeRepeatMarkings(Score* score)
 {
     // remove bar-level repeats
@@ -96,7 +63,7 @@ static void removeRepeatMarkings(Score* score)
     }
 
     // remove coda/fine labels and jumps
-    QList<EngravingItem*> elems;
+    std::vector<EngravingItem*> elems;
     score->scanElements(&elems, collectElements, false);
     for (auto e : elems) {
         if (e->isMarker() || e->isJump()) {
@@ -111,7 +78,7 @@ static void removeRepeatMarkings(Score* score)
     Segment* last = score->lastMeasure()->segments().last();
     if (last->segmentType() == SegmentType::EndBarLine) {
         auto els = last->elist();
-        for (uint i = 0; i < els.size(); i++) {
+        for (size_t i = 0; i < els.size(); i++) {
             if (!els[i]) {
                 continue;
             }
@@ -126,12 +93,12 @@ static void removeRepeatMarkings(Score* score)
 //    has been unrolled
 //---------------------------------------------------------
 
-static void createExcerpts(MasterScore* cs, QList<Excerpt*> excerpts)
+static void createExcerpts(MasterScore* cs, const std::list<Excerpt*>& excerpts)
 {
     // borrowed from musescore.cpp endsWith(".pdf")
-    for (Excerpt* e: excerpts) {
-        Score* nscore = e->oscore()->createScore();
-        e->setPartScore(nscore);
+    for (Excerpt* e : excerpts) {
+        Score* nscore = e->masterScore()->createScore();
+        e->setExcerptScore(nscore);
         nscore->style().set(Sid::createMultiMeasureRests, true);
         cs->startCmd();
         cs->undo(new AddExcerpt(e));
@@ -139,10 +106,10 @@ static void createExcerpts(MasterScore* cs, QList<Excerpt*> excerpts)
 
         // borrowed from excerptsdialog.cpp
         // a new excerpt is created in AddExcerpt, make sure the parts are filed
-        for (Excerpt* ee : e->oscore()->excerpts()) {
-            if (ee->partScore() == nscore && ee != e) {
+        for (Excerpt* ee : e->masterScore()->excerpts()) {
+            if (ee->excerptScore() == nscore && ee != e) {
                 ee->parts().clear();
-                ee->parts().append(e->parts());
+                ee->parts().insert(ee->parts().end(), e->parts().begin(), e->parts().end());
             }
         }
 
@@ -162,8 +129,8 @@ MasterScore* MasterScore::unrollRepeats()
     // create a copy of the original score to play with
     MasterScore* score = original->clone();
 
-    // Give it an appropriate name
-    score->setName(original->title() + "_unrolled");
+    // TODO: Give it an appropriate path/filename
+    NOT_IMPLEMENTED;
 
     // figure out repeat structure
     original->setExpandRepeats(true);
@@ -174,9 +141,9 @@ MasterScore* MasterScore::unrollRepeats()
     }
 
     // remove excerpts for now (they are re-created after unrolling master score)
-    QList<Excerpt*> excerpts;
+    std::list<Excerpt*> excerpts;
     for (Excerpt* e : score->excerpts()) {
-        excerpts.append(new Excerpt(*e, false));
+        excerpts.push_back(new Excerpt(*e, false));
         score->masterScore()->deleteExcerpt(e);
     }
 
@@ -199,13 +166,13 @@ MasterScore* MasterScore::unrollRepeats()
 
     removeRepeatMarkings(score);
 
-    score->fixTicks();
+    score->setUpTempoMap();
 
     score->setLayoutAll();
     score->doLayout();
 
     // re-create excerpt parts
-    if (!excerpts.isEmpty()) {
+    if (!excerpts.empty()) {
         createExcerpts(score, excerpts);
     }
 

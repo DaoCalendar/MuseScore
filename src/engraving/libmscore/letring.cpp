@@ -21,15 +21,17 @@
  */
 
 #include "letring.h"
-#include "io/xml.h"
-#include "system.h"
-#include "measure.h"
-#include "chordrest.h"
+
+#include "rw/xml.h"
+
 #include "score.h"
+#include "stafftype.h"
+#include "system.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 static const ElementStyle letRingStyle {
     { Sid::letRingFontFace,                      Pid::BEGIN_FONT_FACE },
     { Sid::letRingFontFace,                      Pid::CONTINUE_FONT_FACE },
@@ -46,7 +48,8 @@ static const ElementStyle letRingStyle {
     { Sid::letRingHookHeight,                    Pid::BEGIN_HOOK_HEIGHT },
     { Sid::letRingHookHeight,                    Pid::END_HOOK_HEIGHT },
     { Sid::letRingLineStyle,                     Pid::LINE_STYLE },
-    { Sid::letRingBeginTextOffset,               Pid::BEGIN_TEXT_OFFSET },
+    { Sid::letRingDashLineLen,                   Pid::DASH_LINE_LEN },
+    { Sid::letRingDashGapLen,                    Pid::DASH_GAP_LEN },
     { Sid::letRingEndHookType,                   Pid::END_HOOK_TYPE },
     { Sid::letRingLineWidth,                     Pid::LINE_WIDTH },
     { Sid::letRingPlacement,                     Pid::PLACEMENT },
@@ -64,6 +67,14 @@ LetRingSegment::LetRingSegment(LetRing* sp, System* parent)
 
 void LetRingSegment::layout()
 {
+    const StaffType* stType = staffType();
+
+    _skipDraw = false;
+    if (stType && stType->isHiddenElementOnTab(score(), Sid::letRingShowTabCommon, Sid::letRingShowTabSimple)) {
+        _skipDraw = true;
+        return;
+    }
+
     TextLineBaseSegment::layout();
     autoplaceSpannerSegment();
 }
@@ -73,7 +84,7 @@ void LetRingSegment::layout()
 //---------------------------------------------------------
 
 LetRing::LetRing(EngravingItem* parent)
-    : TextLineBase(ElementType::LET_RING, parent)
+    : ChordTextLineBase(ElementType::LET_RING, parent)
 {
     initElementStyle(&letRingStyle);
     resetProperty(Pid::LINE_VISIBLE);
@@ -93,7 +104,7 @@ LetRing::LetRing(EngravingItem* parent)
 void LetRing::read(XmlReader& e)
 {
     if (score()->mscVersion() < 301) {
-        e.addSpanner(e.intAttribute("id", -1), this);
+        e.context()->addSpanner(e.intAttribute("id", -1), this);
     }
     while (e.readNextStartElement()) {
         if (readProperty(e.name(), e, Pid::LINE_WIDTH)) {
@@ -117,7 +128,7 @@ void LetRing::read(XmlReader& e)
 /*
 void LetRing::write(XmlWriter& xml) const
       {
-      if (!xml.canWrite(this))
+      if (!xml.context()->canWrite(this))
             return;
       xml.stag(this);
 
@@ -152,14 +163,14 @@ LineSegment* LetRing::createLineSegment(System* parent)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant LetRing::propertyDefault(Pid propertyId) const
+PropertyValue LetRing::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::LINE_WIDTH:
         return score()->styleV(Sid::letRingLineWidth);
 
     case Pid::ALIGN:
-        return QVariant::fromValue(Align::LEFT | Align::BASELINE);
+        return Align(AlignH::LEFT, AlignV::BASELINE);
 
     case Pid::LINE_STYLE:
         return score()->styleV(Sid::letRingLineStyle);
@@ -169,7 +180,7 @@ QVariant LetRing::propertyDefault(Pid propertyId) const
 
     case Pid::CONTINUE_TEXT_OFFSET:
     case Pid::END_TEXT_OFFSET:
-        return QVariant::fromValue(PointF(0, 0));
+        return PropertyValue::fromValue(PointF(0, 0));
 
     case Pid::BEGIN_FONT_STYLE:
         return score()->styleV(Sid::letRingFontStyle);
@@ -181,12 +192,12 @@ QVariant LetRing::propertyDefault(Pid propertyId) const
         return "";
 
     case Pid::BEGIN_HOOK_TYPE:
-        return int(HookType::NONE);
+        return HookType::NONE;
 
     case Pid::BEGIN_TEXT_PLACE:
     case Pid::CONTINUE_TEXT_PLACE:
     case Pid::END_TEXT_PLACE:
-        return int(PlaceText::AUTO);
+        return TextPlace::AUTO;
 
     default:
         return TextLineBase::propertyDefault(propertyId);
@@ -225,82 +236,5 @@ Sid LetRing::getPropertyStyle(Pid id) const
         break;
     }
     return TextLineBase::getPropertyStyle(id);
-}
-
-//---------------------------------------------------------
-//   linePos
-//    return System() coordinates
-//---------------------------------------------------------
-
-PointF LetRing::linePos(Grip grip, System** sys) const
-{
-    qreal x = 0.0;
-    qreal nhw = score()->noteHeadWidth();
-    System* s = nullptr;
-    if (grip == Grip::START) {
-        ChordRest* c = toChordRest(startElement());
-        if (!c) {
-            return PointF();
-        }
-        s = c->segment()->system();
-        x = c->pos().x() + c->segment()->pos().x() + c->segment()->measure()->pos().x();
-        if (c->isRest() && c->durationType() == TDuration::DurationType::V_MEASURE) {
-            x -= c->x();
-        }
-    } else {
-        EngravingItem* e = endElement();
-        ChordRest* c = toChordRest(endElement());
-        if (!e || e == startElement() || (endHookType() == HookType::HOOK_90)) {
-            // pedal marking on single note or ends with non-angled hook:
-            // extend to next note or end of measure
-            Segment* seg = nullptr;
-            if (!e) {
-                seg = startSegment();
-            } else {
-                seg = c->segment();
-            }
-            if (seg) {
-                seg = seg->next();
-                for (; seg; seg = seg->next()) {
-                    if (seg->segmentType() == SegmentType::ChordRest) {
-                        // look for a chord/rest in any voice on this staff
-                        bool crFound = false;
-                        int track = staffIdx() * VOICES;
-                        for (int i = 0; i < VOICES; ++i) {
-                            if (seg->element(track + i)) {
-                                crFound = true;
-                                break;
-                            }
-                        }
-                        if (crFound) {
-                            break;
-                        }
-                    } else if (seg->segmentType() == SegmentType::EndBarLine) {
-                        break;
-                    }
-                }
-            }
-            if (seg) {
-                s = seg->system();
-                x = seg->pos().x() + seg->measure()->pos().x() - nhw * 2;
-            }
-        } else if (c) {
-            s = c->segment()->system();
-            x = c->pos().x() + c->segment()->pos().x() + c->segment()->measure()->pos().x();
-            if (c->isRest() && c->durationType() == TDuration::DurationType::V_MEASURE) {
-                x -= c->x();
-            }
-        }
-        if (!s) {
-            Fraction t = tick2();
-            Measure* m = score()->tick2measure(t);
-            s = m->system();
-            x = m->tick2pos(t);
-        }
-        x += nhw;
-    }
-
-    *sys = s;
-    return PointF(x, 0);
 }
 }

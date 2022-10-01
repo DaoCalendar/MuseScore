@@ -20,7 +20,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
-import QtQuick.Layouts 1.12
 
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
@@ -29,7 +28,7 @@ import MuseScore.Preferences 1.0
 Item {
     id: root
 
-    property int firstColumnWidth: 0
+    property int columnWidth: 0
 
     property NavigationPanel navigation: null
     property int navigationOrderStart: 0
@@ -41,43 +40,46 @@ Item {
         id: apiModel
     }
 
+    Component.onCompleted: {
+        apiModel.load()
+    }
+
     Column {
         id: content
 
         spacing: 12
 
         ComboBoxWithTitle {
-            title: qsTrc("appshell", "Audio device:")
-            titleWidth: root.firstColumnWidth
+            title: qsTrc("appshell/preferences", "Audio device:")
+            columnWidth: root.columnWidth
 
-            currentIndex: apiModel.currentDeviceIndex
-            model: apiModel.deviceList()
+            currentIndex: indexOfValue(apiModel.currentDeviceId)
+            model: apiModel.deviceList
 
             navigation.name: "AudioDeviceBox"
             navigation.panel: root.navigation
             navigation.row: root.navigationOrderStart
 
-            onValueEdited: {
-                apiModel.currentDeviceIndex = currentIndex
+            onValueEdited: function(newIndex, newValue) {
+                apiModel.deviceSelected(newValue)
             }
         }
 
         ComboBoxWithTitle {
-            id: sampleRate
+            id: bufferSize
 
-            title: qsTrc("appshell", "Sample rate:")
-            titleWidth: root.firstColumnWidth
+            title: qsTrc("appshell", "Buffer size:")
+            columnWidth: root.columnWidth
 
-            currentIndex: apiModel.currentSampleRateIndex
-            model: apiModel.sampleRateHzList()
-            control.displayText: currentValue
+            currentIndex: indexOfValue(apiModel.bufferSize)
+            model: apiModel.bufferSizeList
 
-            navigation.name: "SampleRateBox"
+            navigation.name: "BufferSizeBox"
             navigation.panel: root.navigation
             navigation.row: root.navigationOrderStart + 1
 
-            onValueEdited: {
-                apiModel.currentSampleRateIndex = currentIndex
+            onValueEdited: function(newIndex, newValue) {
+                apiModel.bufferSizeSelected(newValue)
             }
         }
     }

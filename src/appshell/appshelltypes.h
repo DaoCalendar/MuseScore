@@ -32,12 +32,13 @@ using DockName = QString;
 static const DockName PALETTES_PANEL_NAME("palettesPanel");
 static const DockName INSTRUMENTS_PANEL_NAME("instrumentsPanel");
 static const DockName INSPECTOR_PANEL_NAME("inspectorPanel");
-static const DockName NOTATION_NAVIGATOR_PANEL_NAME("notationNavigatorPanel");
-static const DockName TIMELINE_PANEL_NAME("timelinePanel");
-static const DockName MIXER_PANEL_NAME("mixerPanel");
-static const DockName SYNTHESIZER_PANEL_NAME("synthesizerPanel");
 static const DockName SELECTION_FILTERS_PANEL_NAME("selectionFiltersPanel");
-static const DockName PIANO_PANEL_NAME("pianoPanel");
+
+static const DockName NOTATION_NAVIGATOR_PANEL_NAME("notationNavigatorPanel");
+
+static const DockName MIXER_PANEL_NAME("mixerPanel");
+static const DockName PIANO_KEYBOARD_PANEL_NAME("pianoKeyboardPanel");
+static const DockName TIMELINE_PANEL_NAME("timelinePanel");
 static const DockName DRUMSET_PANEL_NAME("drumsetPanel");
 
 // Toolbars:
@@ -49,7 +50,7 @@ static const DockName PLAYBACK_TOOLBAR_NAME("playbackToolBar");
 // Other:
 static const DockName NOTATION_STATUSBAR_NAME("notationStatusBar");
 
-enum class StartupSessionType
+enum class StartupModeType
 {
     StartEmpty,
     ContinueLastSession,

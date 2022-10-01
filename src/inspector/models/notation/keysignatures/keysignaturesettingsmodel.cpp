@@ -36,22 +36,31 @@ KeySignatureSettingsModel::KeySignatureSettingsModel(QObject* parent, IElementRe
 
 void KeySignatureSettingsModel::createProperties()
 {
-    m_hasToShowCourtesy = buildPropertyItem(Ms::Pid::SHOW_COURTESY);
-    m_mode = buildPropertyItem(Ms::Pid::KEYSIG_MODE);
+    m_hasToShowCourtesy = buildPropertyItem(mu::engraving::Pid::SHOW_COURTESY);
+    m_mode = buildPropertyItem(mu::engraving::Pid::KEYSIG_MODE);
 }
 
 void KeySignatureSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::KEYSIG);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::KEYSIG);
 }
 
 void KeySignatureSettingsModel::loadProperties()
 {
-    loadPropertyItem(m_hasToShowCourtesy, [](const QVariant& elementPropertyValue) -> QVariant {
-        return elementPropertyValue.toBool();
-    });
-
+    loadPropertyItem(m_hasToShowCourtesy);
     loadPropertyItem(m_mode);
+
+    bool enabled = true;
+
+    for (const mu::engraving::EngravingItem* element : m_elementList) {
+        if (element->generated()) {
+            enabled = false;
+            break;
+        }
+    }
+
+    m_hasToShowCourtesy->setIsEnabled(enabled);
+    m_mode->setIsEnabled(enabled);
 }
 
 void KeySignatureSettingsModel::resetProperties()

@@ -27,17 +27,18 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   InsertItemBspTreeVisitor
 //---------------------------------------------------------
 
 class InsertItemBspTreeVisitor : public BspTreeVisitor
 {
+    OBJECT_ALLOCATOR(engraving, InsertItemBspTreeVisitor)
 public:
     EngravingItem* item;
 
-    inline void visit(QList<EngravingItem*>* items) { items->prepend(item); }
+    inline void visit(std::list<EngravingItem*>* items) { items->push_front(item); }
 };
 
 //---------------------------------------------------------
@@ -46,10 +47,11 @@ public:
 
 class RemoveItemBspTreeVisitor : public BspTreeVisitor
 {
+    OBJECT_ALLOCATOR(engraving, RemoveItemBspTreeVisitor)
 public:
     EngravingItem* item;
 
-    inline void visit(QList<EngravingItem*>* items) { items->removeAll(item); }
+    inline void visit(std::list<EngravingItem*>* items) { items->remove(item); }
 };
 
 //---------------------------------------------------------
@@ -58,16 +60,17 @@ public:
 
 class FindItemBspTreeVisitor : public BspTreeVisitor
 {
+    OBJECT_ALLOCATOR(engraving, FindItemBspTreeVisitor)
 public:
-    QList<EngravingItem*> foundItems;
+    std::list<EngravingItem*> foundItems;
 
-    void visit(QList<EngravingItem*>* items)
+    void visit(std::list<EngravingItem*>* items)
     {
-        for (int i = 0; i < items->size(); ++i) {
-            EngravingItem* item = items->at(i);
+        for (auto it = items->begin(); it != items->end(); ++it) {
+            EngravingItem* item = *it;
             if (!item->itemDiscovered) {
                 item->itemDiscovered = true;
-                foundItems.prepend(item);
+                foundItems.push_front(item);
             }
         }
     }
@@ -89,7 +92,7 @@ BspTree::BspTree()
 
 static inline int intmaxlog(int n)
 {
-    return n > 0 ? qMax(int(::ceil(::log(qreal(n)) / ::log(qreal(2)))), 5) : 0;
+    return n > 0 ? std::max(int(::ceil(::log(double(n)) / ::log(double(2)))), 5) : 0;
 }
 
 //---------------------------------------------------------
@@ -103,8 +106,8 @@ void BspTree::initialize(const RectF& rec, int n)
     leafCnt    = 0;
 
     nodes.resize((1 << (depth + 1)) - 1);
-    leaves.resize(1 << depth);
-    leaves.fill(QList<EngravingItem*>());
+    leaves.resize(1LL << depth);
+    std::fill(leaves.begin(), leaves.end(), std::list<EngravingItem*>());
     initialize(rec, depth, 0);
 }
 
@@ -145,15 +148,15 @@ void BspTree::remove(EngravingItem* element)
 //   items
 //---------------------------------------------------------
 
-QList<EngravingItem*> BspTree::items(const RectF& rec)
+std::vector<EngravingItem*> BspTree::items(const RectF& rec)
 {
     FindItemBspTreeVisitor findVisitor;
     climbTree(&findVisitor, rec);
-    QList<EngravingItem*> l;
-    for (EngravingItem* e : qAsConst(findVisitor.foundItems)) {
+    std::vector<EngravingItem*> l;
+    for (EngravingItem* e : findVisitor.foundItems) {
         e->itemDiscovered = false;
         if (e->pageBoundingRect().intersects(rec)) {
-            l.append(e);
+            l.push_back(e);
         }
     }
     return l;
@@ -163,16 +166,16 @@ QList<EngravingItem*> BspTree::items(const RectF& rec)
 //   items
 //---------------------------------------------------------
 
-QList<EngravingItem*> BspTree::items(const PointF& pos)
+std::vector<EngravingItem*> BspTree::items(const PointF& pos)
 {
     FindItemBspTreeVisitor findVisitor;
     climbTree(&findVisitor, pos);
 
-    QList<EngravingItem*> l;
-    for (EngravingItem* e : qAsConst(findVisitor.foundItems)) {
+    std::vector<EngravingItem*> l;
+    for (EngravingItem* e : findVisitor.foundItems) {
         e->itemDiscovered = false;
         if (e->contains(pos)) {
-            l.append(e);
+            l.push_back(e);
         }
     }
     return l;
@@ -183,15 +186,15 @@ QList<EngravingItem*> BspTree::items(const PointF& pos)
 //   debug
 //---------------------------------------------------------
 
-QString BspTree::debug(int index) const
+String BspTree::debug(int index) const
 {
     const Node* node = &nodes.at(index);
 
-    QString tmp;
+    String tmp;
     if (node->type == Node::Type::LEAF) {
         RectF rec = rectForIndex(index);
         if (!leaves[node->leafIndex].empty()) {
-            tmp += QString::fromLatin1("[%1, %2, %3, %4] contains %5 items\n")
+            tmp += String(u"[%1, %2, %3, %4] contains %5 items\n")
                    .arg(rec.left()).arg(rec.top())
                    .arg(rec.width()).arg(rec.height())
                    .arg(leaves[node->leafIndex].size());
@@ -225,7 +228,7 @@ void BspTree::initialize(const RectF& rec, int dep, int index)
     if (dep) {
         Node::Type type;
         RectF rect1, rect2;
-        qreal offset1, offset2;
+        double offset1, offset2;
 
         if (node->type == Node::Type::HORIZONTAL) {
             type = Node::Type::VERTICAL;

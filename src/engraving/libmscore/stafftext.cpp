@@ -21,15 +21,10 @@
  */
 
 #include "stafftext.h"
-#include "io/xml.h"
-#include "score.h"
-#include "system.h"
-#include "staff.h"
-#include "measure.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   staffStyle
 //---------------------------------------------------------
@@ -43,7 +38,7 @@ static const ElementStyle staffStyle {
 //   StaffText
 //---------------------------------------------------------
 
-StaffText::StaffText(Segment* parent, Tid tid)
+StaffText::StaffText(Segment* parent, TextStyleType tid)
     : StaffTextBase(ElementType::STAFF_TEXT, parent, tid, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
 {
     initElementStyle(&staffStyle);
@@ -63,11 +58,11 @@ void StaffText::layout()
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant StaffText::propertyDefault(Pid id) const
+engraving::PropertyValue StaffText::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::STAFF);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::STAFF;
     default:
         return StaffTextBase::propertyDefault(id);
     }

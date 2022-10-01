@@ -139,6 +139,7 @@ ListItemBlank {
 
     Component {
         id: textComp
+
         TextInputField {
             id: textControl
 
@@ -153,7 +154,7 @@ ListItemBlank {
 
             currentText: val
 
-            onCurrentTextEdited: {
+            onCurrentTextEdited: function(newTextValue) {
                 textControl.changed(newTextValue)
             }
         }
@@ -161,6 +162,7 @@ ListItemBlank {
 
     Component {
         id: colorComp
+
         ColorPicker {
             id: colorControl
 
@@ -175,7 +177,7 @@ ListItemBlank {
 
             color: val
 
-            onNewColorSelected: {
+            onNewColorSelected: function(newColor) {
                 colorControl.changed(newColor)
             }
         }
@@ -183,6 +185,7 @@ ListItemBlank {
 
     Component {
         id: intComp
+
         IncrementalPropertyControl {
             id: intControl
 
@@ -200,7 +203,7 @@ ListItemBlank {
             step: 1
             decimals: 0
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 intControl.changed(newValue)
             }
         }
@@ -208,6 +211,7 @@ ListItemBlank {
 
     Component {
         id: doubleComp
+
         IncrementalPropertyControl {
             id: doubleControl
 
@@ -223,7 +227,7 @@ ListItemBlank {
             currentValue: val
             step: 1.0
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 doubleControl.changed(newValue)
             }
         }
@@ -231,17 +235,18 @@ ListItemBlank {
 
     Component {
         id: boolComp
+
         CheckBox {
             id: boolControl
 
             property bool val
             signal changed(bool newVal)
 
+            property string accessibleName: checked ? qsTrc("ui", "checked", "checkstate") : qsTrc("ui", "unchecked", "checkstate")
+
             navigation.panel: root.navigation.panel
             navigation.row: root.navigation.row
             navigation.column: 1
-
-            property string accessibleName: checked ? qsTrc("uicomponents", "checked") : qsTrc("uicomponents", "unchecked")
 
             checked: val ? true : false
             onClicked: {

@@ -31,6 +31,8 @@ FocusScope {
     property NavigationPanel navigationPanel: null
     property int navigationRowStart: 1
 
+    property var notationView: null
+
     property var anchorItem: null
     signal ensureContentVisibleRequested(int invisibleContentHeight)
 
@@ -40,4 +42,6 @@ FocusScope {
     function navigationRow(row) {
         return root.navigationRowStart + row
     }
+
+    signal popupOpened(var openedPopup, var control)
 }

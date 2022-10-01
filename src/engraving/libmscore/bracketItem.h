@@ -23,46 +23,46 @@
 #ifndef __BRACKET_ITEM_H__
 #define __BRACKET_ITEM_H__
 
-#include "engravingobject.h"
-#include "mscore.h"
+#include "engravingitem.h"
+
+#include "types/types.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 //---------------------------------------------------------
 //   BracketItem
 //---------------------------------------------------------
 
-class BracketItem final : public EngravingObject
+class BracketItem final : public EngravingItem
 {
-    BracketType _bracketType { BracketType::NO_BRACKET };
-    int _column              { 0 };
-    int _bracketSpan        { 0 };
-    Staff* _staff            { 0 };
+    OBJECT_ALLOCATOR(engraving, BracketItem)
 
-    friend class mu::engraving::Factory;
+    BracketType _bracketType { BracketType::NO_BRACKET };
+    size_t _column = 0;
+    size_t _bracketSpan = 0;
+    Staff* _staff = nullptr;
+
+    friend class Factory;
 
     BracketItem(EngravingItem* parent);
     BracketItem(EngravingItem* parent, BracketType a, int b);
 
 public:
+    EngravingItem* clone() const override;
 
-    QVariant getProperty(Pid) const override;
-    bool setProperty(Pid, const QVariant&) override;
-    QVariant propertyDefault(Pid id) const override;
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
-//      bool selected() const              { return _selected;    }
-    int bracketSpan() const { return _bracketSpan; }
+    size_t bracketSpan() const { return _bracketSpan; }
     BracketType bracketType() const { return _bracketType; }
-//      void setSelected(bool v)           { _selected = v;       }
-    void setBracketSpan(int v) { _bracketSpan = v; }
+    void setBracketSpan(size_t v) { _bracketSpan = v; }
     void setBracketType(BracketType v) { _bracketType = v; }
-    Staff* staff() { return _staff; }
+    Staff* staff() const { return _staff; }
     void setStaff(Staff* s) { _staff = s; }
-    int column() const { return _column; }
-    void setColumn(int v) { _column = v; }
+    size_t column() const { return _column; }
+    void setColumn(size_t v) { _column = v; }
 };
 }
 #endif

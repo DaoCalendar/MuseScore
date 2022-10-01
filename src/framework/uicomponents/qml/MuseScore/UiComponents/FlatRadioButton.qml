@@ -36,6 +36,10 @@ RadioDelegate {
     property int iconCode: IconCode.NONE
     property int iconFontSize: ui.theme.iconsFont.pixelSize
 
+    property string toolTipTitle: ""
+    property string toolTipDescription: ""
+    property string toolTipShortcut: ""
+
     property alias radius: backgroundRect.radius
 
     property bool transparent: false
@@ -44,6 +48,7 @@ RadioDelegate {
     property color checkedColor: ui.theme.accentColor
 
     property alias navigation: navCtrl
+    property alias navigationFocusBorder: navigationFocusBorder
 
     ButtonGroup.group: ListView.view && ListView.view instanceof RadioButtonGroup ? ListView.view.radioButtonGroup : null
 
@@ -58,12 +63,32 @@ RadioDelegate {
         }
     }
 
-    onClicked: root.ensureActiveFocus()
+    onClicked: {
+        navigation.requestActiveByInteraction()
+
+        root.ensureActiveFocus()
+    }
+
+    onPressedChanged: {
+        ui.tooltip.hide(root, true)
+    }
+
+    onHoveredChanged: {
+        if (!Boolean(root.toolTipTitle)) {
+            return
+        }
+
+        if (hovered) {
+            ui.tooltip.show(root, root.toolTipTitle, root.toolTipDescription, root.toolTipShortcut)
+        } else {
+            ui.tooltip.hide(root)
+        }
+    }
 
     NavigationControl {
         id: navCtrl
         name: root.objectName != "" ? root.objectName : "FlatRadioButton"
-        enabled: root.enabled
+        enabled: root.enabled && root.visible
 
         accessible.role: MUAccessible.RadioButton
         accessible.name: root.text
@@ -76,7 +101,10 @@ RadioDelegate {
         id: backgroundRect
         anchors.fill: parent
 
-        NavigationFocusBorder { navigationCtrl: navCtrl }
+        NavigationFocusBorder {
+            id: navigationFocusBorder
+            navigationCtrl: navCtrl
+        }
 
         color: root.checked ? root.checkedColor : root.normalColor
         opacity: ui.theme.buttonOpacityNormal
@@ -84,6 +112,30 @@ RadioDelegate {
         border.width: ui.theme.borderWidth
         border.color: ui.theme.strokeColor
         radius: 2
+
+        states: [
+            State {
+                name: "HOVERED"
+                when: root.hovered && !root.pressed
+
+                PropertyChanges {
+                    target: backgroundRect
+                    color: root.checked ? root.checkedColor : root.hoverHitColor
+                    opacity: ui.theme.buttonOpacityHover
+                }
+            },
+
+            State {
+                name: "PRESSED"
+                when: root.pressed
+
+                PropertyChanges {
+                    target: backgroundRect
+                    color: root.checked ? root.checkedColor : root.hoverHitColor
+                    opacity: ui.theme.buttonOpacityHit
+                }
+            }
+        ]
     }
 
     contentItem: Loader {
@@ -121,28 +173,4 @@ RadioDelegate {
     }
 
     indicator: Item {}
-
-    states: [
-        State {
-            name: "HOVERED"
-            when: root.hovered && !root.pressed
-
-            PropertyChanges {
-                target: backgroundRect
-                color: root.checked ? root.checkedColor : root.hoverHitColor
-                opacity: ui.theme.buttonOpacityHover
-            }
-        },
-
-        State {
-            name: "PRESSED"
-            when: root.pressed
-
-            PropertyChanges {
-                target: backgroundRect
-                color: root.checked ? root.checkedColor : root.hoverHitColor
-                opacity: ui.theme.buttonOpacityHit
-            }
-        }
-    ]
 }

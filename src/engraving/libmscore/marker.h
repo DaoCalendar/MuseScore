@@ -23,9 +23,9 @@
 #ifndef __MARKER_H__
 #define __MARKER_H__
 
-#include "text.h"
+#include "textbase.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   @@ Marker
 //
@@ -35,71 +35,44 @@ namespace Ms {
 
 class Marker final : public TextBase
 {
-public:
-    enum class Type : char {
-        SEGNO,
-        VARSEGNO,
-        CODA,
-        VARCODA,
-        CODETTA, // not in SMuFL, but still needed for 1.x compatibility, rendered as a double coda
-        FINE,
-        TOCODA,
-        TOCODASYM,
-        USER
-    };
-
+    OBJECT_ALLOCATOR(engraving, Marker)
 private:
-    Type _markerType;
-    QString _label;                 ///< referenced from Jump() element
+    MarkerType _markerType;
+    String _label;                 ///< referenced from Jump() element
 
 public:
     Marker(EngravingItem* parent);
-    Marker(EngravingItem* parent, Tid);
+    Marker(EngravingItem* parent, TextStyleType);
 
-    void setMarkerType(Type t);
-    Type markerType() const { return _markerType; }
-    QString markerTypeUserName() const;
-    Type markerType(const QString&) const;
+    void setMarkerType(MarkerType t);
+    MarkerType markerType() const { return _markerType; }
+    String markerTypeUserName() const;
 
     Marker* clone() const override { return new Marker(*this); }
 
     int subtype() const override { return int(_markerType); }
 
-    Measure* measure() const { return (Measure*)parent(); }
+    Measure* measure() const { return (Measure*)explicitParent(); }
 
     void layout() override;
     void read(XmlReader&) override;
     void write(XmlWriter& xml) const override;
 
-    QString label() const { return _label; }
-    void setLabel(const QString& s) { _label = s; }
-    void undoSetLabel(const QString& s);
-    void undoSetMarkerType(Type t);
+    String label() const { return _label; }
+    void setLabel(const String& s) { _label = s; }
+    void undoSetLabel(const String& s);
+    void undoSetMarkerType(MarkerType t);
 
     void styleChanged() override;
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
     EngravingItem* nextSegmentElement() override;
     EngravingItem* prevSegmentElement() override;
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
 };
-
-//---------------------------------------------------------
-//   MarkerTypeItem
-//---------------------------------------------------------
-
-struct MarkerTypeItem {
-    Marker::Type type;
-    QString name;
-};
-
-extern const MarkerTypeItem markerTypeTable[];
-int markerTypeTableSize();
-}     // namespace Ms
-
-Q_DECLARE_METATYPE(Ms::Marker::Type);
+} // namespace mu::engraving
 
 #endif

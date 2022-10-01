@@ -28,14 +28,14 @@
  Definition of class MusicXML
 */
 
-#include "libmscore/fraction.h"
+#include "engraving/types/fraction.h"
 #include "libmscore/mscore.h"
 #include "libmscore/pitchspelling.h"
 #include "libmscore/line.h"
 #include "importxmlfirstpass.h"
 #include "musicxmlsupport.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MusicXmlPartGroup
 //---------------------------------------------------------
@@ -50,7 +50,7 @@ struct MusicXmlPartGroup {
 
 const int MAX_LYRICS       = 16;
 const int MAX_PART_GROUPS  = 8;
-const int MAX_NUMBER_LEVEL = 6; // maximum number of overlapping MusicXML objects
+const int MAX_NUMBER_LEVEL = 16; // maximum number of overlapping MusicXML objects
 
 //---------------------------------------------------------
 //   CreditWords

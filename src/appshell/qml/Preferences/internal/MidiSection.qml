@@ -26,7 +26,7 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "MIDI")
+    title: qsTrc("appshell/preferences", "MIDI")
 
     property alias shortestNotes: shortestNotesBox.model
     property int currentShortestNote: 0
@@ -36,19 +36,20 @@ BaseSection {
     ComboBoxWithTitle {
         id: shortestNotesBox
 
-        title: qsTrc("appshell", "Shortest note:")
-        titleWidth: 220
+        title: qsTrc("appshell/preferences", "Shortest note:")
+        columnWidth: root.columnWidth
 
         currentIndex: control.indexOfValue(root.currentShortestNote)
 
         control.textRole: "title"
         control.valueRole: "value"
+        control.width: 132
 
         navigation.name: "ShortestNoteBox"
         navigation.panel: root.navigation
         navigation.row: 0
 
-        onValueEdited: {
+        onValueEdited: function(newIndex, newValue) {
             root.currentShortestNoteChangeRequested(newValue)
         }
     }

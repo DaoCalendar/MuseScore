@@ -68,6 +68,11 @@ Item {
         navigation.panel: root.navigationPanel
         navigation.row: root.navigationRow
         navigation.column: 1
+        navigation.accessible.name: root.expanded
+                                    //: Collapse a tree item
+                                    ? qsTrc("global", "Collapse")
+                                    //: Expand a tree item
+                                    : qsTrc("global", "Expand")
 
         onClicked: root.toggleExpandRequested()
     }
@@ -154,7 +159,7 @@ Item {
             {id: "properties", title: qsTrc("palette", "Palette properties…") },
         ]
 
-        onHandleMenuItem: {
+        onHandleMenuItem: function(itemId) {
             switch(itemId) {
             case "hide": root.hidePaletteRequested(); break
             case "new": root.insertNewPaletteRequested(); break

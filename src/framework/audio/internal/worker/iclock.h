@@ -25,7 +25,7 @@
 
 #include <memory>
 
-#include "ret.h"
+#include "types/ret.h"
 #include "async/channel.h"
 #include "async/notification.h"
 
@@ -48,6 +48,7 @@ public:
     virtual void resume() = 0;
     virtual void seek(const msecs_t msecs) = 0;
 
+    virtual msecs_t timeDuration() const = 0;
     virtual void setTimeDuration(const msecs_t duration) = 0;
     virtual Ret setTimeLoop(const msecs_t fromMsec, const msecs_t toMsec) = 0;
     virtual void resetTimeLoop() = 0;

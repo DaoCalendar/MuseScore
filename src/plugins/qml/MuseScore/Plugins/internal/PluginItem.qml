@@ -19,48 +19,83 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-import QtQuick 2.7
+import QtQuick 2.15
 import QtGraphicalEffects 1.0
 
+import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 
 Item {
     id: root
 
     property alias name: nameLabel.text
-    property alias thumbnailUrl: thumbnail.source
+    property alias thumbnailUrl: thumbnailImage.source
     property bool selected: false
 
     signal clicked()
 
-    Image {
+    property NavigationControl navigation: NavigationControl {
+        accessible.role: MUAccessible.ListItem
+        accessible.name: root.name
+        enabled: root.enabled && root.visible
+
+        onActiveChanged: function(active) {
+            if (active) {
+                root.forceActiveFocus()
+            }
+        }
+
+        onTriggered: root.clicked()
+    }
+
+    Item {
         id: thumbnail
 
         anchors.top: parent.top
-
         width: parent.width
-        height: 142
+        height: 144
 
-        fillMode: Image.PreserveAspectCrop
+        property real radius: 10
 
-        layer.enabled: true
-        layer.effect: OpacityMask {
-            maskSource: Rectangle {
-                width: thumbnail.width
-                height: thumbnail.height
-                radius: 10
+        Image {
+            id: thumbnailImage
+
+            anchors.fill: parent
+
+            fillMode: Image.PreserveAspectCrop
+
+            layer.enabled: true
+            layer.effect: OpacityMask {
+                maskSource: Rectangle {
+                    width: thumbnail.width
+                    height: thumbnail.height
+                    radius: thumbnail.radius
+                }
             }
         }
-    }
 
-    Rectangle {
-        anchors.fill: thumbnail
+        Rectangle {
+            id: selectionBorder
 
-        color: "transparent"
-        radius: 10
+            readonly property real padding: 2 // add some padding between image and border, to make border better distinguishable
 
-        border.color: ui.theme.fontPrimaryColor
-        border.width: root.selected ? 2 : 0
+            anchors.fill: parent
+            anchors.margins: -border.width - padding
+
+            visible: root.selected
+
+            color: "transparent"
+
+            border.color: ui.theme.fontPrimaryColor
+            border.width: 2
+            radius: thumbnail.radius - anchors.margins
+        }
+
+        NavigationFocusBorder {
+            navigationCtrl: root.navigation
+
+            padding: 2
+        }
     }
 
     StyledTextLabel {
@@ -77,7 +112,7 @@ Item {
             when: mouseArea.containsMouse && !mouseArea.pressed
 
             PropertyChanges {
-                target: root
+                target: thumbnail
                 opacity: 0.7
             }
         },
@@ -87,7 +122,7 @@ Item {
             when: mouseArea.pressed
 
             PropertyChanges {
-                target: root
+                target: thumbnail
                 opacity: 0.5
             }
         }

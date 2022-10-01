@@ -27,9 +27,6 @@
 
 namespace mu::engraving {
 class Factory;
-}
-
-namespace Ms {
 class Note;
 class Rest;
 
@@ -39,23 +36,24 @@ class Rest;
 
 class NoteDot final : public EngravingItem
 {
+    OBJECT_ALLOCATOR(engraving, NoteDot)
 public:
 
     NoteDot* clone() const override { return new NoteDot(*this); }
-    qreal mag() const override;
+    double mag() const override;
 
     void draw(mu::draw::Painter*) const override;
     void read(XmlReader&) override;
     void layout() override;
 
-    Note* note() const { return parent()->isNote() ? toNote(parent()) : 0; }
-    Rest* rest() const { return parent()->isRest() ? toRest(parent()) : 0; }
+    Note* note() const { return explicitParent()->isNote() ? toNote(explicitParent()) : 0; }
+    Rest* rest() const { return explicitParent()->isRest() ? toRest(explicitParent()) : 0; }
     EngravingItem* elementBase() const override;
 
 private:
-    friend class mu::engraving::Factory;
+    friend class Factory;
     NoteDot(Note* parent);
     NoteDot(Rest* parent);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

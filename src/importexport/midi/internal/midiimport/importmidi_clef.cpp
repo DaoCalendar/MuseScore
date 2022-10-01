@@ -21,7 +21,6 @@
  */
 
 #include <set>
-#include <QDebug>
 
 #include "importmidi_clef.h"
 #include "libmscore/factory.h"
@@ -42,9 +41,11 @@
 #include "importmidi_operations.h"
 #include "libmscore/instrtemplate.h"
 
+#include "log.h"
+
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::iex::midi {
 namespace MidiClef {
 class AveragePitch
 {
@@ -114,7 +115,7 @@ ClefType clefTypeFromAveragePitch(int averagePitch)
 //   createClef
 //---------------------------------------------------------
 
-void createClef(ClefType clefType, Staff* staff, int tick, bool isSmall = false)
+static void createClef(ClefType clefType, Staff* staff, int tick, bool isSmall = false)
 {
     if (tick == 0) {
         staff->setDefaultClefType(ClefTypeList(clefType, clefType));
@@ -123,7 +124,7 @@ void createClef(ClefType clefType, Staff* staff, int tick, bool isSmall = false)
         Segment* seg = m->getSegment(SegmentType::Clef, Fraction::fromTicks(tick));
         Clef* clef = Factory::createClef(seg);
         clef->setClefType(clefType);
-        const int track = staff->idx() * VOICES;
+        const track_idx_t track = staff->idx() * VOICES;
         clef->setTrack(track);
         clef->setGenerated(false);
         clef->setMag(staff->staffMag(Fraction::fromTicks(tick)));
@@ -132,10 +133,10 @@ void createClef(ClefType clefType, Staff* staff, int tick, bool isSmall = false)
     }
 }
 
-AveragePitch findAverageSegPitch(const Segment* seg, int strack)
+static AveragePitch findAverageSegPitch(const Segment* seg, track_idx_t strack)
 {
     AveragePitch averagePitch;
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (size_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
         if (cr && cr->isChord()) {
             Chord* chord = toChord(cr);
@@ -148,10 +149,10 @@ AveragePitch findAverageSegPitch(const Segment* seg, int strack)
     return averagePitch;
 }
 
-MinMaxPitch findMinMaxSegPitch(const Segment* seg, int strack)
+static MinMaxPitch findMinMaxSegPitch(const Segment* seg, track_idx_t strack)
 {
     MinMaxPitch minMaxPitch;
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (size_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
         if (cr && cr->isChord()) {
             Chord* chord = toChord(cr);
@@ -166,11 +167,11 @@ MinMaxPitch findMinMaxSegPitch(const Segment* seg, int strack)
 
 #ifdef QT_DEBUG
 
-bool doesClefBreakTie(const Staff* staff)
+static bool doesClefBreakTie(const Staff* staff)
 {
-    const int strack = staff->idx() * VOICES;
+    const track_idx_t strack = staff->idx() * VOICES;
 
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (size_t voice = 0; voice < VOICES; ++voice) {
         bool currentTie = false;
         for (Segment* seg = staff->score()->firstSegment(SegmentType::All); seg; seg = seg->next1()) {
             if (seg->segmentType() == SegmentType::ChordRest) {
@@ -182,9 +183,9 @@ bool doesClefBreakTie(const Staff* staff)
                 }
             } else if (seg->segmentType() == SegmentType::Clef && seg->element(strack)) {
                 if (currentTie) {
-                    qDebug() << "Clef breaks tie; measure number (from 1):"
-                             << seg->measure()->no() + 1
-                             << ", staff index (from 0):" << staff->idx();
+                    LOGD() << "Clef breaks tie; measure number (from 1):"
+                           << seg->measure()->no() + 1
+                           << ", staff index (from 0):" << staff->idx();
                     return true;
                 }
             }
@@ -236,12 +237,11 @@ int findPitchPenaltyForClef(int pitch, int clefIndex)
     return 0;
 }
 
-std::pair<ElementType, ReducedFraction>
-findChordRest(const Segment* seg, int strack)
+static std::pair<ElementType, ReducedFraction> findChordRest(const Segment* seg, track_idx_t strack)
 {
     ElementType elType = ElementType::INVALID;
     ReducedFraction newRestLen(0, 1);
-    for (int voice = 0; voice < VOICES; ++voice) {
+    for (size_t voice = 0; voice < VOICES; ++voice) {
         ChordRest* cr = static_cast<ChordRest*>(seg->element(strack + voice));
         if (!cr) {
             continue;
@@ -276,7 +276,7 @@ int findClefChangePenalty(
     int j = pos;
     ReducedFraction totalRestLen(0, 1);
     int penalty = 0;
-    const int strack = staff->idx() * VOICES;
+    const track_idx_t strack = staff->idx() * VOICES;
     const auto barFraction = ReducedFraction(
         staff->score()->sigmap()->timesig(segment->tick()).timesig());
     const ReducedFraction beatLen = Meter::beatLength(barFraction);
@@ -420,7 +420,7 @@ bool createClefs(
     return true;
 }
 
-void createMainClefFromAveragePitch(Staff* staff, int strack)
+static void createMainClefFromAveragePitch(Staff* staff, track_idx_t strack)
 {
     AveragePitch allAveragePitch;
     for (Segment* seg = staff->score()->firstSegment(SegmentType::ChordRest); seg;
@@ -436,10 +436,10 @@ bool hasGFclefs(const InstrumentTemplate* templ)
     if (!templ) {
         return false;
     }
-    const int staveCount = templ->staffCount;
+    const size_t staveCount = templ->staffCount;
     bool hasG = false;
     bool hasF = false;
-    for (int i = 0; i != staveCount; ++i) {
+    for (staff_idx_t i = 0; i != staveCount; ++i) {
         switch (templ->clefTypes[i]._concertClef) {
         case ClefType::G:
             hasG = true;
@@ -466,7 +466,7 @@ void createClefs(Staff* staff, int indexOfOperation, bool isDrumTrack)
         return;
     }
 
-    const int strack = staff->idx() * VOICES;
+    const track_idx_t strack = staff->idx() * VOICES;
     bool mainClefWasSet = false;
     const bool canChangeClef = !hasInstrument || hasGFclefs(trackInstrList[msInstrIndex]);
 
@@ -514,4 +514,4 @@ void createClefs(Staff* staff, int indexOfOperation, bool isDrumTrack)
 #endif
 }
 } // namespace MidiClef
-} // namespace Ms
+} // namespace mu::iex::midi

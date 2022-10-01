@@ -27,14 +27,14 @@
 #include "modularity/ioc.h"
 #include "async/asyncable.h"
 #include "../iworkspaceconfiguration.h"
-#include "../system/ifilesystem.h"
+#include "io/ifilesystem.h"
 #include "workspace.h"
 
 namespace mu::workspace {
 class WorkspaceManager : public IWorkspaceManager, public async::Asyncable
 {
     INJECT(workspace, IWorkspaceConfiguration, configuration)
-    INJECT(workspace, system::IFileSystem, fileSystem)
+    INJECT(workspace, io::IFileSystem, fileSystem)
 
 public:
 
@@ -47,6 +47,7 @@ public:
     IWorkspacePtr defaultWorkspace() const override;
 
     IWorkspacePtr currentWorkspace() const override;
+    async::Notification currentWorkspaceAboutToBeChanged() const override;
     async::Notification currentWorkspaceChanged() const override;
 
     IWorkspacePtrList workspaces() const override;
@@ -58,9 +59,12 @@ public:
 private:
     void load();
 
-    io::paths findWorkspaceFiles() const;
+    io::paths_t findWorkspaceFiles() const;
 
     WorkspacePtr doNewWorkspace(const std::string& workspaceName) const;
+
+    void appendNewWorkspace(WorkspacePtr workspace);
+    void setupConnectionsToNewWorkspace(const IWorkspacePtr workspace);
 
     void setupDefaultWorkspace();
     void setupCurrentWorkspace();
@@ -78,6 +82,7 @@ private:
 
     WorkspacePtr m_defaultWorkspace;
     WorkspacePtr m_currentWorkspace;
+    async::Notification m_currentWorkspaceAboutToBeChanged;
     async::Notification m_currentWorkspaceChanged;
 
     std::vector<WorkspacePtr> m_workspaces;

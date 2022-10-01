@@ -22,28 +22,27 @@
 
 #include "testbase.h"
 
-#include <QtTest/QtTest>
+#include <QProcess>
 #include <QTextStream>
+
+#include "io/file.h"
+#include "io/buffer.h"
 
 #include "config.h"
 #include "libmscore/masterscore.h"
-#include "libmscore/note.h"
-#include "libmscore/chord.h"
-#include "libmscore/instrtemplate.h"
-#include "libmscore/page.h"
 #include "libmscore/musescoreCore.h"
-#include "libmscore/excerpt.h"
 #include "libmscore/factory.h"
-#include "thirdparty/qzip/qzipreader_p.h"
 
 #include "engraving/compat/mscxcompat.h"
 #include "engraving/compat/scoreaccess.h"
 #include "engraving/compat/writescorehook.h"
-#include "engraving/infrastructure/io/xml.h"
+#include "engraving/infrastructure/io/localfileinfoprovider.h"
+#include "engraving/rw/xml.h"
 
-#include "framework/global/globalmodule.h"
-#include "framework/fonts/fontsmodule.h"
+#include "log.h"
 
+using namespace mu;
+using namespace mu::io;
 using namespace mu::engraving;
 
 static void initMyResources()
@@ -51,7 +50,7 @@ static void initMyResources()
 //    Q_INIT_RESOURCE(mtest);
 }
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   writeReadElement
 //    writes and element and reads it back
@@ -62,10 +61,10 @@ EngravingItem* MTest::writeReadElement(EngravingItem* element)
     //
     // write element
     //
-    QBuffer buffer;
-    buffer.open(QIODevice::WriteOnly);
-    XmlWriter xml(element->score(), &buffer);
-    xml.writeHeader();
+    Buffer buffer;
+    buffer.open(IODevice::WriteOnly);
+    XmlWriter xml(&buffer);
+    xml.startDocument();
     element->write(xml);
     buffer.close();
 
@@ -73,7 +72,7 @@ EngravingItem* MTest::writeReadElement(EngravingItem* element)
     // read element
     //
 
-    XmlReader e(buffer.buffer());
+    XmlReader e(buffer.data());
     e.readNextStartElement();
     element = Factory::createItemByName(e.name(), score->dummy());
     element->read(e);
@@ -106,48 +105,49 @@ MasterScore* MTest::readScore(const QString& name)
 
 MasterScore* MTest::readCreatedScore(const QString& name)
 {
-    MasterScore* score = mu::engraving::compat::ScoreAccess::createMasterScoreWithBaseStyle();
-    QFileInfo fi(name);
-    score->setName(fi.completeBaseName());
-    QString csl  = fi.suffix().toLower();
+    MasterScore* score_ = mu::engraving::compat::ScoreAccess::createMasterScoreWithBaseStyle();
+    io::path_t path = name;
+    score_->setFileInfoProvider(std::make_shared<LocalFileInfoProvider>(path));
+    std::string suffix = io::suffix(path);
 
     ScoreLoad sl;
     Score::FileError rv;
-    if (csl == "mscz" || csl == "mscx") {
-        rv = compat::loadMsczOrMscx(score, name, false);
+    if (suffix == "mscz" || suffix == "mscx") {
+        rv = compat::loadMsczOrMscx(score_, name, false);
     } else {
         rv = Score::FileError::FILE_UNKNOWN_TYPE;
     }
 
     if (rv != Score::FileError::FILE_NO_ERROR) {
-        QWARN(qPrintable(QString("readScore: cannot load <%1> type <%2>\n").arg(name).arg(csl)));
-        delete score;
-        score = 0;
+        LOGE() << "cannot load file at " << path;
+        delete score_;
+        score_ = nullptr;
     } else {
         for (Score* s : score->scoreList()) {
             s->doLayout();
         }
     }
-    return score;
+
+    return score_;
 }
 
 //---------------------------------------------------------
 //   saveScore
 //---------------------------------------------------------
 
-bool MTest::saveScore(Score* score, const QString& name) const
+bool MTest::saveScore(Score* score_, const QString& name) const
 {
-    QFile file(name);
+    File file(name);
     if (file.exists()) {
         file.remove();
     }
 
-    if (!file.open(QIODevice::ReadWrite)) {
+    if (!file.open(IODevice::ReadWrite)) {
         return false;
     }
 
     compat::WriteScoreHook hook;
-    return score->writeScore(&file, false, false, hook);
+    return score_->writeScore(&file, false, false, hook);
 }
 
 //---------------------------------------------------------
@@ -163,14 +163,13 @@ bool MTest::compareFilesFromPaths(const QString& f1, const QString& f2)
     args.append(f2);
     args.append(f1);
     QProcess p;
-    qDebug() << "Running " << cmd << " with arg1: " << QFileInfo(f2).fileName() << " and arg2: "
-             << QFileInfo(f1).fileName();
+    LOGD() << "Running " << cmd << " with arg1: " << f2 << " and arg2: " << f1;
     p.start(cmd, args);
     if (!p.waitForFinished() || p.exitCode()) {
         QByteArray ba = p.readAll();
-        //qDebug("%s", qPrintable(ba));
-        //qDebug("   <diff -u %s %s failed", qPrintable(compareWith),
-        //   qPrintable(QString(root + "/" + saveName)));
+        //LOGD("%s", muPrintable(ba));
+        //LOGD("   <diff -u %s %s failed", muPrintable(compareWith),
+        //   muPrintable(QString(root + "/" + saveName)));
         QTextStream outputText(stdout);
         outputText << QString(ba);
         outputText << QString("   <diff -u %1 %2 failed").arg(f2).arg(f1);
@@ -189,9 +188,9 @@ bool MTest::compareFiles(const QString& saveName, const QString& compareWith) co
 //---------------------------------------------------------
 
 // bool MTest::saveCompareScore(MasterScore* score, const QString& saveName, const QString& compareWith) const
-bool MTest::saveCompareScore(Score* score, const QString& saveName, const QString& compareWith) const
+bool MTest::saveCompareScore(Score* score_, const QString& saveName, const QString& compareWith) const
 {
-    if (!saveScore(score, saveName)) {
+    if (!saveScore(score_, saveName)) {
         return false;
     }
     return compareFiles(saveName, compareWith);
@@ -203,13 +202,13 @@ bool MTest::saveCompareScore(Score* score, const QString& saveName, const QStrin
 
 bool MTest::saveMimeData(QByteArray mimeData, const QString& saveName)
 {
-    QFile f(saveName);
-    if (!f.open(QIODevice::WriteOnly)) {
+    File f(saveName);
+    if (!f.open(IODevice::WriteOnly)) {
         return false;
     }
 
-    f.write(mimeData);
-    return f.error() == QFile::NoError;
+    size_t size = f.write(mimeData);
+    return size == static_cast<size_t>(mimeData.size());
 }
 
 //---------------------------------------------------------
@@ -244,8 +243,8 @@ void MTest::initMTest()
     mscore->init();
 
     root = rootPath();
-    loadInstrumentTemplates(":/data/instruments.xml");
+    loadInstrumentTemplates(u":/data/instruments.xml");
     score = readScore("test.mscx");
-    MScore::_error = Ms::MsError::MS_NO_ERROR;
+    MScore::_error = mu::engraving::MsError::MS_NO_ERROR;
 }
 }

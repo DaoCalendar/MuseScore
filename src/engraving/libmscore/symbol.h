@@ -24,13 +24,12 @@
 #define __SYMBOL_H__
 
 #include "bsymbol.h"
-#include "symid.h"
 
-#include "infrastructure/draw/font.h"
+#include "draw/types/font.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Segment;
-class ScoreFont;
+class SymbolFont;
 
 //---------------------------------------------------------
 //   @@ Symbol
@@ -41,9 +40,10 @@ class ScoreFont;
 
 class Symbol : public BSymbol
 {
+    OBJECT_ALLOCATOR(engraving, Symbol)
 protected:
     SymId _sym;
-    const ScoreFont* _scoreFont = nullptr;
+    const SymbolFont* _scoreFont = nullptr;
 
 public:
     Symbol(const ElementType& type, EngravingItem* parent, ElementFlags f = ElementFlag::MOVABLE);
@@ -54,31 +54,35 @@ public:
 
     Symbol* clone() const override { return new Symbol(*this); }
 
-    void setSym(SymId s, const ScoreFont* sf = nullptr) { _sym  = s; _scoreFont = sf; }
+    void setSym(SymId s, const SymbolFont* sf = nullptr) { _sym  = s; _scoreFont = sf; }
     SymId sym() const { return _sym; }
-    QString symName() const;
+    mu::AsciiStringView symName() const;
+
+    String accessibleInfo() const override;
 
     void draw(mu::draw::Painter*) const override;
     void write(XmlWriter& xml) const override;
     void read(XmlReader&) override;
     void layout() override;
 
-    QVariant getProperty(Pid) const override;
-    bool setProperty(Pid, const QVariant&) override;
+    PropertyValue getProperty(Pid) const override;
+    bool setProperty(Pid, const PropertyValue&) override;
 
-    qreal baseLine() const override { return 0.0; }
-    virtual Segment* segment() const { return (Segment*)parent(); }
+    double baseLine() const override { return 0.0; }
+    virtual Segment* segment() const { return (Segment*)explicitParent(); }
 };
 
 //---------------------------------------------------------
 //   @@ FSymbol
-///    Symbol constructed from a font glyph.
+///    Symbol constructed from a font glyph (i.e. a text character or emoji).
 //---------------------------------------------------------
 
 class FSymbol final : public BSymbol
 {
+    OBJECT_ALLOCATOR(engraving, FSymbol)
+
     mu::draw::Font _font;
-    int _code;
+    int _code; // character code point (Unicode)
 
 public:
     FSymbol(EngravingItem* parent);
@@ -86,17 +90,20 @@ public:
 
     FSymbol* clone() const override { return new FSymbol(*this); }
 
+    String toString() const;
+    String accessibleInfo() const override;
+
     void draw(mu::draw::Painter*) const override;
     void write(XmlWriter& xml) const override;
     void read(XmlReader&) override;
     void layout() override;
 
-    qreal baseLine() const override { return 0.0; }
-    Segment* segment() const { return (Segment*)parent(); }
+    double baseLine() const override { return 0.0; }
+    Segment* segment() const { return (Segment*)explicitParent(); }
     mu::draw::Font font() const { return _font; }
     int code() const { return _code; }
     void setFont(const mu::draw::Font& f);
     void setCode(int val) { _code = val; }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

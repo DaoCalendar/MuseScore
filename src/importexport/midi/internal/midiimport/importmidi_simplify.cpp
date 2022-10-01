@@ -28,23 +28,25 @@
 #include "importmidi_voice.h"
 #include "importmidi_operations.h"
 #include "importmidi_tuplet_voice.h"
+#include "../midishared/midifile.h"
 
 #include "engraving/libmscore/sig.h"
 #include "engraving/libmscore/durationtype.h"
-#include "engraving/compat/midi/midifile.h"
 
-namespace Ms {
+using namespace mu::engraving;
+
+namespace mu::iex::midi {
 namespace Simplify {
 bool hasComplexBeamedDurations(const QList<std::pair<ReducedFraction, TDuration> >& list)
 {
     for (const auto& d: list) {
-        if (d.second == TDuration::DurationType::V_16TH
-            || d.second == TDuration::DurationType::V_32ND
-            || d.second == TDuration::DurationType::V_64TH
-            || d.second == TDuration::DurationType::V_128TH
-            || d.second == TDuration::DurationType::V_256TH
-            || d.second == TDuration::DurationType::V_512TH
-            || d.second == TDuration::DurationType::V_1024TH) {
+        if (d.second == DurationType::V_16TH
+            || d.second == DurationType::V_32ND
+            || d.second == DurationType::V_64TH
+            || d.second == DurationType::V_128TH
+            || d.second == DurationType::V_256TH
+            || d.second == DurationType::V_512TH
+            || d.second == DurationType::V_1024TH) {
             return true;
         }
     }
@@ -189,7 +191,7 @@ void shortenDrumNote(
         }
         if (next != chords.end()) {
             const auto len = ReducedFraction::fromTicks(
-                MScore::division) / 8;                             // 1/32
+                Constants::division) / 8;                             // 1/32
             auto newOffTime = it->first + len;
             if (next->second.isInTuplet) {
                 const auto& tuplet = next->second.tuplet->second;

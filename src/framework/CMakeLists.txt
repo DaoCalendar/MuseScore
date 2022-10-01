@@ -19,6 +19,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #add_subdirectory(global)
+add_subdirectory(draw)
 add_subdirectory(ui)
 add_subdirectory(uicomponents)
 add_subdirectory(fonts)
@@ -33,24 +34,22 @@ if (BUILD_NETWORK_MODULE)
     add_subdirectory(network)
 endif (BUILD_NETWORK_MODULE)
 
-if (BUILD_SYSTEM_MODULE)
-    add_subdirectory(system)
-endif (BUILD_SYSTEM_MODULE)
-
 if (BUILD_AUDIO_MODULE)
     add_subdirectory(audio)
 endif (BUILD_AUDIO_MODULE)
 
 add_subdirectory(midi)
+add_subdirectory(mpe)
 
-if (BUILD_TELEMETRY_MODULE)
-      add_subdirectory(telemetry)
-endif (BUILD_TELEMETRY_MODULE)
+if (BUILD_MUSESAMPLER_MODULE)
+    add_subdirectory(musesampler)
+endif(BUILD_MUSESAMPLER_MODULE)
 
 if (BUILD_UNIT_TESTS)
     add_subdirectory(global/tests)
-    add_subdirectory(system/tests)
+    add_subdirectory(mpe/tests)
     add_subdirectory(ui/tests)
+    add_subdirectory(accessibility/tests)
 endif(BUILD_UNIT_TESTS)
 
 if (BUILD_VST)

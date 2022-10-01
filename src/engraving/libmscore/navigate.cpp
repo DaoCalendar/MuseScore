@@ -21,65 +21,129 @@
  */
 
 #include "navigate.h"
-#include "engravingitem.h"
-#include "clef.h"
-#include "score.h"
-#include "note.h"
-#include "rest.h"
+
 #include "chord.h"
-#include "system.h"
-#include "segment.h"
-#include "harmony.h"
-#include "utils.h"
-#include "input.h"
+#include "engravingitem.h"
 #include "measure.h"
 #include "measurerepeat.h"
-#include "page.h"
+#include "note.h"
+#include "rest.h"
+#include "score.h"
+#include "segment.h"
 #include "spanner.h"
-#include "system.h"
 #include "staff.h"
-#include "barline.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
+using ElementPair = std::pair<EngravingItem*, int>; // element and its index as a child
+
+//---------------------------------------------------------
+//   isChild1beforeChild2
+//    compares if two children are order correctly
+//    from top-left to bottom-right
+//---------------------------------------------------------
+
+static bool isChild1beforeChild2(const ElementPair& child1, const ElementPair& child2)
+{
+    assert(child1.first->parent() == child2.first->parent());
+
+    PointF p1 = child1.first->pos() + child1.first->bbox().center();
+    PointF p2 = child2.first->pos() + child2.first->bbox().center();
+
+    // If one child is *clearly* above the other then visit the higher one first
+    double verticalSeparation = p2.y() - p1.y();
+    if (verticalSeparation > 10) {
+        return true;
+    } else if (verticalSeparation < -10) {
+        return false;
+    }
+
+    // Children are roughly aligned vertically. Visit the one on the left first
+    double horizontalSeparation = p2.x() - p1.x();
+    if (horizontalSeparation > 0.0) {
+        return true;
+    } else if (horizontalSeparation < 0.0) {
+        return false;
+    }
+
+    // Children are aligned horizontally so check exact vertical position.
+    if (verticalSeparation > 0.0) {
+        return true;
+    } else if (verticalSeparation < 0.0) {
+        return false;
+    }
+
+    // Elements are at exact same position so fall back to using child index to determine order.
+    if (child1.second < child2.second) {
+        return true;
+    }
+
+    return false;
+}
+
+//---------------------------------------------------------
+//   toChildPairsSet
+//    return a set of children ordered
+//    on the basis of position
+//---------------------------------------------------------
+
+static std::set<ElementPair, decltype(& isChild1beforeChild2)> toChildPairsSet(const EngravingItem* element)
+{
+    std::set<ElementPair, decltype(& isChild1beforeChild2)> children(&isChild1beforeChild2);
+    int index = 0;
+
+    for (EngravingObject* object : element->children()) {
+        EngravingItem* engravingItem = toEngravingItem(object);
+
+        if (!engravingItem) {
+            continue;
+        }
+
+        children.insert(std::pair<EngravingItem*, int>(engravingItem, index));
+        index++;
+    }
+
+    return children;
+}
+
 //---------------------------------------------------------
 //   nextChordRest
 //    return next Chord or Rest
 //---------------------------------------------------------
 
-ChordRest* nextChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRests)
+ChordRest* nextChordRest(const ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRests)
 {
     if (!cr) {
-        return 0;
+        return nullptr;
     }
 
     if (cr->isGrace()) {
-        Chord* c  = toChord(cr);
-        Chord* pc = toChord(cr->parent());
+        const Chord* c  = toChord(cr);
+        Chord* pc = toChord(cr->explicitParent());
 
         if (skipGrace) {
-            cr = toChordRest(cr->parent());
+            cr = toChordRest(cr->explicitParent());
         } else if (cr->isGraceBefore()) {
-            QVector<Chord*> cl = pc->graceNotesBefore();
-            auto i = std::find(cl.begin(), cl.end(), c);
-            if (i == cl.end()) {
-                return 0;           // unable to find self?
+            const GraceNotesGroup& group = pc->graceNotesBefore();
+            auto i = std::find(group.begin(), group.end(), c);
+            if (i == group.end()) {
+                return nullptr;           // unable to find self?
             }
             ++i;
-            if (i != cl.end()) {
+            if (i != group.end()) {
                 return *i;
             }
             // if this was last grace note before, return parent
             return pc;
         } else {
-            QVector<Chord*> cl = pc->graceNotesAfter();
-            auto i = std::find(cl.begin(), cl.end(), c);
-            if (i == cl.end()) {
-                return 0;           // unable to find self?
+            const GraceNotesGroup& group = pc->graceNotesAfter();
+            auto i = std::find(group.begin(), group.end(), c);
+            if (i == group.end()) {
+                return nullptr;           // unable to find self?
             }
             ++i;
-            if (i != cl.end()) {
+            if (i != group.end()) {
                 return *i;
             }
             // if this was last grace note after, fall through to find next main note
@@ -87,17 +151,17 @@ ChordRest* nextChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRe
         }
     } else { // cr is not a grace note
         if (cr->isChord() && !skipGrace) {
-            Chord* c = toChord(cr);
+            const Chord* c = toChord(cr);
             if (!c->graceNotes().empty()) {
-                QVector<Chord*> cl = c->graceNotesAfter();
-                if (!cl.empty()) {
-                    return cl.first();
+                const GraceNotesGroup& group = c->graceNotesAfter();
+                if (!group.empty()) {
+                    return group.front();
                 }
             }
         }
     }
 
-    int track      = cr->track();
+    track_idx_t track = cr->track();
     SegmentType st = SegmentType::ChordRest;
 
     for (Segment* seg = cr->segment()->next1MM(st); seg; seg = seg->next1MM(st)) {
@@ -109,9 +173,9 @@ ChordRest* nextChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRe
             if (e->isChord() && !skipGrace) {
                 Chord* c = toChord(e);
                 if (!c->graceNotes().empty()) {
-                    QVector<Chord*> cl = c->graceNotesBefore();
-                    if (!cl.empty()) {
-                        return cl.first();
+                    const GraceNotesGroup& group = c->graceNotesBefore();
+                    if (!group.empty()) {
+                        return group.front();
                     }
                 }
             }
@@ -119,7 +183,7 @@ ChordRest* nextChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRe
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 //---------------------------------------------------------
@@ -128,36 +192,36 @@ ChordRest* nextChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRe
 //    if grace is true, include grace notes
 //---------------------------------------------------------
 
-ChordRest* prevChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRests)
+ChordRest* prevChordRest(const ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRests)
 {
     if (!cr) {
-        return 0;
+        return nullptr;
     }
 
     if (cr->isGrace()) {
-        Chord* c  = toChord(cr);
-        Chord* pc = toChord(cr->parent());
+        const Chord* c  = toChord(cr);
+        Chord* pc = toChord(cr->explicitParent());
 
         if (skipGrace) {
-            cr = toChordRest(cr->parent());
+            cr = toChordRest(cr->explicitParent());
         } else if (cr->isGraceBefore()) {
-            QVector<Chord*> cl = pc->graceNotesBefore();
-            auto i = std::find(cl.begin(), cl.end(), c);
-            if (i == cl.end()) {
-                return 0;           // unable to find self?
+            const GraceNotesGroup& group = pc->graceNotesBefore();
+            auto i = std::find(group.begin(), group.end(), c);
+            if (i == group.end()) {
+                return nullptr;           // unable to find self?
             }
-            if (i != cl.begin()) {
+            if (i != group.begin()) {
                 return *--i;
             }
             // if this was first grace note before, fall through to find previous main note
             cr = pc;
         } else {
-            QVector<Chord*> cl = pc->graceNotesAfter();
-            auto i = std::find(cl.begin(), cl.end(), c);
-            if (i == cl.end()) {
-                return 0;           // unable to find self?
+            const GraceNotesGroup& group = pc->graceNotesAfter();
+            auto i = std::find(group.begin(), group.end(), c);
+            if (i == group.end()) {
+                return nullptr;           // unable to find self?
             }
-            if (i != cl.begin()) {
+            if (i != group.begin()) {
                 return *--i;
             }
             // if this was first grace note after, return parent
@@ -167,15 +231,15 @@ ChordRest* prevChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRe
         //
         // cr is not a grace note
         if (cr->isChord() && !skipGrace) {
-            Chord* c = toChord(cr);
-            QVector<Chord*> cl = c->graceNotesBefore();
-            if (!cl.empty()) {
-                return cl.last();
+            const Chord* c = toChord(cr);
+            const GraceNotesGroup& group = c->graceNotesBefore();
+            if (!group.empty()) {
+                return group.back();
             }
         }
     }
 
-    int track = cr->track();
+    track_idx_t track = cr->track();
     SegmentType st = SegmentType::ChordRest;
     for (Segment* seg = cr->segment()->prev1MM(st); seg; seg = seg->prev1MM(st)) {
         ChordRest* e = toChordRest(seg->element(track));
@@ -184,16 +248,16 @@ ChordRest* prevChordRest(ChordRest* cr, bool skipGrace, bool skipMeasureRepeatRe
                 continue; // these rests are not shown, skip them
             }
             if (e->isChord() && !skipGrace) {
-                QVector<Chord*> cl = toChord(e)->graceNotesAfter();
-                if (!cl.empty()) {
-                    return cl.last();
+                const GraceNotesGroup& group = toChord(e)->graceNotesAfter();
+                if (!group.empty()) {
+                    return group.back();
                 }
             }
             return e;
         }
     }
 
-    return 0;
+    return nullptr;
 }
 
 //---------------------------------------------------------
@@ -323,7 +387,7 @@ EngravingItem* Score::lastElement(bool frame)
         return nullptr;
     }
     while (true) {
-        for (int i = (staves().size() - 1) * VOICES; i < staves().size() * VOICES; i++) {
+        for (size_t i = (staves().size() - 1) * VOICES; i < staves().size() * VOICES; i++) {
             if (seg->element(i)) {
                 re = seg->element(i);
             }
@@ -350,7 +414,7 @@ ChordRest* Score::upStaff(ChordRest* cr)
         return cr;
     }
 
-    for (int track = (cr->staffIdx() - 1) * VOICES; track >= 0; --track) {
+    for (int track = (static_cast<int>(cr->staffIdx()) - 1) * VOICES; track >= 0; --track) {
         EngravingItem* el = segment->element(track);
         if (!el) {
             continue;
@@ -372,13 +436,13 @@ ChordRest* Score::upStaff(ChordRest* cr)
 ChordRest* Score::downStaff(ChordRest* cr)
 {
     Segment* segment = cr->segment();
-    int tracks = nstaves() * VOICES;
+    track_idx_t tracks = nstaves() * VOICES;
 
     if (cr->staffIdx() == nstaves() - 1) {
         return cr;
     }
 
-    for (int track = (cr->staffIdx() + 1) * VOICES; track < tracks; --track) {
+    for (track_idx_t track = (cr->staffIdx() + 1) * VOICES; track < tracks; --track) {
         EngravingItem* el = segment->element(track);
         if (!el) {
             continue;
@@ -408,8 +472,8 @@ ChordRest* Score::nextTrack(ChordRest* cr, bool skipMeasureRepeatRests)
 
     ChordRest* el = nullptr;
     Measure* measure = cr->measure();
-    int track = cr->track();
-    int tracks = nstaves() * VOICES;
+    track_idx_t track = cr->track();
+    size_t tracks = nstaves() * VOICES;
 
     while (!el) {
         // find next non-empty track
@@ -456,7 +520,7 @@ ChordRest* Score::prevTrack(ChordRest* cr, bool skipMeasureRepeatRests)
 
     ChordRest* el = nullptr;
     Measure* measure = cr->measure();
-    int track = cr->track();
+    int track = static_cast<int>(cr->track());
 
     while (!el) {
         // find next non-empty track
@@ -527,12 +591,12 @@ ChordRest* Score::nextMeasure(ChordRest* element, bool selectBehavior, bool mmRe
         measure = element->measure();
         last = true;
     }
-    int staff = element->staffIdx();
+    staff_idx_t staff = element->staffIdx();
 
     Segment* startSeg = last ? measure->last() : measure->first();
     for (Segment* seg = startSeg; seg; seg = last ? seg->prev() : seg->next()) {
-        int etrack = (staff + 1) * VOICES;
-        for (int track = staff * VOICES; track < etrack; ++track) {
+        track_idx_t etrack = (staff + 1) * VOICES;
+        for (track_idx_t track = staff * VOICES; track < etrack; ++track) {
             EngravingItem* pel = seg->element(track);
 
             if (pel && pel->isChordRest()) {
@@ -573,12 +637,12 @@ ChordRest* Score::prevMeasure(ChordRest* element, bool mmRest)
         last = false;
     }
 
-    int staff = element->staffIdx();
+    staff_idx_t staff = element->staffIdx();
 
     Segment* startSeg = last ? measure->last() : measure->first();
     for (Segment* seg = startSeg; seg; seg = last ? seg->prev() : seg->next()) {
-        int etrack = (staff + 1) * VOICES;
-        for (int track = staff * VOICES; track < etrack; ++track) {
+        track_idx_t etrack = (staff + 1) * VOICES;
+        for (track_idx_t track = staff * VOICES; track < etrack; ++track) {
             EngravingItem* pel = seg->element(track);
 
             if (pel && pel->isChordRest()) {
@@ -599,7 +663,7 @@ EngravingItem* Score::nextElement()
     if (!e) {
         return nullptr;
     }
-    int staffId = e->staffIdx();
+    staff_idx_t staffId = e->staffIdx();
     while (e) {
         switch (e->type()) {
         case ElementType::NOTE:
@@ -653,7 +717,11 @@ EngravingItem* Score::nextElement()
         case ElementType::TRILL_SEGMENT:
         case ElementType::VIBRATO_SEGMENT:
         case ElementType::LET_RING_SEGMENT:
+        case ElementType::GRADUAL_TEMPO_CHANGE_SEGMENT:
         case ElementType::PALM_MUTE_SEGMENT:
+        case ElementType::WHAMMY_BAR_SEGMENT:
+        case ElementType::RASGUEADO_SEGMENT:
+        case ElementType::HARMONIC_MARK_SEGMENT:
         case ElementType::PEDAL_SEGMENT: {
             SpannerSegment* s = toSpannerSegment(e);
             Spanner* sp = s->spanner();
@@ -691,12 +759,34 @@ EngravingItem* Score::nextElement()
         case ElementType::VBOX:
         case ElementType::HBOX:
         case ElementType::TBOX: {
+            auto boxChildren = toChildPairsSet(e);
+
+            EngravingItem* selectedElement = getSelectedElement();
+
+            if ((selectedElement->type() == ElementType::VBOX
+                 || selectedElement->type() == ElementType::HBOX
+                 || selectedElement->type() == ElementType::TBOX) && !boxChildren.empty()) {
+                return boxChildren.begin()->first;
+            }
+
+            for (auto child = boxChildren.begin(); child != boxChildren.end(); child++) {
+                if (selectedElement != child->first) {
+                    continue;
+                }
+
+                auto targetElement = std::next(child);
+
+                if (targetElement != boxChildren.end()) {
+                    return targetElement->first;
+                }
+            }
+
             MeasureBase* mb = toMeasureBase(e)->nextMM();
             if (!mb) {
                 break;
             } else if (mb->isMeasure()) {
                 ChordRest* cr = selection().currentCR();
-                int si = cr ? cr->staffIdx() : 0;
+                staff_idx_t si = cr ? cr->staffIdx() : 0;
                 return toMeasure(mb)->nextElementStaff(si);
             } else {
                 return mb;
@@ -723,7 +813,7 @@ EngravingItem* Score::prevElement()
     if (!e) {
         return nullptr;
     }
-    int staffId = e->staffIdx();
+    staff_idx_t staffId = e->staffIdx();
     while (e) {
         switch (e->type()) {
         case ElementType::NOTE:
@@ -756,8 +846,21 @@ EngravingItem* Score::prevElement()
         case ElementType::BAR_LINE: {
             for (; e && e->type() != ElementType::SEGMENT; e = e->parentItem()) {
             }
-            Segment* s = toSegment(e);
-            return s->prevElement(staffId);
+            EngravingItem* previousElement = toSegment(e)->prevElement(staffId);
+
+            if (previousElement->type() != ElementType::VBOX
+                && previousElement->type() != ElementType::HBOX
+                && previousElement->type() != ElementType::TBOX) {
+                return previousElement;
+            }
+
+            auto boxChildren = toChildPairsSet(previousElement);
+
+            if (boxChildren.size() > 0) {
+                return boxChildren.rbegin()->first;
+            }
+
+            return previousElement;
         }
         case ElementType::VOLTA_SEGMENT:
         case ElementType::SLUR_SEGMENT:
@@ -808,7 +911,7 @@ EngravingItem* Score::prevElement()
             SpannerSegment* s = toSpannerSegment(e);
             Spanner* sp = s->spanner();
             EngravingItem* elSt = sp->startElement();
-            Q_ASSERT(elSt->type() == ElementType::NOTE);
+            assert(elSt->type() == ElementType::NOTE);
             Note* n = toNote(elSt);
             EngravingItem* prev =  n->prevElement();
             if (prev) {
@@ -820,12 +923,28 @@ EngravingItem* Score::prevElement()
         case ElementType::VBOX:
         case ElementType::HBOX:
         case ElementType::TBOX: {
+            auto boxChildren = toChildPairsSet(e);
+
+            EngravingItem* selectedElement = getSelectedElement();
+
+            for (auto child = boxChildren.rbegin(); child != boxChildren.rend(); child++) {
+                if (selectedElement != child->first) {
+                    continue;
+                }
+
+                auto targetElement = std::next(child);
+
+                if (targetElement != boxChildren.rend()) {
+                    return targetElement->first;
+                }
+            }
+
             MeasureBase* mb = toMeasureBase(e)->prevMM();
             if (!mb) {
                 break;
             } else if (mb->isMeasure()) {
                 ChordRest* cr = selection().currentCR();
-                int si = cr ? cr->staffIdx() : 0;
+                staff_idx_t si = cr ? cr->staffIdx() : 0;
                 Segment* s = toMeasure(mb)->last();
                 if (s) {
                     return s->lastElement(si);

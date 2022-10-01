@@ -23,9 +23,15 @@
 #ifndef __DURATIONLIST_H__
 #define __DURATIONLIST_H__
 
-#include "fraction.h"
+#include <list>
+#include <vector>
 
-namespace Ms {
+#include "global/allocator.h"
+
+#include "types/fraction.h"
+#include "types/types.h"
+
+namespace mu::engraving {
 class EngravingItem;
 class Measure;
 class Tuplet;
@@ -39,11 +45,13 @@ class Score;
 //   TrackList
 //---------------------------------------------------------
 
-class TrackList : public QList<EngravingItem*>
+class TrackList : public std::vector<EngravingItem*>
 {
+    OBJECT_ALLOCATOR(engraving, TrackList)
+
     Fraction _duration;
-    ScoreRange* _range;
-    int _track { 0 };
+    ScoreRange* _range = nullptr;
+    track_idx_t _track = 0;
 
     Tuplet* writeTuplet(Tuplet* parent, Tuplet* tuplet, Measure*& measure, Fraction& rest) const;
     void append(EngravingItem*);
@@ -57,13 +65,13 @@ public:
     Fraction ticks() const { return _duration; }
     ScoreRange* range() const { return _range; }
 
-    int track() const { return _track; }
-    void setTrack(int val) { _track = val; }
+    track_idx_t track() const { return _track; }
+    void setTrack(track_idx_t val) { _track = val; }
 
     void read(const Segment* fs, const Segment* ls);
     bool write(Score*, const Fraction&) const;
 
-    void appendGap(const Fraction&, Ms::Score* score);
+    void appendGap(const Fraction&, Score* score);
     bool truncate(const Fraction&);
     void dump() const;
 };
@@ -83,13 +91,13 @@ struct Annotation {
 
 class ScoreRange
 {
-    QList<TrackList*> tracks;
+    std::list<TrackList*> tracks;
     Segment* _first;
     Segment* _last;
 
 protected:
-    QList<Spanner*> spanner;
-    QList<Annotation> annotations;
+    std::list<Spanner*> spanner;
+    std::list<Annotation> annotations;
 
 public:
     ScoreRange() {}
@@ -104,5 +112,5 @@ public:
 
     friend class TrackList;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

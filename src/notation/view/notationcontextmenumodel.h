@@ -22,28 +22,49 @@
 #ifndef MU_NOTATION_NOTATIONCONTEXTMENUMODEL_H
 #define MU_NOTATION_NOTATIONCONTEXTMENUMODEL_H
 
-#include "ui/view/abstractmenumodel.h"
+#include "modularity/ioc.h"
+#include "context/iglobalcontext.h"
+
+#include "uicomponents/view/abstractmenumodel.h"
 #include "notation/notationtypes.h"
 
 namespace mu::notation {
-class NotationContextMenuModel : public ui::AbstractMenuModel
+class NotationContextMenuModel : public uicomponents::AbstractMenuModel
 {
     Q_OBJECT
+
+    INJECT(notation, context::IGlobalContext, globalContext)
 
 public:
     Q_INVOKABLE void loadItems(int elementType);
 
 private:
-    ui::MenuItemList itemsByElementType(ElementType type) const;
+    uicomponents::MenuItemList makeItemsByElementType(ElementType type);
 
-    ui::MenuItemList pageItems() const;
-    ui::MenuItemList defaultCopyPasteItems() const;
-    ui::MenuItemList measureItems() const;
-    ui::MenuItemList staffTextItems() const;
-    ui::MenuItemList systemTextItems() const;
-    ui::MenuItemList timeSignatureItems() const;
-    ui::MenuItemList selectItems() const;
-    ui::MenuItemList elementItems() const;
+    uicomponents::MenuItemList makePageItems();
+    uicomponents::MenuItemList makeDefaultCopyPasteItems();
+    uicomponents::MenuItemList makeMeasureItems();
+    uicomponents::MenuItemList makeStaffTextItems();
+    uicomponents::MenuItemList makeSystemTextItems();
+    uicomponents::MenuItemList makeTimeSignatureItems();
+    uicomponents::MenuItemList makeInstrumentNameItems();
+    uicomponents::MenuItemList makeHarmonyItems();
+    uicomponents::MenuItemList makeSelectItems();
+    uicomponents::MenuItemList makeElementItems();
+    uicomponents::MenuItemList makeInsertMeasuresItems();
+    uicomponents::MenuItemList makeChangeInstrumentItems();
+    uicomponents::MenuItemList makeVerticalBoxItems();
+    uicomponents::MenuItemList makeHorizontalBoxItems();
+
+    bool isSingleSelection() const;
+    bool canSelectSimilarInRange() const;
+    bool canSelectSimilar() const;
+    bool isDrumsetStaff() const;
+
+    INotationInteractionPtr interaction() const;
+    INotationSelectionPtr selection() const;
+
+    const INotationInteraction::HitElementContext& hitElementContext() const;
 };
 }
 

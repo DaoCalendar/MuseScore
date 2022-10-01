@@ -28,8 +28,16 @@ import MuseScore.Shortcuts 1.0
 PreferencesPage {
     id: root
 
+    contentFillsAvailableHeight: true
+
+    property alias shortcutCodeKey: page.shortcutCodeKey
+
     function apply() {
         return page.apply()
+    }
+
+    function reset() {
+        page.reset()
     }
 
     ShortcutsPage {

@@ -46,14 +46,37 @@ QString FilePickerModel::filter() const
 
 QString FilePickerModel::selectFile()
 {
-    io::path file = interactive()->selectOpeningFile(m_title, m_dir, m_filter);
+    io::path_t file = interactive()->selectOpeningFile(m_title, m_dir, m_filter);
+
+    if (!file.empty()) {
+        m_dir = io::dirpath(file).toQString();
+    }
+
     return file.toQString();
 }
 
 QString FilePickerModel::selectDirectory()
 {
-    io::path directory = interactive()->selectDirectory(m_title, m_dir);
+    io::path_t directory = interactive()->selectDirectory(m_title, m_dir);
+
+    if (!directory.empty()) {
+        m_dir = directory.toQString();
+    }
+
     return directory.toQString();
+}
+
+QString FilePickerModel::selectMultipleDirectories(const QString& selectedDirectoriesStr)
+{
+    io::paths_t selectedDirectories = io::pathsFromString(selectedDirectoriesStr.toStdString());
+    io::paths_t directories = interactive()->selectMultipleDirectories(m_title, m_dir, selectedDirectories);
+
+    QStringList result;
+    for (const io::path_t& dir: directories) {
+        result << dir.toQString();
+    }
+
+    return result.join(";");
 }
 
 void FilePickerModel::setTitle(const QString& title)

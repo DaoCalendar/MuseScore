@@ -53,6 +53,7 @@ public:
 
     QString title() const override;
     bool isBlank() const override;
+    bool isActive() const override;
     bool hasNativeEditorSupport() const override;
 
 signals:
@@ -61,6 +62,7 @@ signals:
 private:
     using ResourceByVendorMap = std::map<audio::AudioResourceVendor, audio::AudioResourceMetaList>;
 
+    QVariantMap buildMuseMenuItem(const ResourceByVendorMap& resourcesByVendor) const;
     QVariantMap buildVstMenuItem(const ResourceByVendorMap& resourcesByVendor) const;
     QVariantMap buildSoundFontsMenuItem(const ResourceByVendorMap& resourcesByVendor) const;
 

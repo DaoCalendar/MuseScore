@@ -30,18 +30,18 @@ MeasureRepeatSettingsModel::MeasureRepeatSettingsModel(QObject* parent, IElement
 {
     setModelType(InspectorModelType::TYPE_MEASURE_REPEAT);
     setTitle(qtrc("inspector", "Measure repeat"));
-    setIcon(ui::IconCode::Code::QUESTION_MARK);
+    setIcon(ui::IconCode::Code::MEASURE_REPEAT);
     createProperties();
 }
 
 void MeasureRepeatSettingsModel::createProperties()
 {
-    m_numberPosition = buildPropertyItem(Ms::Pid::MEASURE_REPEAT_NUMBER_POS);
+    m_numberPosition = buildPropertyItem(mu::engraving::Pid::MEASURE_REPEAT_NUMBER_POS);
 }
 
 void MeasureRepeatSettingsModel::requestElements()
 {
-    m_elementList = m_repository->findElementsByType(Ms::ElementType::MEASURE_REPEAT);
+    m_elementList = m_repository->findElementsByType(mu::engraving::ElementType::MEASURE_REPEAT);
 }
 
 void MeasureRepeatSettingsModel::loadProperties()

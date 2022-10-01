@@ -23,18 +23,14 @@
 #ifndef __BEND_H__
 #define __BEND_H__
 
-#include "infrastructure/draw/font.h"
-#include "style/style.h"
+#include "draw/types/font.h"
 
 #include "engravingitem.h"
-#include "pitchvalue.h"
-#include "property.h"
+#include "types.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 //---------------------------------------------------------
 //   @@ Bend
 //---------------------------------------------------------
@@ -48,46 +44,47 @@ enum class BendType {
     CUSTOM
 };
 
-class Bend final : public EngravingItem
+class Bend : public EngravingItem // TODO: bring back "final" keyword
 {
-    M_PROPERTY(QString,   fontFace,  setFontFace)
-    M_PROPERTY(qreal,     fontSize,  setFontSize)
-    M_PROPERTY(FontStyle, fontStyle, setFontStyle)
-    M_PROPERTY(qreal,     lineWidth, setLineWidth)
+    OBJECT_ALLOCATOR(engraving, Bend)
+
+    M_PROPERTY(String,     fontFace,  setFontFace)
+    M_PROPERTY(double,      fontSize,  setFontSize)
+    M_PROPERTY(FontStyle,  fontStyle, setFontStyle)
+    M_PROPERTY(Millimetre, lineWidth, setLineWidth)
 
 public:
-
     Bend* clone() const override { return new Bend(*this); }
 
     void layout() override;
     void draw(mu::draw::Painter*) const override;
     void write(XmlWriter&) const override;
     void read(XmlReader& e) override;
-    QList<PitchValue>& points() { return m_points; }
-    const QList<PitchValue>& points() const { return m_points; }
-    void setPoints(const QList<PitchValue>& p) { m_points = p; }
+    PitchValues& points() { return m_points; }
+    const PitchValues& points() const { return m_points; }
+    void setPoints(const PitchValues& p) { m_points = p; }
     bool playBend() const { return m_playBend; }
     void setPlayBend(bool v) { m_playBend = v; }
 
     // property methods
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
 
-private:
+protected: /// TODO: bring back "private" keyword after removing StretchedBend class
+    friend class Factory;
+    Bend(Note* parent, ElementType type = ElementType::BEND);
 
-    friend class mu::engraving::Factory;
-    Bend(Note* parent);
-
-    mu::draw::Font font(qreal) const;
+    mu::draw::Font font(double) const;
     BendType parseBendTypeFromCurve() const;
     void updatePointsByBendType(const BendType bendType);
 
     bool m_playBend = true;
-    QList<PitchValue> m_points;
+    PitchValues m_points;
 
     mu::PointF m_notePos;
-    qreal m_noteWidth;
+    double m_noteWidth = 0;
+    double m_noteHeight = 0;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

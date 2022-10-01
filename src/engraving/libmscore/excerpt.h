@@ -20,83 +20,89 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __EXCERPT_H__
-#define __EXCERPT_H__
+#ifndef MU_ENGRAVING_EXCERPT_H
+#define MU_ENGRAVING_EXCERPT_H
 
-#include <QMultiMap>
+#include <map>
 
-#include "fraction.h"
+#include "types/fraction.h"
+#include "types/types.h"
+#include "types/string.h"
 
-namespace Ms {
+namespace mu::engraving {
 class MasterScore;
-class Score;
 class Part;
-class Measure;
-class XmlWriter;
+class Score;
 class Staff;
+class Spanner;
 class XmlReader;
-class EngravingItem;
 
-//---------------------------------------------------------
-//   @@ Excerpt
-//---------------------------------------------------------
-
-class Excerpt : public QObject
+class Excerpt
 {
-    MasterScore* _oscore;
-
-    Score* _partScore           { 0 };
-    QString _title;
-    QList<Part*> _parts;
-    QMultiMap<int, int> _tracks;
-
 public:
-    Excerpt(MasterScore* s = 0) { _oscore = s; }
+    Excerpt(MasterScore* masterScore = nullptr) { m_masterScore = masterScore; }
     Excerpt(const Excerpt& ex, bool copyPartScore = true);
 
     ~Excerpt();
 
-    QList<Part*>& parts() { return _parts; }
-    const QList<Part*>& parts() const { return _parts; }
+    bool inited() const;
+
+    const ID& initialPartId() const;
+    void setInitialPartId(const ID& id);
+
+    MasterScore* masterScore() const { return m_masterScore; }
+    Score* excerptScore() const { return m_excerptScore; }
+    void setExcerptScore(Score* s);
+
+    String name() const { return m_name; }
+    void setName(const String& title) { m_name = title; }
+
+    std::vector<Part*>& parts() { return m_parts; }
+    const std::vector<Part*>& parts() const { return m_parts; }
+    void setParts(const std::vector<Part*>& parts) { m_parts = parts; }
+
     bool containsPart(const Part* part) const;
 
     void removePart(const ID& id);
 
-    void setParts(const QList<Part*>& p) { _parts = p; }
-
-    int nstaves() const;
+    size_t nstaves() const;
     bool isEmpty() const;
 
-    QMultiMap<int, int>& tracks() { return _tracks; }
-    void setTracks(const QMultiMap<int, int>& tracks);
-
-    MasterScore* oscore() const { return _oscore; }
-    Score* partScore() const { return _partScore; }
-    void setPartScore(Score* s);
-
-    void read(XmlReader&);
-
-    bool operator!=(const Excerpt&) const;
-    bool operator==(const Excerpt&) const;
-
-    QString title() const { return _title; }
-    void setTitle(const QString& s) { _title = s; }
-
-    void updateTracks();
+    TracksMap& tracksMapping();
+    void setTracksMapping(const TracksMap& tracksMapping);
 
     void setVoiceVisible(Staff* staff, int voiceIndex, bool visible);
 
-    static QList<Excerpt*> createExcerptsFromParts(const QList<Part*>& parts);
+    void read(XmlReader&);
+
+    static std::vector<Excerpt*> createExcerptsFromParts(const std::vector<Part*>& parts);
     static Excerpt* createExcerptFromPart(Part* part);
 
     static void createExcerpt(Excerpt*);
-    static void cloneStaves(Score* oscore, Score* score, const QList<int>& sourceStavesIndexes, QMultiMap<int, int>& allTracks);
-    static void cloneStaff(Staff* ostaff, Staff* nstaff);
+    static void cloneStaves(Score* sourceScore, Score* dstScore, const std::vector<staff_idx_t>& sourceStavesIndexes,
+                            const TracksMap& allTracks);
+    static void cloneMeasures(Score* oscore, Score* score);
+    static void cloneStaff(Staff* ostaff, Staff* nstaff, bool cloneSpanners = true);
     static void cloneStaff2(Staff* ostaff, Staff* nstaff, const Fraction& startTick, const Fraction& endTick);
+    static void cloneSpanner(Spanner* s, Score* score, track_idx_t dstTrack, track_idx_t dstTrack2);
 
 private:
-    static QString formatTitle(const QString& partName, const QList<Excerpt*>&);
-    static void processLinkedClone(EngravingItem* ne, Score* score, int strack);
+    friend class MasterScore;
+
+    static String formatName(const String& partName, const std::vector<Excerpt*>&);
+
+    void setInited(bool inited);
+
+    void updateTracksMapping(bool voicesVisibilityChanged = false);
+
+    MasterScore* m_masterScore = nullptr;
+    Score* m_excerptScore = nullptr;
+    String m_name;
+    std::vector<Part*> m_parts;
+    TracksMap m_tracksMapping;
+    bool m_inited = false;
+    ID m_initialPartId;
 };
-}     // namespace Ms
-#endif
+}
+
+#endif // MU_ENGRAVING_EXCERPT_H

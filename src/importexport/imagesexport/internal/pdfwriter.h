@@ -37,13 +37,11 @@ class PdfWriter : public AbstractImageWriter
 
 public:
     std::vector<project::INotationWriter::UnitType> supportedUnitTypes() const override;
-    Ret write(notation::INotationPtr notation, io::Device& destinationDevice, const Options& options = Options()) override;
-    Ret writeList(const notation::INotationPtrList& notations, io::Device& destinationDevice, const Options& options = Options()) override;
+    Ret write(notation::INotationPtr notation, QIODevice& destinationDevice, const Options& options = Options()) override;
+    Ret writeList(const notation::INotationPtrList& notations, QIODevice& destinationDevice, const Options& options = Options()) override;
 
 private:
-    QString documentTitle(const Ms::Score& score) const;
-    void preparePdfWriter(QPdfWriter& pdfWriter, const QString& title) const;
-    void doWrite(QPdfWriter& pdfWriter, mu::draw::Painter& painter, Ms::Score* score) const;
+    void preparePdfWriter(QPdfWriter& pdfWriter, const QString& title, const QSizeF& size) const;
 };
 }
 

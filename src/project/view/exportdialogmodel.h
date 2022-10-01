@@ -65,7 +65,6 @@ class ExportDialogModel : public QAbstractListModel
     Q_PROPERTY(
         bool pngTransparentBackground READ pngTransparentBackground WRITE setPngTransparentBackground NOTIFY pngTransparentBackgroundChanged)
 
-    Q_PROPERTY(bool normalizeAudio READ normalizeAudio WRITE setNormalizeAudio NOTIFY normalizeAudioChanged)
     Q_PROPERTY(int sampleRate READ sampleRate WRITE setSampleRate NOTIFY sampleRateChanged)
     Q_PROPERTY(int bitRate READ bitRate WRITE setBitRate NOTIFY bitRateChanged)
 
@@ -73,6 +72,9 @@ class ExportDialogModel : public QAbstractListModel
     Q_PROPERTY(bool midiExportRpns READ midiExportRpns WRITE setMidiExportRpns NOTIFY midiExportRpnsChanged)
 
     Q_PROPERTY(MusicXmlLayoutType musicXmlLayoutType READ musicXmlLayoutType WRITE setMusicXmlLayoutType NOTIFY musicXmlLayoutTypeChanged)
+
+    Q_PROPERTY(bool shouldDestinationFolderBeOpenedOnExport READ shouldDestinationFolderBeOpenedOnExport
+               WRITE setShouldDestinationFolderBeOpenedOnExport NOTIFY shouldDestinationFolderBeOpenedOnExportChanged)
 
 public:
     explicit ExportDialogModel(QObject* parent = nullptr);
@@ -110,9 +112,6 @@ public:
     bool pngTransparentBackground() const;
     void setPngTransparentBackground(const bool& transparent);
 
-    bool normalizeAudio() const;
-    void setNormalizeAudio(bool normalizeAudio);
-
     Q_INVOKABLE QList<int> availableSampleRates() const;
     int sampleRate() const;
     void setSampleRate(int sampleRate);
@@ -139,6 +138,9 @@ public:
     MusicXmlLayoutType musicXmlLayoutType() const;
     void setMusicXmlLayoutType(MusicXmlLayoutType layoutType);
 
+    bool shouldDestinationFolderBeOpenedOnExport() const;
+    void setShouldDestinationFolderBeOpenedOnExport(bool enabled);
+
 signals:
     void selectionChanged();
 
@@ -149,7 +151,6 @@ signals:
     void pngResolutionChanged(int resolution);
     void pngTransparentBackgroundChanged(bool transparent);
 
-    void normalizeAudioChanged(bool normalizeAudio);
     void availableSampleRatesChanged();
     void sampleRateChanged(int sampleRate);
     void availableBitRatesChanged();
@@ -159,6 +160,8 @@ signals:
     void midiExportRpnsChanged(bool exportRpns);
 
     void musicXmlLayoutTypeChanged(MusicXmlLayoutType layoutType);
+
+    void shouldDestinationFolderBeOpenedOnExportChanged(bool shouldDestinationFolderBeOpenedOnExport);
 
 private:
     enum Roles {

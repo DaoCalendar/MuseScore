@@ -38,7 +38,7 @@
 #include "translation.h"
 
 using namespace mu::palette;
-using namespace Ms;
+using namespace mu::engraving;
 
 TimeDialog::TimeDialog(QWidget* parent)
     : QWidget(parent, Qt::WindowFlags(Qt::Dialog | Qt::Window))
@@ -50,7 +50,8 @@ TimeDialog::TimeDialog(QWidget* parent)
     l->setContentsMargins(0, 0, 0, 0);
     frame->setLayout(l);
 
-    sp = new PaletteWidget(PaletteCreator::newTimePalette(), this);
+    sp = new PaletteWidget(this);
+    sp->setPalette(PaletteCreator::newTimePalette());
     sp->setReadOnly(false);
     sp->setSelectable(true);
 
@@ -82,6 +83,24 @@ TimeDialog::TimeDialog(QWidget* parent)
     sp->elementForCellAt(2)->layout();
     sp->setSelected(2);
     paletteChanged(2);
+
+    //! NOTE: It is necessary for the correct start of navigation in the dialog
+    setFocus();
+}
+
+TimeDialog::TimeDialog(const TimeDialog& dialog)
+    : TimeDialog(dialog.parentWidget())
+{
+}
+
+bool TimeDialog::dirty() const
+{
+    return _dirty;
+}
+
+bool TimeDialog::showTimePalette() const
+{
+    return _timePalette->isVisible();
 }
 
 //---------------------------------------------------------
@@ -104,14 +123,15 @@ void TimeDialog::addClicked()
     sp->appendElement(ts, "");
     sp->setSelected(sp->actualCellCount() - 1);
     _dirty = true;
-    emit timeSigAdded(ts);
+
+    paletteProvider()->addCustomItemRequested().send(ts);
 }
 
 //---------------------------------------------------------
 //   showTimePalette
 //---------------------------------------------------------
 
-void TimeDialog::showTimePalette(bool val)
+void TimeDialog::setShowTimePalette(bool val)
 {
     _timePalette->setVisible(val);
 }
@@ -171,6 +191,8 @@ int TimeDialog::denominator2Idx(int denominator) const
         break;
     case 64: val = 6;
         break;
+    case 128: val = 7;
+        break;
     }
     return val;
 }
@@ -196,6 +218,8 @@ int TimeDialog::denominator() const
     case 5: val = 32;
         break;
     case 6: val = 64;
+        break;
+    case 7: val = 128;
         break;
     }
     return val;
@@ -248,4 +272,9 @@ void TimeDialog::textChanged()
 {
     Fraction sig(zNominal->value(), denominator());
     groups->setSig(sig, Groups::endings(sig), zText->text(), nText->text());
+}
+
+void TimeDialog::setDirty()
+{
+    _dirty = true;
 }

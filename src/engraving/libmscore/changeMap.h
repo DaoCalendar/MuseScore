@@ -23,29 +23,17 @@
 #ifndef __CHANGEMAP_H__
 #define __CHANGEMAP_H__
 
-#include <QMultiMap>
+#include <map>
 
-#include "fraction.h"
+#include "global/allocator.h"
+#include "types/types.h"
 
 /**
  \file
  Definition of class ChangeMap.
 */
 
-namespace Ms {
-enum class ChangeMethod : signed char {
-    NORMAL,
-    EXPONENTIAL,
-    EASE_IN,
-    EASE_OUT,
-    EASE_IN_OUT        // and shake it all about
-};
-
-enum class ChangeDirection : signed char {
-    INCREASING,
-    DECREASING
-};
-
+namespace mu::engraving {
 //---------------------------------------------------------
 ///   ChangeEvent
 ///   item in ChangeMap
@@ -85,8 +73,10 @@ public:
 
 typedef std::vector<std::pair<Fraction, Fraction> > EndPointsVector;
 
-class ChangeMap : public QMultiMap<Fraction, ChangeEvent>
+class ChangeMap : public std::multimap<Fraction, ChangeEvent>
 {
+    OBJECT_ALLOCATOR(engraving, ChangeMap)
+
     bool cleanedUp    { false };
     static const int DEFAULT_VALUE  { 80 };
 
@@ -111,13 +101,7 @@ public:
     void addRamp(Fraction stick, Fraction etick, int change, ChangeMethod method, ChangeDirection direction);
     void cleanup();
 
-    void dump();
-
     static int interpolate(Fraction& eventTick, ChangeEvent& event, Fraction& tick);
-    static QString changeMethodToName(ChangeMethod method);
-    static ChangeMethod nameToChangeMethod(QString name);
-
-    static const std::vector<ChangeMethodItem> changeMethodTable;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

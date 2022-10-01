@@ -23,11 +23,12 @@
 #ifndef __SELECT_H__
 #define __SELECT_H__
 
-#include "pitchspelling.h"
-#include "mscore.h"
 #include "durationtype.h"
+#include "mscore.h"
+#include "pitchspelling.h"
+#include "types.h"
 
-namespace Ms {
+namespace mu::engraving {
 class Score;
 class Page;
 class System;
@@ -43,12 +44,12 @@ class Chord;
 //---------------------------------------------------------
 
 struct ElementPattern {
-    QList<EngravingItem*> el;
+    std::list<EngravingItem*> el;
     int type = 0;
     int subtype = 0;
-    int staffStart = 0;
-    int staffEnd = 0;   // exclusive
-    int voice = 0;
+    staff_idx_t staffStart = 0;
+    staff_idx_t staffEnd = 0;   // exclusive
+    voice_idx_t voice = 0;
     const System* system = nullptr;
     bool subtypeValid = false;
     Fraction durationTicks;
@@ -61,17 +62,17 @@ struct ElementPattern {
 //---------------------------------------------------------
 
 struct NotePattern {
-    QList<Note*> el;
+    std::list<Note*> el;
     int pitch = -1;
     int string = INVALID_STRING_INDEX;
     int tpc = Tpc::TPC_INVALID;
-    NoteHead::Group notehead = NoteHead::Group::HEAD_INVALID;
+    NoteHeadGroup notehead = NoteHeadGroup::HEAD_INVALID;
     TDuration durationType = TDuration();
     Fraction durationTicks;
     NoteType type = NoteType::INVALID;
-    int staffStart;
-    int staffEnd;   // exclusive
-    int voice;
+    staff_idx_t staffStart;
+    staff_idx_t staffEnd;   // exclusive
+    voice_idx_t voice;
     Fraction beat { 0, 0 };
     const Measure* measure = nullptr;
     const System* system = nullptr;
@@ -137,7 +138,7 @@ public:
     void setFiltered(SelectionFilterType type, bool filtered);
 
     bool canSelect(const EngravingItem* element) const;
-    bool canSelectVoice(int track) const;
+    bool canSelectVoice(track_idx_t track) const;
 
 private:
     unsigned int m_filteredTypes = static_cast<unsigned int>(SelectionFilterType::ALL);
@@ -153,10 +154,10 @@ class Selection
 {
     Score* _score;
     SelState _state;
-    QList<EngravingItem*> _el;            // valid in mode SelState::LIST
+    std::vector<EngravingItem*> _el;            // valid in mode SelState::LIST
 
-    int _staffStart = 0;            // valid if selState is SelState::RANGE
-    int _staffEnd = 0;
+    staff_idx_t _staffStart = 0;            // valid if selState is SelState::RANGE
+    staff_idx_t _staffEnd = 0;
     Segment* _startSegment = nullptr;
     Segment* _endSegment = nullptr; // next segment after selection
 
@@ -166,18 +167,18 @@ class Selection
     // structure (e.g. MMRests reconstruction).
 
     Segment* _activeSegment = nullptr;
-    int _activeTrack = 0;
+    track_idx_t _activeTrack = 0;
 
     Fraction _currentTick;    // tracks the most recent selection
-    int _currentTrack = 0;
+    track_idx_t _currentTrack = 0;
 
-    QString _lockReason;
+    String _lockReason;
 
-    QByteArray staffMimeData() const;
-    QByteArray symbolListMimeData() const;
+    mu::ByteArray staffMimeData() const;
+    mu::ByteArray symbolListMimeData() const;
     SelectionFilter selectionFilter() const;
     bool canSelect(EngravingItem* e) const { return selectionFilter().canSelect(e); }
-    bool canSelectVoice(int track) const { return selectionFilter().canSelectVoice(track); }
+    bool canSelectVoice(track_idx_t track) const { return selectionFilter().canSelectVoice(track); }
     void appendFiltered(EngravingItem* e);
     void appendChord(Chord* chord);
 
@@ -192,16 +193,17 @@ public:
     void setState(SelState s);
 
     //! NOTE If locked, the selected items should not be changed.
-    void lock(const QString& reason) { _lockReason = reason; }
-    void unlock(const QString& reason) { Q_UNUSED(reason); _lockReason.clear(); }    // reason for clarity
+    void lock(const String& reason) { _lockReason = reason; }
+    void unlock(const String& /*reason*/) { _lockReason.clear(); }    // reason for clarity
     bool isLocked() const { return !_lockReason.isEmpty(); }
-    const QString& lockReason() const { return _lockReason; }
+    const String& lockReason() const { return _lockReason; }
 
-    const QList<EngravingItem*>& elements() const { return _el; }
-    std::vector<Note*> noteList(int track = -1) const;
+    const std::vector<EngravingItem*>& elements() const { return _el; }
+    std::vector<EngravingItem*> elements(ElementType type) const;
+    std::vector<Note*> noteList(track_idx_t track = mu::nidx) const;
 
-    const QList<EngravingItem*> uniqueElements() const;
-    QList<Note*> uniqueNotes(int track = -1) const;
+    const std::list<EngravingItem*> uniqueElements() const;
+    std::list<Note*> uniqueNotes(track_idx_t track = mu::nidx) const;
 
     bool isSingle() const { return (_state == SelState::LIST) && (_el.size() == 1); }
 
@@ -212,21 +214,21 @@ public:
     EngravingItem* element() const;
     ChordRest* cr() const;
     Segment* firstChordRestSegment() const;
-    ChordRest* firstChordRest(int track = -1) const;
-    ChordRest* lastChordRest(int track = -1) const;
+    ChordRest* firstChordRest(track_idx_t track = mu::nidx) const;
+    ChordRest* lastChordRest(track_idx_t track = mu::nidx) const;
     Measure* findMeasure() const;
     void update();
     void updateState();
     void dump();
-    QString mimeType() const;
-    QByteArray mimeData() const;
+    String mimeType() const;
+    mu::ByteArray mimeData() const;
 
     Segment* startSegment() const { return _startSegment; }
     Segment* endSegment() const { return _endSegment; }
     void setStartSegment(Segment* s) { _startSegment = s; }
     void setEndSegment(Segment* s) { _endSegment = s; }
-    void setRange(Segment* startSegment, Segment* endSegment, int staffStart, int staffEnd);
-    void setRangeTicks(const Fraction& tick1, const Fraction& tick2, int staffStart, int staffEnd);
+    void setRange(Segment* startSegment, Segment* endSegment, staff_idx_t staffStart, staff_idx_t staffEnd);
+    void setRangeTicks(const Fraction& tick1, const Fraction& tick2, staff_idx_t staffStart, staff_idx_t staffEnd);
     Segment* activeSegment() const { return _activeSegment; }
     void setActiveSegment(Segment* s) { _activeSegment = s; }
     ChordRest* activeCR() const;
@@ -235,17 +237,17 @@ public:
     ChordRest* currentCR() const;
     Fraction tickStart() const;
     Fraction tickEnd() const;
-    int staffStart() const { return _staffStart; }
-    int staffEnd() const { return _staffEnd; }
-    int activeTrack() const { return _activeTrack; }
+    staff_idx_t staffStart() const { return _staffStart; }
+    staff_idx_t staffEnd() const { return _staffEnd; }
+    track_idx_t activeTrack() const { return _activeTrack; }
     void setStaffStart(int v) { _staffStart = v; }
     void setStaffEnd(int v) { _staffEnd = v; }
-    void setActiveTrack(int v) { _activeTrack = v; }
+    void setActiveTrack(track_idx_t v) { _activeTrack = v; }
     bool canCopy() const;
     void updateSelectedElements();
     bool measureRange(Measure** m1, Measure** m2) const;
     void extendRangeSelection(ChordRest* cr);
-    void extendRangeSelection(Segment* seg, Segment* segAfter, int staffIdx, const Fraction& tick, const Fraction& etick);
+    void extendRangeSelection(Segment* seg, Segment* segAfter, staff_idx_t staffIdx, const Fraction& tick, const Fraction& etick);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

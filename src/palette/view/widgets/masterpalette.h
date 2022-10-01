@@ -23,31 +23,27 @@
 #ifndef __MASTERPALETTE_H__
 #define __MASTERPALETTE_H__
 
-#include <QDialog>
-
 #include "ui_masterpalette.h"
 
-#include "ui/view/widgetdialog.h"
+#include "internal/palette.h"
+
+#include "uicomponents/view/topleveldialog.h"
 
 namespace mu::palette {
-class PaletteWidget;
-}
-
-namespace Ms {
 class TimeDialog;
 class KeyEditor;
+class SymbolDialog;
 
-class MasterPalette : public mu::ui::WidgetDialog, Ui::MasterPalette
+class MasterPalette : public uicomponents::TopLevelDialog, Ui::MasterPalette
 {
     Q_OBJECT
 
     Q_PROPERTY(QString selectedPaletteName READ selectedPaletteName WRITE setSelectedPaletteName NOTIFY selectedPaletteNameChanged)
 
 public:
-    MasterPalette(QWidget* parent = nullptr);
+    explicit MasterPalette(QWidget* parent = nullptr);
 
     static int static_metaTypeId();
-    int metaTypeId() const override;
 
     QString selectedPaletteName() const;
 
@@ -66,7 +62,7 @@ private slots:
     void closeEvent(QCloseEvent* event) override;
 
 private:
-    void addPalette(mu::palette::PaletteWidget* sp);
+    void addPalette(PalettePtr palette);
     void retranslate(bool firstTime = false);
 
     TimeDialog* m_timeDialog = nullptr;
@@ -76,6 +72,7 @@ private:
     QTreeWidgetItem* m_symbolItem = nullptr;
 
     int m_idxAllSymbols = -1;
+    QHash<int, SymbolDialog*> m_symbolWidgets;
 };
 } // namespace Ms
 

@@ -29,6 +29,7 @@
 #include "actions/iactionsdispatcher.h"
 #include "iprojectconfiguration.h"
 #include "irecentprojectsprovider.h"
+#include "iinteractive.h"
 
 namespace mu::project {
 class RecentProjectsModel : public QAbstractListModel, public async::Asyncable
@@ -38,6 +39,7 @@ class RecentProjectsModel : public QAbstractListModel, public async::Asyncable
     INJECT(project, actions::IActionsDispatcher, dispatcher)
     INJECT(project, IProjectConfiguration, configuration)
     INJECT(project, IRecentProjectsProvider, recentProjectsProvider)
+    INJECT(project, framework::IInteractive, interactive)
 
 public:
     RecentProjectsModel(QObject* parent = nullptr);
@@ -49,18 +51,18 @@ public:
     Q_INVOKABLE void addNewScore();
     Q_INVOKABLE void openScore();
     Q_INVOKABLE void openRecentScore(const QString& scorePath);
+    Q_INVOKABLE void openScoreManager();
 
 private:
     enum Roles {
-        RoleTitle = Qt::UserRole + 1,
-        RoleScore
+        NameRole = Qt::UserRole + 1,
+        ScoreRole
     };
 
     void updateRecentScores(const ProjectMetaList& recentProjectsList);
     void setRecentScores(const QVariantList& recentScores);
 
     QVariantList m_recentScores;
-    QHash<int, QByteArray> m_roles;
 };
 }
 

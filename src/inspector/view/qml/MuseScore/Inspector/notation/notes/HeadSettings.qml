@@ -45,46 +45,72 @@ FocusableItem {
 
         spacing: 12
 
-        CheckBox {
-            isIndeterminate: root.model ? root.model.isHeadHidden.isUndefined : false
-            checked: root.model && !isIndeterminate ? root.model.isHeadHidden.value : false
-            text: qsTrc("inspector", "Hide notehead")
+        FlatRadioButtonGroupPropertyView {
+            id: noteHeadParenthesesView
 
-            navigation.name: "HideNoteHeadBox"
-            navigation.panel: root.navigationPanel
-            navigation.row: root.navigationRowStart + 1
-            navigation.enabled: root.enabled
+            titleText: qsTrc("inspector", "Notehead parentheses")
+            propertyItem: root.model ? root.model.hasHeadParentheses : null
 
-            onClicked: { root.model.isHeadHidden.value = !checked }
+            navigationPanel: root.navigationPanel
+            navigationRowStart: root.navigationRowStart + 1
+
+            model: [
+                { iconCode: IconCode.NOTE_HEAD, value: false, title: qsTrc("inspector", "Normal notehead") },
+                { iconCode: IconCode.NOTE_HEAD_PARENTHESES, value: true, title: qsTrc("inspector", "Notehead with parentheses") }
+            ]
         }
 
         NoteheadGroupSelector {
             id: noteHeadSection
+
             propertyItem: root.model ? root.model.headGroup : null
 
             navigationPanel: root.navigationPanel
-            navigationRowStart: root.navigationRowStart + 2
-            navigationEnabled: root.enabled
+            navigationRowStart: noteHeadParenthesesView.navigationRowEnd + 1
+        }
+
+        CheckBoxPropertyView {
+            id: hideNoteheadCheckBox
+
+            text: qsTrc("inspector", "Hide notehead")
+            propertyItem: root.model ? root.model.isHeadHidden : null
+
+            navigation.name: "HideNoteHeadBox"
+            navigation.panel: root.navigationPanel
+            navigation.row: noteHeadSection.navigationRowEnd + 1
+        }
+
+        CheckBoxPropertyView {
+            id: smallNoteheadCheckBox
+
+            text: qsTrc("inspector", "Small notehead")
+            propertyItem: root.model ? root.model.isHeadSmall : null
+
+            navigation.name: "SmallNoteHeadBox"
+            navigation.panel: root.navigationPanel
+            navigation.row: hideNoteheadCheckBox.navigation.row + 1
         }
 
         FlatRadioButtonGroupPropertyView {
-            id: dottedNotePositionSection
-            titleText: qsTrc("inspector", "Dotted note position")
+            id: durationDotPosition
+
+            titleText: qsTrc("inspector", "Duration dot position")
             propertyItem: root.model ? root.model.dotPosition : null
 
+            navigationName: "DottedNote"
             navigationPanel: root.navigationPanel
-            navigationRowStart: noteHeadSection.navigationRowEnd + 1
-            navigationEnabled: root.enabled
+            navigationRowStart: smallNoteheadCheckBox.navigation.row + 1
 
             model: [
                 { text: qsTrc("inspector", "Auto"), value: NoteHead.DOT_POSITION_AUTO, title: qsTrc("inspector", "Auto") },
-                { iconCode: IconCode.DOT_ABOVE_LINE, value: NoteHead.DOT_POSITION_DOWN, title: qsTrc("inspector", "Down") },
-                { iconCode: IconCode.DOT_BELOW_LINE, value: NoteHead.DOT_POSITION_UP, title: qsTrc("inspector", "Up") }
+                { iconCode: IconCode.DOT_BELOW_LINE, value: NoteHead.DOT_POSITION_DOWN, title: qsTrc("inspector", "Down") },
+                { iconCode: IconCode.DOT_ABOVE_LINE, value: NoteHead.DOT_POSITION_UP, title: qsTrc("inspector", "Up") }
             ]
         }
 
         ExpandableBlank {
             id: showItem
+
             isExpanded: false
 
             title: isExpanded ? qsTrc("inspector", "Show less") : qsTrc("inspector", "Show more")
@@ -92,7 +118,7 @@ FocusableItem {
             width: parent.width
 
             navigation.panel: root.navigationPanel
-            navigation.row: dottedNotePositionSection.navigationRowEnd + 1
+            navigation.row: durationDotPosition.navigationRowEnd + 1
 
             contentItemComponent: Column {
                 height: implicitHeight
@@ -100,30 +126,39 @@ FocusableItem {
 
                 spacing: 12
 
+                DropdownPropertyView {
+                    id: noteHeadSystemSection
+
+                    titleText: qsTrc("inspector", "Notehead system")
+                    propertyItem: root.model ? root.model.headSystem : null
+
+                    model: root.model.possibleHeadSystemTypes()
+
+                    navigationName: "NoteHeadSystemSection"
+                    navigationPanel: root.navigationPanel
+                    navigationRowStart: showItem.navigation.row + 1
+                }
+
                 NoteheadTypeSelector {
                     id: noteHeadTypeSection
                     titleText: qsTrc("inspector", "Notehead type (visual only)")
                     propertyItem: root.model ? root.model.headType : null
 
+                    navigationName: "NoteHeadTypeSection"
                     navigationPanel: root.navigationPanel
-                    navigationRowStart: showItem.navigation.row + 1
-                    navigationEnabled: root.enabled && showItem.isExpanded
+                    navigationRowStart: noteHeadSystemSection.navigationRowEnd + 1
                 }
 
-                FlatRadioButtonGroupPropertyView {
+                DirectionSection {
                     id: noteDirectionSection
+
                     titleText: qsTrc("inspector", "Note direction")
                     propertyItem: root.model ? root.model.headDirection : null
 
+                    orientation: Qt.Horizontal
+
                     navigationPanel: root.navigationPanel
                     navigationRowStart: noteHeadTypeSection.navigationRowEnd + 1
-                    navigationEnabled: root.enabled && showItem.isExpanded
-
-                    model: [
-                        { text: qsTrc("inspector", "Auto"), value: NoteHead.DIRECTION_H_AUTO, title: qsTrc("inspector", "Auto") },
-                        { iconCode: IconCode.ARROW_LEFT, value: NoteHead.DIRECTION_H_LEFT, title: qsTrc("inspector", "Left") },
-                        { iconCode: IconCode.ARROW_RIGHT, value: NoteHead.DIRECTION_H_RIGHT, title: qsTrc("inspector", "Right") }
-                    ]
                 }
 
                 OffsetSection {
@@ -131,9 +166,9 @@ FocusableItem {
                     horizontalOffset: root.model ? root.model.horizontalOffset : null
                     verticalOffset: root.model ? root.model.verticalOffset : null
 
+                    navigationName: "NoteHeadOffsetSection"
                     navigationPanel: root.navigationPanel
                     navigationRowStart: noteDirectionSection.navigationRowEnd + 1
-                    navigationEnabled: root.enabled && visible && showItem.isExpanded
                 }
             }
         }

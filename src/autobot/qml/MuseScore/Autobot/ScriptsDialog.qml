@@ -28,11 +28,17 @@ StyledDialogView {
 
     title: "Autobot"
 
+    //! NOTE It is necessary that it can be determined that this is an object for diagnostics
+    contentItem.objectName: panel.objectName
+
     contentHeight: 600
     contentWidth: 400
     resizable: true
 
+    x: 850
+
     ScriptsPanel {
+        id: panel
         anchors.fill: parent
     }
 }

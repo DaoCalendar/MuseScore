@@ -28,14 +28,10 @@ import MuseScore.Palette 1.0
 import MuseScore.UiComponents 1.0
 import MuseScore.Ui 1.0
 
-import "utils.js" as Utils
+import "utils.js" as PaletteUtils
 
-GridView {
+StyledGridView {
     id: paletteView
-    clip: true
-
-    interactive: height < contentHeight // TODO: check if it helps on Mac
-    boundsBehavior: Flickable.StopAtBounds
 
     property size cellSize
     property bool drawGrid: false
@@ -58,6 +54,8 @@ GridView {
     property NavigationPanel navigationPanel: null
     property int navigationRow: 0
     property int navigationCol: 1
+
+    interactive: height < contentHeight // TODO: check if it helps on Mac
 
     states: [
         State {
@@ -103,7 +101,7 @@ GridView {
 
     readonly property int cellDefaultWidth: cellSize.width
     property bool stretchWidth: !(oneRow && showMoreButton)
-    cellWidth: stretchWidth ? Math.floor(Utils.stretched(cellDefaultWidth, width)) : cellDefaultWidth
+    cellWidth: stretchWidth ? Math.floor(PaletteUtils.stretched(cellDefaultWidth, width)) : cellDefaultWidth
     cellHeight: cellSize.height
 
     readonly property int nrows: Math.max(0, Math.floor(height / cellHeight))
@@ -181,7 +179,6 @@ GridView {
             //! NOTE Just Up/Down navigation now
             navigation.row: paletteView.ncells + paletteView.navigationRow
             navigation.column: 1
-            navigation.enabled: paletteView.visible
 
             onActiveFocusChanged: {
                 if (activeFocus) {
@@ -193,6 +190,7 @@ GridView {
                 }
             }
 
+            //: Caption of a button to reveal more elements
             text: qsTrc("palette", "More")
 
             transparent: true
@@ -227,7 +225,7 @@ GridView {
             anchors.fill: parent
 
             property var action
-            property var proposedAction: Qt.IgnoreAction
+            property int proposedAction: Qt.IgnoreAction
             property bool internal: false
 
             function onDrag(drag) {
@@ -263,7 +261,7 @@ GridView {
                 onDragOverPaletteFinished();
 
                 // first check if controller allows dropping this item here
-                const mimeData = Utils.dropEventMimeData(drag);
+                const mimeData = PaletteUtils.dropEventMimeData(drag);
                 internal = (drag.source.parentModelIndex === paletteView.paletteRootIndex);
                 action = paletteView.paletteController.dropAction(mimeData, drag.proposedAction, paletteView.paletteRootIndex, internal);
                 proposedAction = drag.proposedAction;
@@ -318,7 +316,7 @@ GridView {
                     srcRowIndex: drag.source.rowIndex,
                     paletteView: paletteView,
                     destIndex: destIndex,
-                    mimeData: Utils.dropEventMimeData(drop)
+                    mimeData: PaletteUtils.dropEventMimeData(drop)
                 };
 
                 if (typeof data.srcParentModelIndex !== "undefined") {
@@ -385,7 +383,7 @@ GridView {
     }
 
     function removeSelectedCells() {
-        Utils.removeSelectedItems(paletteController, selectionModel, paletteRootIndex);
+        PaletteUtils.removeSelectedItems(paletteController, selectionModel, paletteRootIndex);
     }
 
     function focusFirstItem() {
@@ -453,22 +451,14 @@ GridView {
         }
     }
 
-    Rectangle {
+    IconView {
         id: draggedIcon
 
         width: paletteView.cellWidth
         height: paletteView.cellHeight
 
-        color: ui.theme.textFieldColor
+        backgroundColor: Utils.colorWithAlpha(ui.theme.textFieldColor, 0.5)
         visible: false
-
-        property alias source: view.icon
-
-        IconView {
-            id: view
-
-            anchors.fill: parent
-        }
     }
 
     model: DelegateModel {
@@ -486,13 +476,6 @@ GridView {
             //! NOTE Please, don't remove (igor.korsukov@gmail.com)
             //property int cellRow: paletteView.ncolumns == 0 ? 0 : Math.floor(model.index / paletteView.ncolumns)
             //property int cellCol: model.index - (cellRow * paletteView.ncolumns)
-
-            onActiveFocusChanged: {
-                if (activeFocus) {
-                    paletteTree.currentTreeItem = this;
-                    paletteView.updateSelection(false);
-                }
-            }
 
             readonly property bool dragged: Drag.active && !dragDropReorderTimer.running
             property bool paletteDrag: false
@@ -515,23 +498,15 @@ GridView {
             navigation.row: model.index + paletteView.navigationRow
             navigation.column: 1
 
-            navigation.enabled: paletteView.visible
             navigation.onActiveChanged: {
-                if (navigation.active) {
-                    paletteView.currentIndex = paletteCell.rowIndex;
-                    paletteView.updateSelection(true);
+                if (navigation.highlight) {
+                    updateSelection()
                 }
             }
-            navigation.onTriggered: paletteCell.clicked()
 
-            Connections {
-                target: paletteView
-
-                function onCurrentIndexChanged() {
-                    if (paletteView.currentIndex === paletteCell.rowIndex && !paletteCell.navigation.active) {
-                        paletteCell.navigation.requestActive()
-                    }
-                }
+            function updateSelection() {
+                paletteView.currentIndex = paletteCell.rowIndex
+                paletteView.updateSelection(true)
             }
 
             IconView {
@@ -542,27 +517,26 @@ GridView {
 
             hint: model.toolTip
 
-            Accessible.name: model.accessibleText;
+            navigation.accessible.name: model.accessibleText
 
             // leftClickArea
             mouseArea.drag.target: draggedIcon
             mouseArea.onPressed: {
-                paletteView.currentIndex = paletteCell.rowIndex;
-                paletteView.updateSelection(true);
-                paletteCell.forceActiveFocus();
-                paletteCell.beginDrag();
+                paletteCell.beginDrag()
             }
 
             onClicked: {
-                if (paletteView.paletteController.applyPaletteElement(paletteCell.modelIndex, ui.keyboardModifiers())) {
-                    paletteView.selectionModel.setCurrentIndex(paletteCell.modelIndex, ItemSelectionModel.Current);
+                if (!paletteView.paletteController.applyPaletteElement(paletteCell.modelIndex, ui.keyboardModifiers())) {
+                    updateSelection()
                 }
             }
 
             onDoubleClicked: {
-                const index = paletteCell.modelIndex;
-                paletteView.selectionModel.setCurrentIndex(index, ItemSelectionModel.Current);
-                paletteView.paletteController.applyPaletteElement(index, ui.keyboardModifiers());
+                // Empty handler to avoid onClicked being triggered twice on double-click.
+            }
+
+            onRemoveSelectionRequested: {
+                removeSelectedCells()
             }
 
             MouseArea {
@@ -609,13 +583,17 @@ GridView {
 
                     dropData = null;
                 }
+
+                paletteView.selectionModel.clearSelection()
             }
 
             function beginDrag() {
-                draggedIcon.source = model.decoration
+                draggedIcon.icon = model.decoration
 
                 draggedIcon.grabToImage(function(result) {
                     Drag.imageSource = result.url
+                    Drag.hotSpot.x = paletteCell.mouseArea.mouseX
+                    Drag.hotSpot.y = paletteCell.mouseArea.mouseY
                     dragDropReorderTimer.restart();
                 })
             }
@@ -631,8 +609,6 @@ GridView {
 
                 property var modelIndex: null
                 property bool canEdit: true
-
-                navigation: paletteCell.navigation
 
                 property var items: [
                     { id: "delete", title: qsTrc("palette", "Delete"), icon: IconCode.DELETE_TANK, enabled: contextMenu.canEdit },

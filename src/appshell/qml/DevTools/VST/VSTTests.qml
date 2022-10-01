@@ -71,7 +71,7 @@ Rectangle {
                 text: "Track sequence"
             }
 
-            Dropdown {
+            StyledDropdown {
                 id: sequences
 
                 navigation.name: "TrackSequence Dropdown"
@@ -84,12 +84,8 @@ Rectangle {
                 currentIndex: sequences.indexOfValue(pluginListModel.currentSequenceId)
                 model: pluginListModel.sequenceIdList
 
-                onCurrentValueChanged: {
-                    if (sequences.currentIndex == -1) {
-                        return
-                    }
-
-                    pluginListModel.currentSequenceId = sequences.currentValue
+                onActivated: function(index, value) {
+                    pluginListModel.currentSequenceId = value
                 }
             }
         }
@@ -104,7 +100,7 @@ Rectangle {
                 text: "Track"
             }
 
-            Dropdown {
+            StyledDropdown {
                 id: tracks
 
                 navigation.name: "Tracks Dropdown"
@@ -117,12 +113,8 @@ Rectangle {
                 model: pluginListModel.trackIdList
                 currentIndex: tracks.indexOfValue(pluginListModel.currentTrackId)
 
-                onCurrentValueChanged: {
-                    if (tracks.currentIndex == -1) {
-                        return
-                    }
-
-                    pluginListModel.currentTrackId = tracks.currentValue
+                onActivated: function(index, value) {
+                    pluginListModel.currentTrackId = value
                 }
             }
         }
@@ -137,7 +129,7 @@ Rectangle {
                 text: "Synth resource"
             }
 
-            Dropdown {
+            StyledDropdown {
                 id: synthResources
 
                 width: 200
@@ -152,12 +144,8 @@ Rectangle {
                 model: pluginListModel.availableSynthResources
                 currentIndex: synthResources.indexOfValue(pluginListModel.currentSynthResource)
 
-                onCurrentValueChanged: {
-                    if (synthResources.currentIndex == -1) {
-                        return
-                    }
-
-                    pluginListModel.currentSynthResource = synthResources.currentValue
+                onActivated: function(index, value) {
+                    pluginListModel.currentSynthResource = value
                 }
             }
         }
@@ -172,7 +160,7 @@ Rectangle {
                 text: "Synth resource"
             }
 
-            Dropdown {
+            StyledDropdown {
                 id: fxResources
 
                 width: 200

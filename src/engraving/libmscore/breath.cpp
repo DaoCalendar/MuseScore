@@ -22,18 +22,21 @@
 
 #include "breath.h"
 
-#include "io/xml.h"
+#include "rw/xml.h"
+#include "types/symnames.h"
 
-#include "symnames.h"
-#include "system.h"
-#include "segment.h"
 #include "measure.h"
 #include "score.h"
+#include "segment.h"
 #include "staff.h"
+#include "system.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 const std::vector<BreathType> Breath::breathList {
     { SymId::breathMarkComma,      false, 0.0 },
     { SymId::breathMarkTick,       false, 0.0 },
@@ -77,15 +80,15 @@ bool Breath::isCaesura() const
 
 void Breath::layout()
 {
-    bool palette = (!staff() || track() == -1);
+    bool palette = (!staff() || track() == mu::nidx);
     if (!palette) {
         int voiceOffset = placeBelow() * (staff()->lines(tick()) - 1) * spatium();
         if (isCaesura()) {
-            setPos(rxpos(), spatium() + voiceOffset);
+            setPos(xpos(), spatium() + voiceOffset);
         } else if ((score()->styleSt(Sid::MusicalSymbolFont) == "Emmentaler") && (symId() == SymId::breathMarkComma)) {
-            setPos(rxpos(), 0.5 * spatium() + voiceOffset);
+            setPos(xpos(), 0.5 * spatium() + voiceOffset);
         } else {
-            setPos(rxpos(), -0.5 * spatium() + voiceOffset);
+            setPos(xpos(), -0.5 * spatium() + voiceOffset);
         }
     }
     setbbox(symBbox(_symId));
@@ -97,14 +100,14 @@ void Breath::layout()
 
 void Breath::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
     writeProperty(xml, Pid::SYMBOL);
     writeProperty(xml, Pid::PAUSE);
     EngravingItem::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -114,7 +117,7 @@ void Breath::write(XmlWriter& xml) const
 void Breath::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "subtype") {                 // obsolete
             switch (e.readInt()) {
             case 0:
@@ -129,7 +132,7 @@ void Breath::read(XmlReader& e)
                 break;
             }
         } else if (tag == "symbol") {
-            _symId = SymNames::symIdByName(e.readElementText());
+            _symId = SymNames::symIdByName(e.readAsciiText());
         } else if (tag == "pause") {
             _pause = e.readDouble();
         } else if (!EngravingItem::readProperties(e)) {
@@ -142,7 +145,7 @@ void Breath::read(XmlReader& e)
 //   mag
 //---------------------------------------------------------
 
-qreal Breath::mag() const
+double Breath::mag() const
 {
     return staff() ? staff()->staffMag(tick()) : 1.0;
 }
@@ -164,11 +167,11 @@ void Breath::draw(mu::draw::Painter* painter) const
 
 mu::PointF Breath::pagePos() const
 {
-    if (parent() == 0) {
+    if (explicitParent() == 0) {
         return pos();
     }
     System* system = segment()->measure()->system();
-    qreal yp = y();
+    double yp = y();
     if (system) {
         yp += system->staff(staffIdx())->y() + system->y();
     }
@@ -179,11 +182,11 @@ mu::PointF Breath::pagePos() const
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Breath::getProperty(Pid propertyId) const
+PropertyValue Breath::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::SYMBOL:
-        return QVariant::fromValue(_symId);
+        return PropertyValue::fromValue(_symId);
     case Pid::PAUSE:
         return _pause;
     default:
@@ -195,7 +198,7 @@ QVariant Breath::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Breath::setProperty(Pid propertyId, const QVariant& v)
+bool Breath::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::SYMBOL:
@@ -219,13 +222,13 @@ bool Breath::setProperty(Pid propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Breath::propertyDefault(Pid id) const
+PropertyValue Breath::propertyDefault(Pid id) const
 {
     switch (id) {
     case Pid::PAUSE:
         return 0.0;
     case Pid::PLACEMENT:
-        return track() & 1 ? int(Placement::BELOW) : int(Placement::ABOVE);
+        return track() & 1 ? PlacementV::BELOW : PlacementV::ABOVE;
     default:
         return EngravingItem::propertyDefault(id);
     }
@@ -253,8 +256,26 @@ EngravingItem* Breath::prevSegmentElement()
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Breath::accessibleInfo() const
+String Breath::accessibleInfo() const
 {
     return SymNames::translatedUserNameForSymId(_symId);
+}
+
+void Breath::added()
+{
+    IF_ASSERT_FAILED(score()) {
+        return;
+    }
+
+    score()->setUpTempoMap();
+}
+
+void Breath::removed()
+{
+    IF_ASSERT_FAILED(score()) {
+        return;
+    }
+
+    score()->setUpTempoMap();
 }
 }

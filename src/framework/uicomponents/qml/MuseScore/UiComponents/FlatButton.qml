@@ -20,6 +20,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import QtQuick 2.15
+import QtQuick.Layouts 1.15
+
 import MuseScore.Ui 1.0
 import MuseScore.UiComponents 1.0
 
@@ -28,6 +30,7 @@ FocusScope {
 
     property int icon: IconCode.NONE
     property string text: ""
+    property int textFormat: Text.AutoText
 
     property string toolTipTitle: ""
     property string toolTipDescription: ""
@@ -44,9 +47,11 @@ FocusScope {
     property color hoverHitColor: accentButton ? accentColor : ui.theme.buttonColor
     property color accentColor: ui.theme.accentColor
 
-    property bool narrowMargins: false
-    property real margins: narrowMargins ? 12 : 32
-    property real minWidth: narrowMargins ? 24 : 132
+    property bool isNarrow: buttonType === FlatButton.Horizontal
+    property real margins: isNarrow ? 12 : 16
+    property real minWidth: isNarrow ? 24 : 132
+
+    property bool drawFocusBorderInsideRect: false
 
     property int orientation: Qt.Vertical
     readonly property bool isVertical: root.orientation === Qt.Vertical
@@ -58,17 +63,42 @@ FocusScope {
 
     property bool isClickOnKeyNavTriggered: true
 
-    property Component contentItem: defaultContentComponent
+    property Component contentItem: null
     property Component backgroundItem: defaultBackgroundComponent
+
+    enum ButtonType {
+        TextOnly,
+        IconOnly,
+        Horizontal,
+        Vertical,
+        Custom
+    }
+
+    // Can be overridden, for buttons that have a custom content component
+    // but should be sized as one of the default types
+    property int buttonType: {
+        if (contentItem) {
+            return FlatButton.Custom
+        }
+
+        if (icon !== IconCode.NONE) {
+            if (Boolean(text)) {
+                return isVertical ? FlatButton.Vertical : FlatButton.Horizontal
+            }
+
+            return FlatButton.IconOnly
+        }
+
+        return FlatButton.TextOnly
+    }
 
     signal clicked(var mouse)
     signal pressAndHold(var mouse)
 
     objectName: root.text
 
-    height: contentLoader.item.height + 14
-    width: Boolean(text) ? Math.max(contentLoader.item.width + margins, root.isVertical ? minWidth : 0)
-                         : contentLoader.item.width + 16
+    implicitWidth: contentLoader.implicitWidth + 2 * margins
+    implicitHeight: Math.max(contentLoader.implicitHeight, ui.theme.defaultButtonSize)
 
     opacity: root.enabled ? 1.0 : ui.theme.itemOpacityDisabled
 
@@ -81,9 +111,10 @@ FocusScope {
         accessible.name: Boolean(root.text) ? root.text : root.toolTipTitle
         accessible.description: root.toolTipDescription
         accessible.visualItem: root
+        accessible.enabled: navCtrl.enabled
 
         onTriggered: {
-            if (root.isClickOnKeyNavTriggered) {
+            if (navCtrl.enabled && root.isClickOnKeyNavTriggered) {
                 root.clicked(null)
             }
         }
@@ -108,7 +139,10 @@ FocusScope {
             border.width: ui.theme.borderWidth
             border.color: ui.theme.strokeColor
 
-            NavigationFocusBorder { navigationCtrl: navCtrl }
+            NavigationFocusBorder {
+                navigationCtrl: navCtrl
+                drawOutsideParent: !root.drawFocusBorderInsideRect
+            }
 
             states: [
                 State {
@@ -142,75 +176,101 @@ FocusScope {
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
         anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
 
-        sourceComponent: root.contentItem
+        sourceComponent: root.contentItem ? root.contentItem : defaultContentComponent
+        readonly property Component defaultContentComponent: root.isVertical ? verticalContentComponent : horizontalContentComponent
     }
 
     Component {
-        id: defaultContentComponent
+        id: verticalContentComponent
 
-        Item {
-            id: contentWrapper
-
-            property int spacing: Boolean(!buttonIcon.isEmpty) && Boolean(textLabel.text) ? 4 : 0
-
-            height: !root.isVertical ? Math.max(buttonIcon.height, textLabel.height) : buttonIcon.height + textLabel.height + spacing
-            width: root.isVertical ? Math.max(textLabel.width, buttonIcon.width) : buttonIcon.width + textLabel.width + spacing
+        ColumnLayout {
+            spacing: 4
 
             StyledIconLabel {
-                id: buttonIcon
-
+                Layout.alignment: Qt.AlignHCenter
                 iconCode: root.icon
                 font: root.iconFont
+                visible: !isEmpty
             }
 
             StyledTextLabel {
-                id: textLabel
-
+                Layout.alignment: Qt.AlignHCenter
                 text: root.text
                 font: root.textFont
-
-                height: text === "" ? 0 : implicitHeight
-                horizontalAlignment: Text.AlignHCenter
+                textFormat: root.textFormat
+                visible: !isEmpty
             }
-
-            states: [
-                State {
-                    when: !root.isVertical
-                    AnchorChanges {
-                        target: buttonIcon
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    AnchorChanges {
-                        target: textLabel
-                        anchors.left: buttonIcon.right
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    PropertyChanges {
-                        target: textLabel
-                        anchors.leftMargin: contentWrapper.spacing
-                    }
-                },
-                State {
-                    when: root.isVertical
-                    AnchorChanges {
-                        target: buttonIcon
-                        anchors.top: parent.top
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    AnchorChanges {
-                        target: textLabel
-                        anchors.top: buttonIcon.bottom
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    PropertyChanges {
-                        target: textLabel
-                        anchors.leftMargin: contentWrapper.spacing
-                    }
-                }
-            ]
         }
     }
+
+    Component {
+        id: horizontalContentComponent
+
+        RowLayout {
+            spacing: 8
+
+            StyledIconLabel {
+                Layout.alignment: Qt.AlignVCenter
+                iconCode: root.icon
+                font: root.iconFont
+                visible: !isEmpty
+            }
+
+            StyledTextLabel {
+                Layout.alignment: Qt.AlignVCenter
+                text: root.text
+                font: root.textFont
+                textFormat: root.textFormat
+                visible: !isEmpty
+            }
+        }
+    }
+
+    states: [
+        State {
+            name: "ICON_ONLY"
+            when: root.buttonType === FlatButton.IconOnly
+
+            PropertyChanges {
+                target: root
+                implicitWidth: ui.theme.defaultButtonSize
+                implicitHeight: ui.theme.defaultButtonSize
+            }
+        },
+
+        State {
+            name: "TEXT_ONLY"
+            when: root.buttonType === FlatButton.TextOnly
+
+            PropertyChanges {
+                target: root
+                implicitWidth: Math.max(contentLoader.implicitWidth + 2 * root.margins,
+                                        root.minWidth)
+                implicitHeight: ui.theme.defaultButtonSize
+            }
+        },
+
+        State {
+            name: "HORIZONTAL"
+            when: root.buttonType === FlatButton.Horizontal
+
+            PropertyChanges {
+                target: root
+                implicitHeight: ui.theme.defaultButtonSize
+            }
+        },
+
+        State {
+            name: "VERTICAL"
+            when: root.buttonType === FlatButton.Vertical
+
+            PropertyChanges {
+                target: root
+                implicitHeight: 48
+            }
+
+        }
+    ]
 
     MouseArea {
         id: mouseArea
@@ -218,15 +278,17 @@ FocusScope {
 
         hoverEnabled: true
 
-        onClicked: function (mouse) {
+        onClicked: function(mouse) {
+            navigation.requestActiveByInteraction()
+
             root.clicked(mouse)
         }
 
         onPressed: {
-            ui.tooltip.hide(this)
+            ui.tooltip.hide(root, true)
         }
 
-        onPressAndHold: function (mouse) {
+        onPressAndHold: function(mouse) {
             root.pressAndHold(mouse)
         }
 
@@ -236,9 +298,9 @@ FocusScope {
             }
 
             if (mouseArea.containsMouse) {
-                ui.tooltip.show(this, root.toolTipTitle, root.toolTipDescription, root.toolTipShortcut)
+                ui.tooltip.show(root, root.toolTipTitle, root.toolTipDescription, root.toolTipShortcut)
             } else {
-                ui.tooltip.hide(this)
+                ui.tooltip.hide(root)
             }
         }
     }

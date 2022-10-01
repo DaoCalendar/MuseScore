@@ -22,12 +22,10 @@
 
 #include "lyrics.h"
 
-#include <QRegularExpression>
+#include "rw/xml.h"
+#include "translation.h"
+#include "types/translatablestring.h"
 
-#include "io/xml.h"
-
-#include "chord.h"
-#include "masterscore.h"
 #include "measure.h"
 #include "mscoreview.h"
 #include "score.h"
@@ -37,9 +35,12 @@
 #include "textedit.h"
 #include "undo.h"
 
-using namespace mu;
+#include "log.h"
 
-namespace Ms {
+using namespace mu;
+using namespace mu::engraving;
+
+namespace mu::engraving {
 //---------------------------------------------------------
 //   lyricsElementStyle
 //---------------------------------------------------------
@@ -52,8 +53,8 @@ static const ElementStyle lyricsElementStyle {
 //   Lyrics
 //---------------------------------------------------------
 
-Lyrics::Lyrics(EngravingItem* parent)
-    : TextBase(ElementType::LYRICS, parent, Tid::LYRICS_ODD)
+Lyrics::Lyrics(ChordRest* parent)
+    : TextBase(ElementType::LYRICS, parent, TextStyleType::LYRICS_ODD)
 {
     _even       = false;
     initElementStyle(&lyricsElementStyle);
@@ -86,10 +87,10 @@ Lyrics::~Lyrics()
 
 void Lyrics::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
     writeProperty(xml, Pid::VERSE);
     if (_syllabic != Syllabic::SINGLE) {
         static const char* sl[] = {
@@ -101,7 +102,7 @@ void Lyrics::write(XmlWriter& xml) const
     writeProperty(xml, Pid::LYRIC_TICKS);
 
     TextBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -115,11 +116,11 @@ void Lyrics::read(XmlReader& e)
             e.unknown();
         }
     }
-    if (!isStyled(Pid::OFFSET) && !e.pasteMode()) {
+    if (!isStyled(Pid::OFFSET) && !e.context()->pasteMode()) {
         // fix offset for pre-3.1 scores
         // 3.0: y offset was meaningless if autoplace is set
-        QString version = mscoreVersion();
-        if (autoplace() && !version.isEmpty() && version < "3.1") {
+        String version = e.context()->mscoreVersion();
+        if (autoplace() && !version.isEmpty() && version < u"3.1") {
             PointF off = propertyDefault(Pid::OFFSET).value<PointF>();
             ryoffset() = off.y();
         }
@@ -132,12 +133,12 @@ void Lyrics::read(XmlReader& e)
 
 bool Lyrics::readProperties(XmlReader& e)
 {
-    const QStringRef& tag(e.name());
+    const AsciiStringView tag(e.name());
 
     if (tag == "no") {
         _no = e.readInt();
     } else if (tag == "syllabic") {
-        QString val(e.readElementText());
+        String val(e.readText());
         if (val == "single") {
             _syllabic = Syllabic::SINGLE;
         } else if (val == "begin") {
@@ -147,7 +148,7 @@ bool Lyrics::readProperties(XmlReader& e)
         } else if (val == "middle") {
             _syllabic = Syllabic::MIDDLE;
         } else {
-            qDebug("bad syllabic property");
+            LOGD("bad syllabic property");
         }
     } else if (tag == "ticks") {          // obsolete
         _ticks = e.readFraction();     // will fall back to reading integer ticks on older scores
@@ -158,6 +159,11 @@ bool Lyrics::readProperties(XmlReader& e)
         return false;
     }
     return true;
+}
+
+TranslatableString Lyrics::subtypeUserName() const
+{
+    return TranslatableString("engraving", "Verse %1").arg(_no + 1);
 }
 
 //---------------------------------------------------------
@@ -171,7 +177,7 @@ void Lyrics::add(EngravingItem* el)
 //            _separator.append((Line*)el);           // ignore! Internally managed
 //            ;
 //      else
-    qDebug("Lyrics::add: unknown element %s", el->name());
+    LOGD("Lyrics::add: unknown element %s", el->typeName());
 }
 
 //---------------------------------------------------------
@@ -187,11 +193,11 @@ void Lyrics::remove(EngravingItem* el)
             // be sure each finds a clean context
             LyricsLine* separ = _separator;
             _separator = 0;
-            separ->moveToDummy();
+            separ->resetExplicitParent();
             separ->removeUnmanaged();
         }
     } else {
-        qDebug("Lyrics::remove: unknown element %s", el->name());
+        LOGD("Lyrics::remove: unknown element %s", el->typeName());
     }
 }
 
@@ -231,7 +237,7 @@ bool Lyrics::isMelisma() const
 
 void Lyrics::layout()
 {
-    if (!parent()) {   // palette & clone trick
+    if (!explicitParent()) {   // palette & clone trick
         setPos(PointF());
         TextBase::layout1();
         return;
@@ -248,32 +254,50 @@ void Lyrics::layout()
     // 3) string of non-word characters at end of syllable
     //QRegularExpression leadingPattern("(^[\\d\\W]+)([^\\d\\W]+)");
 
-    const QString text = plainText();
-    QString leading;
-    QString trailing;
+    const String text = plainText();
+    String leading;
+    String trailing;
 
     if (score()->styleB(Sid::lyricsAlignVerseNumber)) {
-        QRegularExpression punctuationPattern("(^[\\d\\W]*)([^\\d\\W].*?)([\\d\\W]*$)", QRegularExpression::UseUnicodePropertiesOption);
-        QRegularExpressionMatch punctuationMatch = punctuationPattern.match(text);
-        if (punctuationMatch.hasMatch()) {
-            // leading and trailing punctuation
-            leading = punctuationMatch.captured(1);
-            trailing = punctuationMatch.captured(3);
-            //QString actualLyric = punctuationMatch.captured(2);
-            if (!leading.isEmpty() && leading[0].isDigit()) {
-                hasNumber = true;
+        size_t leadingIdx = 0;
+        for (size_t i = 0; i < text.size(); ++i) {
+            Char ch = text.at(i);
+            if (ch.isLetter()) {
+                leadingIdx = i;
+                break;
             }
+        }
+
+        if (leadingIdx != 0) {
+            leading = text.mid(0, leadingIdx);
+        }
+
+        size_t trailingIdx = text.size() - 1;
+        for (int i = static_cast<int>(text.size() - 1); i >= 0; --i) {
+            Char ch = text.at(i);
+            if (ch.isLetter()) {
+                trailingIdx = i;
+                break;
+            }
+        }
+
+        if (trailingIdx != text.size() - 1) {
+            trailing = text.mid(trailingIdx + 1);
+        }
+
+        if (!leading.isEmpty() && leading.at(0).isDigit()) {
+            hasNumber = true;
         }
     }
 
     bool styleDidChange = false;
     if (isEven() && !_even) {
-        initTid(Tid::LYRICS_EVEN, /* preserveDifferent */ true);
+        initTextStyleType(TextStyleType::LYRICS_EVEN, /* preserveDifferent */ true);
         _even             = true;
         styleDidChange    = true;
     }
     if (!isEven() && _even) {
-        initTid(Tid::LYRICS_ODD, /* preserveDifferent */ true);
+        initTextStyleType(TextStyleType::LYRICS_ODD, /* preserveDifferent */ true);
         _even             = false;
         styleDidChange    = true;
     }
@@ -295,24 +319,24 @@ void Lyrics::layout()
     }
 
     PointF o(propertyDefault(Pid::OFFSET).value<PointF>());
-    rxpos() = o.x();
-    qreal x = pos().x();
+    setPosX(o.x());
+    double x = pos().x();
     TextBase::layout1();
 
-    qreal centerAdjust = 0.0;
-    qreal leftAdjust   = 0.0;
+    double centerAdjust = 0.0;
+    double leftAdjust   = 0.0;
 
     if (score()->styleB(Sid::lyricsAlignVerseNumber)) {
         // Calculate leading and trailing parts widths. Lyrics
         // should have text layout to be able to do it correctly.
-        Q_ASSERT(rows() != 0);
+        assert(rows() != 0);
         if (!leading.isEmpty() || !trailing.isEmpty()) {
-//                   qDebug("create leading, trailing <%s> -- <%s><%s>", qPrintable(text), qPrintable(leading), qPrintable(trailing));
+//                   LOGD("create leading, trailing <%s> -- <%s><%s>", muPrintable(text), muPrintable(leading), muPrintable(trailing));
             const TextBlock& tb = textBlock(0);
 
-            const qreal leadingWidth = tb.xpos(leading.length(), this) - tb.boundingRect().x();
-            const int trailingPos = text.length() - trailing.length();
-            const qreal trailingWidth = tb.boundingRect().right() - tb.xpos(trailingPos, this);
+            const double leadingWidth = tb.xpos(leading.size(), this) - tb.boundingRect().x();
+            const size_t trailingPos = text.size() - trailing.size();
+            const double trailingWidth = tb.boundingRect().right() - tb.xpos(trailingPos, this);
 
             leftAdjust = leadingWidth;
             centerAdjust = leadingWidth - trailingWidth;
@@ -321,20 +345,20 @@ void Lyrics::layout()
 
     ChordRest* cr = chordRest();
 
-    if (align() & Align::HCENTER) {
+    if (align() == AlignH::HCENTER) {
         //
         // center under notehead, not origin
         // however, lyrics that are melismas or have verse numbers will be forced to left alignment
         //
         // center under note head
-        qreal nominalWidth = symWidth(SymId::noteheadBlack);
+        double nominalWidth = symWidth(SymId::noteheadBlack);
         x += nominalWidth * .5 - cr->x() - centerAdjust * 0.5;
-    } else if (!(align() & Align::RIGHT)) {
+    } else if (!(align() == AlignH::RIGHT)) {
         // even for left aligned syllables, ignore leading verse numbers and/or punctuation
         x -= leftAdjust;
     }
 
-    rxpos() = x;
+    setPosX(x);
 
     if (_ticks > Fraction(0, 1) || _syllabic == Syllabic::BEGIN || _syllabic == Syllabic::MIDDLE) {
         if (!_separator) {
@@ -370,21 +394,34 @@ void Lyrics::layout()
 }
 
 //---------------------------------------------------------
+//   scanElements
+//---------------------------------------------------------
+
+void Lyrics::scanElements(void* data, void (* func)(void*, EngravingItem*), bool /*all*/)
+{
+    func(data, this);
+    /* DO NOT ADD EITHER THE LYRICSLINE OR THE SEGMENTS: segments are added through the system each belongs to;
+      LyricsLine is not needed, as it is internally managed.
+      if (_separator)
+            _separator->scanElements(data, func, all); */
+}
+
+//---------------------------------------------------------
 //   layout2
 //    compute vertical position
 //---------------------------------------------------------
 
 void Lyrics::layout2(int nAbove)
 {
-    qreal lh = lineSpacing() * score()->styleD(Sid::lyricsLineHeight);
+    double lh = lineSpacing() * score()->styleD(Sid::lyricsLineHeight);
 
     if (placeBelow()) {
-        qreal yo = segment()->measure()->system()->staff(staffIdx())->bbox().height();
-        rypos()  = lh * (_no - nAbove) + yo - chordRest()->y();
-        rpos()  += styleValue(Pid::OFFSET, Sid::lyricsPosBelow).value<PointF>();
+        double yo = segment()->measure()->system()->staff(staffIdx())->bbox().height();
+        setPosY(lh * (_no - nAbove) + yo - chordRest()->y());
+        movePos(styleValue(Pid::OFFSET, Sid::lyricsPosBelow).value<PointF>());
     } else {
-        rypos() = -lh * (nAbove - _no - 1) - chordRest()->y();
-        rpos() += styleValue(Pid::OFFSET, Sid::lyricsPosAbove).value<PointF>();
+        setPosY(-lh * (nAbove - _no - 1) - chordRest()->y());
+        movePos(styleValue(Pid::OFFSET, Sid::lyricsPosAbove).value<PointF>());
     }
 }
 
@@ -392,52 +429,52 @@ void Lyrics::layout2(int nAbove)
 //   paste
 //---------------------------------------------------------
 
-void Lyrics::paste(EditData& ed, const QString& txt)
+void Lyrics::paste(EditData& ed, const String& txt)
 {
     MuseScoreView* scoreview = ed.view();
-    QString regex = QString("[^\\S") + QChar(0xa0) + QChar(0x202F) + "]+";
-    QStringList sl = txt.split(QRegularExpression(regex), Qt::SkipEmptyParts);
+    String regex = String(u"[^\\S") + Char(0xa0) + Char(0x202F) + u"]+";
+    StringList sl = txt.split(std::regex(regex.toStdString()), mu::SkipEmptyParts);
     if (sl.empty()) {
         return;
     }
 
-    QStringList hyph = sl[0].split("-");
+    StringList hyph = sl.at(0).split(u'-');
     bool minus = false;
     bool underscore = false;
     score()->startCmd();
 
-    if (hyph.length() > 1) {
+    if (hyph.size() > 1) {
         score()->undo(new InsertText(cursorFromEditData(ed), hyph[0]), &ed);
-        hyph.removeFirst();
-        sl[0] =  hyph.join("-");
+        hyph.removeAt(0);
+        sl[0] =  hyph.join(u"-");
         minus = true;
-    } else if (sl.length() > 1 && sl[1] == "-") {
+    } else if (sl.size() > 1 && sl[1] == u"-") {
         score()->undo(new InsertText(cursorFromEditData(ed), sl[0]), &ed);
-        sl.removeFirst();
-        sl.removeFirst();
+        sl.removeAt(0);
+        sl.removeAt(0);
         minus = true;
-    } else if (sl[0].startsWith("_")) {
+    } else if (sl[0].startsWith(u"_")) {
         sl[0].remove(0, 1);
         if (sl[0].isEmpty()) {
-            sl.removeFirst();
+            sl.removeAt(0);
         }
         underscore = true;
-    } else if (sl[0].contains("_")) {
-        int p = sl[0].indexOf("_");
+    } else if (sl[0].contains(u"_")) {
+        size_t p = sl[0].indexOf(u'_');
         score()->undo(new InsertText(cursorFromEditData(ed), sl[0]), &ed);
         sl[0] = sl[0].mid(p + 1);
         if (sl[0].isEmpty()) {
-            sl.removeFirst();
+            sl.removeAt(0);
         }
         underscore = true;
-    } else if (sl.length() > 1 && sl[1] == "_") {
+    } else if (sl.size() > 1 && sl[1] == "_") {
         score()->undo(new InsertText(cursorFromEditData(ed), sl[0]), &ed);
-        sl.removeFirst();
-        sl.removeFirst();
+        sl.removeAt(0);
+        sl.removeAt(0);
         underscore = true;
     } else {
         score()->undo(new InsertText(cursorFromEditData(ed), sl[0]), &ed);
-        sl.removeFirst();
+        sl.removeAt(0);
     }
 
     score()->endCmd();
@@ -491,24 +528,55 @@ EngravingItem* Lyrics::drop(EditData& data)
     return e;
 }
 
+bool Lyrics::isEditAllowed(EditData& ed) const
+{
+    if (isTextNavigationKey(ed.key, ed.modifiers)) {
+        return false;
+    }
+
+    static const std::set<KeyboardModifiers> navigationModifiers {
+        NoModifier,
+        KeypadModifier,
+        ShiftModifier
+    };
+
+    if (navigationModifiers.find(ed.modifiers) != navigationModifiers.end()) {
+        static const std::set<int> navigationKeys {
+            Key_Underscore,
+            Key_Minus,
+            Key_Enter,
+            Key_Return,
+            Key_Up,
+            Key_Down
+        };
+
+        if (navigationKeys.find(ed.key) != navigationKeys.end()) {
+            return false;
+        }
+    }
+
+    if (ed.key == Key_Left) {
+        return cursor()->column() != 0 || cursor()->hasSelection();
+    }
+
+    if (ed.key == Key_Right) {
+        bool cursorInLastColumn = cursor()->column() == cursor()->curLine().columns();
+        return !cursorInLastColumn || cursor()->hasSelection();
+    }
+
+    return TextBase::isEditAllowed(ed);
+}
+
 //---------------------------------------------------------
 //   edit
 //---------------------------------------------------------
 
 bool Lyrics::edit(EditData& ed)
 {
-    if (ed.modifiers == 0 || ed.modifiers == Qt::ShiftModifier) {
-        switch (ed.key) {
-        case Qt::Key_Space:
-        case Qt::Key_Underscore:
-        case Qt::Key_Minus:
-        case Qt::Key_Enter:
-        case Qt::Key_Return:
-        case Qt::Key_Up:
-        case Qt::Key_Down:
-            return false; // allow shortcut key controller to handle
-        }
+    if (!isEditAllowed(ed)) {
+        return false;
     }
+
     return TextBase::edit(ed);
 }
 
@@ -547,7 +615,7 @@ void Lyrics::removeFromScore()
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Lyrics::getProperty(Pid propertyId) const
+PropertyValue Lyrics::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::SYLLABIC:
@@ -565,11 +633,11 @@ QVariant Lyrics::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Lyrics::setProperty(Pid propertyId, const QVariant& v)
+bool Lyrics::setProperty(Pid propertyId, const PropertyValue& v)
 {
     switch (propertyId) {
     case Pid::PLACEMENT:
-        setPlacement(Placement(v.toInt()));
+        setPlacement(v.value<PlacementV>());
         break;
     case Pid::SYLLABIC:
         _syllabic = Syllabic(v.toInt());
@@ -608,11 +676,11 @@ bool Lyrics::setProperty(Pid propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Lyrics::propertyDefault(Pid id) const
+PropertyValue Lyrics::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(isEven() ? Tid::LYRICS_EVEN : Tid::LYRICS_ODD);
+    case Pid::TEXT_STYLE:
+        return isEven() ? TextStyleType::LYRICS_EVEN : TextStyleType::LYRICS_ODD;
     case Pid::PLACEMENT:
         return score()->styleV(Sid::lyricsPlacement);
     case Pid::SYLLABIC:
@@ -652,14 +720,14 @@ void Score::forAllLyrics(std::function<void(Lyrics*)> f)
 //   undoChangeProperty
 //---------------------------------------------------------
 
-void Lyrics::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
+void Lyrics::undoChangeProperty(Pid id, const PropertyValue& v, PropertyFlags ps)
 {
     if (id == Pid::VERSE && no() != v.toInt()) {
         for (Lyrics* l : chordRest()->lyrics()) {
             if (l->no() == v.toInt()) {
                 // verse already exists, swap
                 l->TextBase::undoChangeProperty(id, no(), ps);
-                Placement p = l->placement();
+                PlacementV p = l->placement();
                 l->TextBase::undoChangeProperty(Pid::PLACEMENT, int(placement()), ps);
                 TextBase::undoChangeProperty(Pid::PLACEMENT, int(p), ps);
                 break;
@@ -676,7 +744,7 @@ void Lyrics::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
             // unsetting autoplace
             // rebase offset
             PointF off = offset();
-            qreal y = pos().y() - propertyDefault(Pid::OFFSET).value<PointF>().y();
+            double y = pos().y() - propertyDefault(Pid::OFFSET).value<PointF>().y();
             off.ry() = placeAbove() ? y : y - staff()->height();
             undoChangeProperty(Pid::OFFSET, off, PropertyFlags::UNSTYLED);
         }
@@ -685,5 +753,13 @@ void Lyrics::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
     }
 
     TextBase::undoChangeProperty(id, v, ps);
+}
+
+KerningType Lyrics::doComputeKerningType(const EngravingItem* nextItem) const
+{
+    if (nextItem->isLyrics() || nextItem->isBarLine()) {
+        return KerningType::NON_KERNING;
+    }
+    return KerningType::KERNING;
 }
 }

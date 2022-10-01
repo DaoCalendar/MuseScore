@@ -117,7 +117,7 @@ samples_t Mixer::process(float* outBuffer, samples_t samplesPerChannel)
     ONLY_AUDIO_WORKER_THREAD;
 
     for (IClockPtr clock : m_clocks) {
-        clock->forward((samplesPerChannel * 1000) / m_sampleRate);
+        clock->forward((samplesPerChannel * 1000000) / m_sampleRate);
     }
 
     std::fill(outBuffer, outBuffer + samplesPerChannel * audioChannelsCount(), 0.f);
@@ -154,6 +154,17 @@ samples_t Mixer::process(float* outBuffer, samples_t samplesPerChannel)
     return masterChannelSampleCount;
 }
 
+void Mixer::setIsActive(bool arg)
+{
+    ONLY_AUDIO_WORKER_THREAD;
+
+    AbstractAudioSource::setIsActive(arg);
+
+    for (const auto& channel : m_mixerChannels) {
+        channel.second->setIsActive(arg);
+    }
+}
+
 void Mixer::addClock(IClockPtr clock)
 {
     ONLY_AUDIO_WORKER_THREAD;
@@ -187,11 +198,16 @@ void Mixer::setMasterOutputParams(const AudioOutputParams& params)
 
     m_masterFxProcessors.clear();
     m_masterFxProcessors = fxResolver()->resolveMasterFxList(params.fxChain);
-    m_masterOutputParamsChanged.send(params);
 
     for (IFxProcessorPtr& fx : m_masterFxProcessors) {
         fx->setSampleRate(m_sampleRate);
+        fx->paramsChanged().onReceive(this, [this](const AudioFxParams& fxParams) {
+            m_masterParams.fxChain.insert_or_assign(fxParams.chainOrder, fxParams);
+            m_masterOutputParamsChanged.send(m_masterParams);
+        });
     }
+
+    m_masterOutputParamsChanged.send(params);
 }
 
 Channel<AudioOutputParams> Mixer::masterOutputParamsChanged() const
@@ -249,6 +265,10 @@ void Mixer::completeOutput(float* buffer, const samples_t& samplesPerChannel)
 
         float rms = dsp::samplesRootMeanSquare(singleChannelSquaredSum, samplesPerChannel);
         notifyAboutAudioSignalChanges(audioChNum, rms);
+    }
+
+    if (!m_limiter->isActive()) {
+        return;
     }
 
     float totalRms = dsp::samplesRootMeanSquare(totalSquaredSum, samplesPerChannel * audioChannelsCount());

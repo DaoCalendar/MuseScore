@@ -47,6 +47,8 @@
 #include "notation/lines/letringsettingsmodel.h"
 #include "notation/lines/palmmutesettingsmodel.h"
 #include "notation/lines/vibratosettingsmodel.h"
+#include "notation/lines/slurandtiesettingsmodel.h"
+#include "notation/lines/gradualtempochangesettingsmodel.h"
 #include "notation/stafftype/stafftypesettingsmodel.h"
 #include "notation/frames/textframesettingsmodel.h"
 #include "notation/frames/verticalframesettingsmodel.h"
@@ -57,32 +59,31 @@
 #include "notation/images/imagesettingsmodel.h"
 #include "notation/chordsymbols/chordsymbolsettingsmodel.h"
 #include "notation/brackets/bracketsettingsmodel.h"
-#include "notation/brackets/bracesettingsmodel.h"
 #include "notation/timesignatures/timesignaturesettingsmodel.h"
 #include "notation/mmrests/mmrestsettingsmodel.h"
 #include "notation/bends/bendsettingsmodel.h"
 #include "notation/tremolobars/tremolobarsettingsmodel.h"
 #include "notation/tremolos/tremolosettingsmodel.h"
 #include "notation/measurerepeats/measurerepeatsettingsmodel.h"
+#include "notation/tuplets/tupletsettingsmodel.h"
+#include "notation/instrumentname/instrumentnamesettingsmodel.h"
 
 using namespace mu::inspector;
 
-using InspectorModelType = AbstractInspectorModel::InspectorModelType;
-
-AbstractInspectorModel* InspectorModelCreator::newInspectorModel(AbstractInspectorModel::InspectorModelType modelType, QObject* parent,
+AbstractInspectorModel* InspectorModelCreator::newInspectorModel(InspectorModelType modelType, QObject* parent,
                                                                  IElementRepositoryService* repository) const
 {
     switch (modelType) {
     case InspectorModelType::TYPE_NOTE:
         return new NoteSettingsProxyModel(parent, repository);
-    case InspectorModelType::TYPE_BEAM:
-        return new NoteSettingsProxyModel(parent, repository, InspectorModelType::TYPE_BEAM);
     case InspectorModelType::TYPE_NOTEHEAD:
-        return new NoteSettingsProxyModel(parent, repository, InspectorModelType::TYPE_NOTEHEAD);
+        return new NoteheadSettingsModel(parent, repository);
     case InspectorModelType::TYPE_STEM:
-        return new NoteSettingsProxyModel(parent, repository, InspectorModelType::TYPE_STEM);
+        return new StemSettingsModel(parent, repository);
     case InspectorModelType::TYPE_HOOK:
-        return new NoteSettingsProxyModel(parent, repository, InspectorModelType::TYPE_HOOK);
+        return new HookSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_BEAM:
+        return new BeamSettingsModel(parent, repository);
     case InspectorModelType::TYPE_FERMATA:
         return new FermataSettingsModel(parent, repository);
     case InspectorModelType::TYPE_TEMPO:
@@ -125,8 +126,16 @@ AbstractInspectorModel* InspectorModelCreator::newInspectorModel(AbstractInspect
         return new PalmMuteSettingsModel(parent, repository);
     case InspectorModelType::TYPE_LET_RING:
         return new LetRingSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_TEXT_LINE:
+        return new TextLineSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_GRADUAL_TEMPO_CHANGE:
+        return new GradualTempoChangeSettingsModel(parent, repository);
     case InspectorModelType::TYPE_VIBRATO:
         return new VibratoSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_SLUR:
+        return new SlurAndTieSettingsModel(parent, repository, SlurAndTieSettingsModel::Slur);
+    case InspectorModelType::TYPE_TIE:
+        return new SlurAndTieSettingsModel(parent, repository, SlurAndTieSettingsModel::Tie);
     case InspectorModelType::TYPE_STAFF_TYPE_CHANGES:
         return new StaffTypeSettingsModel(parent, repository);
     case InspectorModelType::TYPE_TEXT_FRAME:
@@ -147,8 +156,6 @@ AbstractInspectorModel* InspectorModelCreator::newInspectorModel(AbstractInspect
         return new ChordSymbolSettingsModel(parent, repository);
     case InspectorModelType::TYPE_BRACKET:
         return new BracketSettingsModel(parent, repository);
-    case InspectorModelType::TYPE_BRACE:
-        return new BraceSettingsModel(parent, repository);
     case InspectorModelType::TYPE_TIME_SIGNATURE:
         return new TimeSignatureSettingsModel(parent, repository);
     case InspectorModelType::TYPE_MMREST:
@@ -161,6 +168,10 @@ AbstractInspectorModel* InspectorModelCreator::newInspectorModel(AbstractInspect
         return new TremoloSettingsModel(parent, repository);
     case InspectorModelType::TYPE_MEASURE_REPEAT:
         return new MeasureRepeatSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_TUPLET:
+        return new TupletSettingsModel(parent, repository);
+    case InspectorModelType::TYPE_INSTRUMENT_NAME:
+        return new InstrumentNameSettingsModel(parent, repository);
     case InspectorModelType::TYPE_BREATH:
     case InspectorModelType::TYPE_ARPEGGIO:
     case InspectorModelType::TYPE_DYNAMIC:

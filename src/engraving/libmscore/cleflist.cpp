@@ -21,13 +21,10 @@
  */
 
 #include "cleflist.h"
-#include "io/xml.h"
-#include "clef.h"
-#include "score.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   ClefTypeList::operator==
 //---------------------------------------------------------

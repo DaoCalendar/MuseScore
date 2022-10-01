@@ -24,7 +24,7 @@
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   systemStyle
 //---------------------------------------------------------
@@ -38,8 +38,8 @@ static const ElementStyle systemStyle {
 //   SystemText
 //---------------------------------------------------------
 
-SystemText::SystemText(Segment* parent, Tid tid)
-    : StaffTextBase(ElementType::SYSTEM_TEXT, parent, tid, ElementFlag::SYSTEM | ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+SystemText::SystemText(Segment* parent, TextStyleType tid, ElementType type)
+    : StaffTextBase(type, parent, tid, ElementFlag::SYSTEM | ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
 {
     initElementStyle(&systemStyle);
 }
@@ -48,11 +48,11 @@ SystemText::SystemText(Segment* parent, Tid tid)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant SystemText::propertyDefault(Pid id) const
+engraving::PropertyValue SystemText::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::SYSTEM);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::SYSTEM;
     default:
         return TextBase::propertyDefault(id);
     }
@@ -67,4 +67,4 @@ void SystemText::layout()
     TextBase::layout();
     autoplaceSegmentElement();
 }
-} // namespace Ms
+} // namespace mu::engraving

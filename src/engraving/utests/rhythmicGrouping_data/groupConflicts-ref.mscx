@@ -23,7 +23,7 @@
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle">Title</metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -73,7 +73,7 @@
           </Channel>
         </Instrument>
       </Part>
-    <Part>
+    <Part id="2">
       <Staff id="2">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -127,11 +127,11 @@
       <VBox>
         <height>10</height>
         <Text>
-          <style>Title</style>
+          <style>title</style>
           <text>Grouping conflicts</text>
           </Text>
         <Text>
-          <style>Subtitle</style>
+          <style>subtitle</style>
           <text>Currently the grouping algorithm does not consider other notes and rests in the measure.</text>
           </Text>
         </VBox>
@@ -142,7 +142,7 @@
             <sigD>4</sigD>
             </TimeSig>
           <StaffText>
-            <style>Instrument Change</style>
+            <style>instrument_change</style>
             <text>Simple Triple: must expose 2 out of 3 beats</text>
             </StaffText>
           <Chord>
@@ -209,12 +209,12 @@
             <sigD>8</sigD>
             </TimeSig>
           <StaffText>
-            <style>Instrument Change</style>
+            <style>instrument_change</style>
             <text>Compound: must expose 2 out of 3 divisions within a beat (similar to Simple Triple)</text>
             </StaffText>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>38</l1>
+            <l2>38</l2>
             </Beam>
           <Chord>
             <dots>1</dots>
@@ -292,12 +292,12 @@
             <sigD>4</sigD>
             </TimeSig>
           <StaffText>
-            <style>Instrument Change</style>
+            <style>instrument_change</style>
             <text>Syncopation: allow simple rhythms to cross unstressed beats</text>
             </StaffText>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>40</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -344,8 +344,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>40</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -453,7 +453,7 @@
       <Measure>
         <voice>
           <StaffText>
-            <style>Instrument Change</style>
+            <style>instrument_change</style>
             <text>Syncopation continued:  don't allow isolated notes to cross unstressed beats</text>
             </StaffText>
           <Chord>
@@ -665,8 +665,8 @@
             <text>Incorrect</text>
             </StaffText>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>40</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <dots>1</dots>
@@ -772,8 +772,8 @@
             <text>Correct</text>
             </StaffText>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>40</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -820,8 +820,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>40</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>
@@ -994,8 +994,8 @@
             <text>Alternative: beam over rests</text>
             </StaffText>
           <Beam>
-            <l1>20</l1>
-            <l2>20</l2>
+            <l1>40</l1>
+            <l2>40</l2>
             </Beam>
           <Chord>
             <durationType>16th</durationType>

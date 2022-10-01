@@ -23,17 +23,12 @@
 #ifndef __HAIRPIN_H__
 #define __HAIRPIN_H__
 
-#include "engravingitem.h"
-#include "dynamic.h"
-#include "line.h"
 #include "textlinebase.h"
-#include "mscore.h"
 
-namespace Ms {
-class Score;
+#include "types/types.h"
+
+namespace mu::engraving {
 class Hairpin;
-
-enum class ChangeMethod : signed char;
 
 enum class HairpinType : signed char {
     INVALID = -1,
@@ -49,9 +44,11 @@ enum class HairpinType : signed char {
 
 class HairpinSegment final : public TextLineBaseSegment
 {
+    OBJECT_ALLOCATOR(engraving, HairpinSegment)
+
     bool drawCircledTip;
     mu::PointF circledTip;
-    qreal circledTipRadius;
+    double circledTipRadius;
 
     void startEditDrag(EditData&) override;
     void editDrag(EditData&) override;
@@ -76,7 +73,7 @@ public:
     void layout() override;
     Shape shape() const override;
 
-    int gripsCount() const override { return 4; }
+    int gripsCount() const override;
     std::vector<mu::PointF> gripsPositions(const EditData& = EditData()) const override;
 
     std::unique_ptr<ElementGroup> getDragGroup(std::function<bool(const EngravingItem*)> isDragged) override;
@@ -91,10 +88,12 @@ public:
 
 class Hairpin final : public TextLineBase
 {
+    OBJECT_ALLOCATOR(engraving, Hairpin)
+
     HairpinType _hairpinType { HairpinType::INVALID };
     int _veloChange;
     bool _hairpinCircledTip;
-    Dynamic::Range _dynRange;
+    DynamicRange _dynRange;
     bool _singleNoteDynamics;
     ChangeMethod _veloChangeMethod;
 
@@ -110,10 +109,13 @@ public:
 
     int subtype() const override;
 
+    DynamicType dynamicTypeFrom() const;
+    DynamicType dynamicTypeTo() const;
+
     HairpinType hairpinType() const { return _hairpinType; }
     void setHairpinType(HairpinType val);
 
-    Segment* segment() const { return (Segment*)parent(); }
+    Segment* segment() const { return (Segment*)explicitParent(); }
     void layout() override;
     LineSegment* createLineSegment(System* parent) override;
 
@@ -123,8 +125,8 @@ public:
     int veloChange() const { return _veloChange; }
     void setVeloChange(int v) { _veloChange = v; }
 
-    Dynamic::Range dynRange() const { return _dynRange; }
-    void setDynRange(Dynamic::Range t) { _dynRange = t; }
+    DynamicRange dynRange() const { return _dynRange; }
+    void setDynRange(DynamicRange t) { _dynRange = t; }
 
     Spatium hairpinHeight() const { return _hairpinHeight; }
     void setHairpinHeight(Spatium val) { _hairpinHeight = val; }
@@ -151,19 +153,20 @@ public:
     void write(XmlWriter&) const override;
     void read(XmlReader&) override;
 
-    QVariant getProperty(Pid id) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid id) const override;
-    Pid propertyId(const QStringRef& xmlName) const override;
+    PropertyValue getProperty(Pid id) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid id) const override;
 
-    QString accessibleInfo() const override;
+    String accessibleInfo() const override;
     bool isLineType() const
     {
         return _hairpinType == HairpinType::CRESC_LINE || _hairpinType == HairpinType::DECRESC_LINE;
     }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 
-Q_DECLARE_METATYPE(Ms::HairpinType);
+#ifndef NO_QT_SUPPORT
+Q_DECLARE_METATYPE(mu::engraving::HairpinType);
+#endif
 
 #endif

@@ -29,23 +29,14 @@
 using namespace mu::audio;
 using namespace mu::audio::synth;
 
-static const std::map<SoundFontFormat, std::string> FLUID_SF_FILE_EXTENSIONS =
-{
-    { SoundFontFormat::SF2, "*.sf2" },
-    { SoundFontFormat::SF3, "*.sf3" }
-};
-
 static const AudioResourceVendor FLUID_VENDOR_NAME = "Fluid";
 
-FluidResolver::FluidResolver(const io::paths& soundFontDirs, async::Channel<io::paths> sfDirsChanges)
+FluidResolver::FluidResolver()
 {
     ONLY_AUDIO_WORKER_THREAD;
 
-    m_soundFontDirs = soundFontDirs;
     refresh();
-
-    sfDirsChanges.onReceive(this, [this](const io::paths& newSfDirs) {
-        m_soundFontDirs = newSfDirs;
+    soundFontRepository()->soundFontPathsChanged().onNotify(this, [this]() {
         refresh();
     });
 }
@@ -54,8 +45,7 @@ ISynthesizerPtr FluidResolver::resolveSynth(const TrackId /*trackId*/, const Aud
 {
     ONLY_AUDIO_WORKER_THREAD;
 
-    ISynthesizerPtr synth = std::make_shared<FluidSynth>(params);
-    synth->init();
+    FluidSynthPtr synth = std::make_shared<FluidSynth>(params);
 
     auto search = m_resourcesCache.find(params.resourceMeta.id);
 
@@ -67,6 +57,11 @@ ISynthesizerPtr FluidResolver::resolveSynth(const TrackId /*trackId*/, const Aud
     synth->addSoundFonts({ search->second });
 
     return synth;
+}
+
+bool FluidResolver::hasCompatibleResources(const PlaybackSetupData& /*setup*/) const
+{
+    return true;
 }
 
 AudioResourceMetaList FluidResolver::resolveResources() const
@@ -81,6 +76,7 @@ AudioResourceMetaList FluidResolver::resolveResources() const
         meta.id = pair.first;
         meta.type = AudioResourceType::FluidSoundfont;
         meta.vendor = FLUID_VENDOR_NAME;
+        meta.attributes = { { u"playbackSetupData", mpe::GENERIC_SETUP_DATA_STRING } };
         meta.hasNativeEditorSupport = false;
 
         result.push_back(std::move(meta));
@@ -95,21 +91,7 @@ void FluidResolver::refresh()
 
     m_resourcesCache.clear();
 
-    for (const auto& pair : FLUID_SF_FILE_EXTENSIONS) {
-        updateCaches(pair.second);
-    }
-}
-
-void FluidResolver::updateCaches(const std::string& fileExtension)
-{
-    for (const io::path& path : m_soundFontDirs) {
-        RetVal<io::paths> files = fileSystem()->scanFiles(path, { QString::fromStdString(fileExtension) });
-        if (!files.ret) {
-            continue;
-        }
-
-        for (const io::path& filePath : files.val) {
-            m_resourcesCache.emplace(io::basename(filePath).toStdString(), filePath);
-        }
+    for (const SoundFontPath& path : soundFontRepository()->soundFontPaths()) {
+        m_resourcesCache.emplace(io::basename(path).toStdString(), path);
     }
 }

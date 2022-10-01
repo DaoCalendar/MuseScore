@@ -22,37 +22,45 @@
 #ifndef MU_APPSHELL_APPSHELLCONFIGURATION_H
 #define MU_APPSHELL_APPSHELLCONFIGURATION_H
 
+#include "async/asyncable.h"
+
 #include "modularity/ioc.h"
-#include "iappshellconfiguration.h"
+#include "iglobalconfiguration.h"
+#include "io/ifilesystem.h"
+#include "multiinstances/imultiinstancesprovider.h"
+#include "ui/iuiconfiguration.h"
 #include "project/iprojectconfiguration.h"
 #include "notation/inotationconfiguration.h"
 #include "playback/iplaybackconfiguration.h"
 #include "languages/ilanguagesconfiguration.h"
-#include "ui/iuiconfiguration.h"
-#include "async/asyncable.h"
+
+#include "iappshellconfiguration.h"
 
 namespace mu::appshell {
 class AppShellConfiguration : public IAppShellConfiguration, public async::Asyncable
 {
+    INJECT(appshell, framework::IGlobalConfiguration, globalConfiguration)
+    INJECT(appshell, io::IFileSystem, fileSystem)
+    INJECT(appshell, mi::IMultiInstancesProvider, multiInstancesProvider)
+    INJECT(appshell, ui::IUiConfiguration, uiConfiguration)
     INJECT(appshell, project::IProjectConfiguration, projectConfiguration)
     INJECT(appshell, notation::INotationConfiguration, notationConfiguration)
     INJECT(appshell, playback::IPlaybackConfiguration, playbackConfiguration)
     INJECT(appshell, languages::ILanguagesConfiguration, languagesConfiguration)
-    INJECT(appshell, ui::IUiConfiguration, uiConfiguration)
 
 public:
     void init();
 
-    StartupSessionType startupSessionType() const override;
-    void setStartupSessionType(StartupSessionType type) override;
+    bool hasCompletedFirstLaunchSetup() const override;
+    void setHasCompletedFirstLaunchSetup(bool has) override;
 
-    io::path startupScorePath() const override;
-    void setStartupScorePath(const io::path& scorePath) override;
+    StartupModeType startupModeType() const override;
+    void setStartupModeType(StartupModeType type) override;
 
-    bool isAppUpdatable() const override;
+    io::path_t startupScorePath() const override;
+    void setStartupScorePath(const io::path_t& scorePath) override;
 
-    bool needCheckForUpdate() const override;
-    void setNeedCheckForUpdate(bool needCheck) override;
+    io::path_t userDataPath() const override;
 
     std::string handbookUrl() const override;
     std::string askForHelpUrl() const override;
@@ -74,20 +82,28 @@ public:
     bool needShowSplashScreen() const override;
     void setNeedShowSplashScreen(bool show) override;
 
-    bool needShowTours() const override;
-    void setNeedShowTours(bool show) override;
-
     void startEditSettings() override;
     void applySettings() override;
     void rollbackSettings() override;
 
-    void revertToFactorySettings(bool keepDefaultSettings = false) const override;
+    void revertToFactorySettings(bool keepDefaultSettings = false, bool notifyAboutChanges = true) const override;
+
+    io::paths_t sessionProjectsPaths() const override;
+    Ret setSessionProjectsPaths(const io::paths_t& paths) override;
 
 private:
     std::string utmParameters(const std::string& utmMedium) const;
     std::string sha() const;
 
     std::string currentLanguageCode() const;
+
+    io::path_t sessionDataPath() const;
+    io::path_t sessionFilePath() const;
+
+    RetVal<mu::ByteArray> readSessionState() const;
+    Ret writeSessionState(const QByteArray& data);
+
+    io::paths_t parseSessionProjectsPaths(const QByteArray& json) const;
 };
 }
 

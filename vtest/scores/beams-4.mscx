@@ -9,7 +9,7 @@
       </Synthesizer>
     <Division>480</Division>
     <Style>
-      <measureSpacing>1</measureSpacing>
+      <measureSpacing>1.5</measureSpacing>
       <showMeasureNumber>0</showMeasureNumber>
       <showFooter>0</showFooter>
       <evenFooterL>&lt;font size=&quot;13&quot;/&gt;&lt;font face=&quot;Sans&quot;/&gt;&amp;lt;font size=&amp;quot;13&amp;quot;/&amp;gt;&amp;lt;font face=&amp;quot;Sans&amp;quot;/&amp;gt;&amp;amp;lt;font size=&amp;amp;quot;13&amp;amp;quot;/&amp;amp;gt;&amp;amp;lt;font face=&amp;amp;quot;.Helvetica Neue DeskInterface&amp;amp;quot;/&amp;amp;gt;$p</evenFooterL>
@@ -106,7 +106,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -167,7 +167,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -277,7 +277,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -330,7 +330,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>eighth</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -359,7 +359,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -425,7 +425,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -458,7 +458,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>
@@ -491,7 +491,7 @@
           <actualNotes>3</actualNotes>
           <baseNote>16th</baseNote>
           <Number>
-            <style>Tuplet</style>
+            <style>tuplet</style>
             <text>3</text>
             </Number>
           </Tuplet>

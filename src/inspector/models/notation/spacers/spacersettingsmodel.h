@@ -42,6 +42,9 @@ public:
     PropertyItem* spacerHeight() const;
 
 private:
+    void onNotationChanged(const mu::engraving::PropertyIdSet& changedPropertyIdSet,
+                           const mu::engraving::StyleIdSet& changedStyleIdSet) override;
+
     PropertyItem* m_spacerHeight = nullptr;
 };
 }

@@ -23,9 +23,10 @@
 #include "volta.h"
 
 #include <algorithm>
+#include <vector>
 
-#include "style/style.h"
-#include "io/xml.h"
+#include "rw/xml.h"
+#include "types/typesconv.h"
 
 #include "changeMap.h"
 #include "measure.h"
@@ -33,11 +34,13 @@
 #include "staff.h"
 #include "system.h"
 #include "tempo.h"
-#include "text.h"
+
+#include "log.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 static const ElementStyle voltaStyle {
     { Sid::voltaFontFace,                      Pid::BEGIN_FONT_FACE },
     { Sid::voltaFontFace,                      Pid::CONTINUE_FONT_FACE },
@@ -56,6 +59,8 @@ static const ElementStyle voltaStyle {
     { Sid::voltaOffset,                        Pid::END_TEXT_OFFSET },
     { Sid::voltaLineWidth,                     Pid::LINE_WIDTH },
     { Sid::voltaLineStyle,                     Pid::LINE_STYLE },
+    { Sid::voltaDashLineLen,                   Pid::DASH_LINE_LEN },
+    { Sid::voltaDashGapLen,                    Pid::DASH_GAP_LEN },
     { Sid::voltaHook,                          Pid::BEGIN_HOOK_HEIGHT },
     { Sid::voltaHook,                          Pid::END_HOOK_HEIGHT },
     { Sid::voltaPosAbove,                      Pid::OFFSET },
@@ -99,11 +104,11 @@ EngravingItem* VoltaSegment::propertyDelegate(Pid pid)
 Volta::Volta(EngravingItem* parent)
     : TextLineBase(ElementType::VOLTA, parent, ElementFlag::SYSTEM)
 {
-    setPlacement(Placement::ABOVE);
+    setPlacement(PlacementV::ABOVE);
     initElementStyle(&voltaStyle);
 
-    setBeginTextPlace(PlaceText::BELOW);
-    setContinueTextPlace(PlaceText::BELOW);
+    setBeginTextPlace(TextPlace::BELOW);
+    setContinueTextPlace(TextPlace::BELOW);
     setLineVisible(true);
     resetProperty(Pid::BEGIN_TEXT);
     resetProperty(Pid::CONTINUE_TEXT);
@@ -120,7 +125,7 @@ Volta::Volta(EngravingItem* parent)
 ///
 /// \brief sorts the provided list in ascending order
 ///
-void Volta::setEndings(const QList<int>& l)
+void Volta::setEndings(const std::vector<int>& l)
 {
     _endings = l;
     std::sort(_endings.begin(), _endings.end());
@@ -130,7 +135,7 @@ void Volta::setEndings(const QList<int>& l)
 //   setText
 //---------------------------------------------------------
 
-void Volta::setText(const QString& s)
+void Volta::setText(const String& s)
 {
     setBeginText(s);
 }
@@ -139,7 +144,7 @@ void Volta::setText(const QString& s)
 //   text
 //---------------------------------------------------------
 
-QString Volta::text() const
+String Volta::text() const
 {
     return beginText();
 }
@@ -153,15 +158,10 @@ void Volta::read(XmlReader& e)
     eraseSpannerSegments();
 
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "endings") {
-            QString s = e.readElementText();
-            QStringList sl = s.split(",", Qt::SkipEmptyParts);
-            _endings.clear();
-            for (const QString& l : qAsConst(sl)) {
-                int i = l.simplified().toInt();
-                _endings.append(i);
-            }
+            String s = e.readText();
+            _endings = TConv::fromXml(s, std::vector<int>());
         } else if (readStyledProperty(e, tag)) {
         } else if (!readProperties(e)) {
             e.unknown();
@@ -181,7 +181,7 @@ bool Volta::readProperties(XmlReader& e)
 
     if (anchor() != VOLTA_ANCHOR) {
         // Volta strictly assumes that its anchor is measure, so don't let old scores override this.
-        qWarning("Correcting volta anchor type from %d to %d", int(anchor()), int(VOLTA_ANCHOR));
+        LOGW("Correcting volta anchor type from %d to %d", int(anchor()), int(VOLTA_ANCHOR));
         setAnchor(VOLTA_ANCHOR);
     }
 
@@ -194,17 +194,10 @@ bool Volta::readProperties(XmlReader& e)
 
 void Volta::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     TextLineBase::writeProperties(xml);
-    QString s;
-    for (int i : _endings) {
-        if (!s.isEmpty()) {
-            s += ", ";
-        }
-        s += QString("%1").arg(i);
-    }
-    xml.tag("endings", s);
-    xml.endObject();
+    xml.tag("endings", TConv::toXml(_endings));
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -244,7 +237,7 @@ bool Volta::hasEnding(int repeat) const
 
 int Volta::firstEnding() const
 {
-    if (_endings.isEmpty()) {
+    if (_endings.empty()) {
         return 0;
     }
     return _endings.front();
@@ -256,7 +249,7 @@ int Volta::firstEnding() const
 
 int Volta::lastEnding() const
 {
-    if (_endings.isEmpty()) {
+    if (_endings.empty()) {
         return 0;
     }
     return _endings.back();
@@ -266,11 +259,11 @@ int Volta::lastEnding() const
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Volta::getProperty(Pid propertyId) const
+PropertyValue Volta::getProperty(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::VOLTA_ENDING:
-        return QVariant::fromValue(endings());
+        return PropertyValue::fromValue(endings());
     default:
         break;
     }
@@ -281,12 +274,12 @@ QVariant Volta::getProperty(Pid propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Volta::setProperty(Pid propertyId, const QVariant& val)
+bool Volta::setProperty(Pid propertyId, const PropertyValue& val)
 {
     switch (propertyId) {
-    case Pid::VOLTA_ENDING:
-        setEndings(val.value<QList<int> >());
-        break;
+    case Pid::VOLTA_ENDING: {
+        setEndings(val.value<std::vector<int> >());
+    } break;
     default:
         if (!TextLineBase::setProperty(propertyId, val)) {
             return false;
@@ -301,17 +294,17 @@ bool Volta::setProperty(Pid propertyId, const QVariant& val)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Volta::propertyDefault(Pid propertyId) const
+PropertyValue Volta::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
     case Pid::VOLTA_ENDING:
-        return QVariant::fromValue(QList<int>());
+        return PropertyValue::fromValue(std::vector<int>());
     case Pid::ANCHOR:
         return int(VOLTA_ANCHOR);
     case Pid::BEGIN_HOOK_TYPE:
-        return int(HookType::HOOK_90);
+        return HookType::HOOK_90;
     case Pid::END_HOOK_TYPE:
-        return int(HookType::NONE);
+        return HookType::NONE;
     case Pid::BEGIN_TEXT:
     case Pid::CONTINUE_TEXT:
     case Pid::END_TEXT:
@@ -321,10 +314,10 @@ QVariant Volta::propertyDefault(Pid propertyId) const
     case Pid::BEGIN_TEXT_PLACE:
     case Pid::CONTINUE_TEXT_PLACE:
     case Pid::END_TEXT_PLACE:
-        return int(PlaceText::ABOVE);
+        return TextPlace::ABOVE;
 
     case Pid::PLACEMENT:
-        return int(Placement::ABOVE);
+        return PlacementV::ABOVE;
 
     default:
         return TextLineBase::propertyDefault(propertyId);
@@ -337,7 +330,7 @@ QVariant Volta::propertyDefault(Pid propertyId) const
 
 SpannerSegment* Volta::layoutSystem(System* system)
 {
-    SpannerSegment* voltaSegment= SLine::layoutSystem(system);
+    SpannerSegment* voltaSegment = TextLineBase::layoutSystem(system);
 
     // we need set tempo in layout because all tempos of score is set in layout
     // so fermata in seconda volta works correct because fermata apply itself tempo during layouting
@@ -386,7 +379,7 @@ void Volta::setChannel() const
         Fraction startTick = startMeasure->tick() - Fraction::fromTicks(1);
         Fraction endTick  = endMeasure->endTick() - Fraction::fromTicks(1);
         Staff* st = staff();
-        for (int voice = 0; voice < VOICES; ++voice) {
+        for (voice_idx_t voice = 0; voice < VOICES; ++voice) {
             int channel = st->channel(startTick, voice);
             st->insertIntoChannelList(voice, endTick, channel);
         }
@@ -408,7 +401,7 @@ void Volta::setTempo() const
         }
         Fraction startTick = startMeasure->tick() - Fraction::fromTicks(1);
         Fraction endTick  = endMeasure->endTick() - Fraction::fromTicks(1);
-        qreal tempoBeforeVolta = score()->tempomap()->tempo(startTick.ticks());
+        BeatsPerSecond tempoBeforeVolta = score()->tempomap()->tempo(startTick.ticks());
         score()->setTempo(endTick, tempoBeforeVolta);
     }
 }
@@ -417,9 +410,9 @@ void Volta::setTempo() const
 //   accessibleInfo
 //---------------------------------------------------------
 
-QString Volta::accessibleInfo() const
+String Volta::accessibleInfo() const
 {
-    return QString("%1: %2").arg(EngravingItem::accessibleInfo(), text());
+    return String(u"%1: %2").arg(EngravingItem::accessibleInfo(), text());
 }
 
 //---------------------------------------------------------

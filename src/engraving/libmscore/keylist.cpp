@@ -21,12 +21,13 @@
  */
 
 #include "keylist.h"
-#include "io/xml.h"
+
 #include "rw/readcontext.h"
+#include "rw/xml.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   key
 //

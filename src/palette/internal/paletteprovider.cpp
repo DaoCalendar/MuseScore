@@ -40,11 +40,12 @@
 #include "commonscene/commonscenetypes.h"
 
 #include "translation.h"
+#include "types/uri.h"
 
 using namespace mu::palette;
 using namespace mu::framework;
+using namespace mu::engraving;
 
-namespace Ms {
 // ========================================================
 // PaletteElementEditor
 // ========================================================
@@ -78,13 +79,30 @@ QString PaletteElementEditor::actionName() const
 
 void PaletteElementEditor::onElementAdded(const ElementPtr element)
 {
+    if (!element) {
+        return;
+    }
+
+    static const QMap<ElementType, Palette::Type> elementTypeToPaletteType {
+        { ElementType::TIMESIG, Palette::Type::TimeSig },
+        { ElementType::KEYSIG, Palette::Type::KeySig }
+    };
+
+    Palette::Type paletteType = elementTypeToPaletteType.value(element->type(), Palette::Type::Unknown);
+
+    if (paletteType != _type) {
+        return;
+    }
+
     if (!_paletteIndex.isValid()
         || !_paletteIndex.data(PaletteTreeModel::VisibleRole).toBool()) {
         interactive()->info("", mu::trc("palette", "The palette was hidden or changed"));
         return;
     }
+
     QVariantMap mimeData;
-    mimeData[mu::commonscene::MIME_SYMBOL_FORMAT] = element->mimeData(mu::PointF());
+    mimeData[mu::commonscene::MIME_SYMBOL_FORMAT] = element->mimeData().toQByteArray();
+
     _controller->insert(_paletteIndex, -1, mimeData, Qt::CopyAction);
 }
 
@@ -94,34 +112,37 @@ void PaletteElementEditor::open()
         return;
     }
 
-    QWidget* editor = nullptr;
+    mu::UriQuery uri;
 
     using Type = Palette::Type;
     switch (_type) {
     case Type::KeySig: {
-        KeyEditor* keyEditor = new KeyEditor();
-        keyEditor->showKeyPalette(false);
-        connect(keyEditor, &KeyEditor::keySigAdded, this, &PaletteElementEditor::onElementAdded);
-        editor = keyEditor;
+        uri = mu::UriQuery("musescore://notation/keysignatures");
+        uri.addParam("showKeyPalette", mu::Val(false));
     }
     break;
     case Type::TimeSig: {
-        TimeDialog* timeEditor = new TimeDialog();
-        timeEditor->showTimePalette(false);
-        connect(timeEditor, &TimeDialog::timeSigAdded, this, &PaletteElementEditor::onElementAdded);
-        editor = timeEditor;
+        uri = mu::UriQuery("musescore://notation/timesignatures");
+        uri.addParam("showTimePalette", mu::Val(false));
     }
     break;
     default:
         break;
     }
 
-    if (!editor) {
-        return;
-    }
+    if (uri.isValid()) {
+        uri.addParam("sync", mu::Val(false));
 
-    editor->setAttribute(Qt::WA_DeleteOnClose);
-    editor->show();
+        paletteProvider()->addCustomItemRequested().onReceive(this, [this](ElementPtr item) {
+            onElementAdded(item);
+        });
+
+        if (interactive()->isOpened(uri).val) {
+            interactive()->raise(uri);
+        } else {
+            interactive()->open(uri);
+        }
+    }
 }
 
 // ========================================================
@@ -313,10 +334,10 @@ const
     int deleteButton = hideButton + 1;
 
     IInteractive::Result result = interactive()->question(std::string(), question, {
-            IInteractive::ButtonData(hideButton, mu::trc("palette", "Hide")),
-            IInteractive::ButtonData(deleteButton, mu::trc("palette", "Delete permanently")),
-            interactive()->buttonData(IInteractive::Button::Cancel)
-        });
+        IInteractive::ButtonData(hideButton, mu::trc("palette", "Hide")),
+        IInteractive::ButtonData(deleteButton, mu::trc("palette", "Delete permanently")),
+        interactive()->buttonData(IInteractive::Button::Cancel)
+    });
 
     RemoveAction action = RemoveAction::NoAction;
 
@@ -362,9 +383,9 @@ void UserPaletteController::queryRemove(const QModelIndexList& removeIndices, in
                                    : mu::trc("palette", "Do you want to permanently delete these custom palette cells?");
 
             IInteractive::Result result = interactive()->question(std::string(), question, {
-                    IInteractive::Button::Yes,
-                    IInteractive::Button::No
-                });
+                IInteractive::Button::Yes,
+                IInteractive::Button::No
+            });
 
             if (result.standardButton() == IInteractive::Button::Yes) {
                 remove(removeIndices, RemoveAction::DeletePermanently);
@@ -453,7 +474,7 @@ void UserPaletteController::removeSelection(const QModelIndexList& selectedIndex
     int customItemsCount = 0;
 
     for (const QModelIndex& idx : selectedIndexes) {
-        if (idx.parent() == parent) {
+        if (idx.parent() == parent || !parent.isValid()) {
             removeIndices.push_back(idx);
             const bool custom = idx.data(PaletteTreeModel::CustomRole).toBool();
             if (custom) {
@@ -490,7 +511,7 @@ void UserPaletteController::editPaletteProperties(const QModelIndex& index)
 
     QVariantMap properties;
     properties["paletteId"] = palette->id();
-    properties["name"] = palette->translatedName();
+    properties["name"] = QString(palette->translatedName().toUtf8().toPercentEncoding());
     properties["cellWidth"] = palette->gridSize().width();
     properties["cellHeight"] = palette->gridSize().height();
     properties["scale"] = palette->mag();
@@ -572,10 +593,10 @@ bool UserPaletteController::applyPaletteElement(const QModelIndex& index, Qt::Ke
 
 void PaletteProvider::init()
 {
-    m_userPaletteModel = new Ms::PaletteTreeModel(std::make_shared<PaletteTree>(), this);
+    m_userPaletteModel = new PaletteTreeModel(std::make_shared<PaletteTree>(), this);
     connect(m_userPaletteModel, &PaletteTreeModel::treeChanged, this, &PaletteProvider::notifyAboutUserPaletteChanged);
 
-    m_masterPaletteModel = new Ms::PaletteTreeModel(PaletteCreator::newMasterPaletteTree());
+    m_masterPaletteModel = new PaletteTreeModel(PaletteCreator::newMasterPaletteTree());
     m_masterPaletteModel->setParent(this);
 
     m_searchFilterModel = new PaletteCellFilterProxyModel(this);
@@ -586,6 +607,14 @@ void PaletteProvider::init()
     m_visibilityFilterModel->setFilterRole(PaletteTreeModel::VisibleRole);
     m_visibilityFilterModel->setFilterFixedString("true");
     m_visibilityFilterModel->setSourceModel(m_userPaletteModel);
+
+    configuration()->isSinglePalette().ch.onReceive(this, [this](bool) {
+        emit isSinglePaletteChanged();
+    });
+
+    configuration()->isSingleClickToOpenPalette().ch.onReceive(this, [this](bool) {
+        emit isSingleClickToOpenPaletteChanged();
+    });
 }
 
 void PaletteProvider::setSearching(bool searching)
@@ -599,6 +628,16 @@ void PaletteProvider::setSearching(bool searching)
     m_mainPalette = nullptr;
     m_mainPaletteController = nullptr;
     emit mainPaletteChanged();
+}
+
+bool PaletteProvider::isSinglePalette() const
+{
+    return configuration()->isSinglePalette().val;
+}
+
+bool PaletteProvider::isSingleClickToOpenPalette() const
+{
+    return configuration()->isSingleClickToOpenPalette().val;
 }
 
 QAbstractItemModel* PaletteProvider::mainPaletteModel()
@@ -650,7 +689,7 @@ AbstractPaletteController* PaletteProvider::customElementsPaletteController()
     return m_customElementsPaletteController;
 }
 
-QModelIndex PaletteProvider::poolPaletteIndex(const QModelIndex& index, Ms::FilterPaletteTreeModel* poolPalette) const
+QModelIndex PaletteProvider::poolPaletteIndex(const QModelIndex& index, FilterPaletteTreeModel* poolPalette) const
 {
     const QModelIndex poolPaletteIndex = convertIndex(index, poolPalette);
     if (poolPaletteIndex.isValid()) {
@@ -771,8 +810,8 @@ bool PaletteProvider::removeCustomPalette(const QPersistentModelIndex& index)
 
         IInteractive::Result result
             = interactive()->question("", mu::trc("palette", "Do you want to permanently delete this custom palette?"), {
-                IInteractive::Button::Yes, IInteractive::Button::No
-            });
+            IInteractive::Button::Yes, IInteractive::Button::No
+        });
 
         if (result.standardButton() == IInteractive::Button::Yes) {
             return m_userPaletteModel->removeRow(index.row(), index.parent());
@@ -793,8 +832,8 @@ bool PaletteProvider::resetPalette(const QModelIndex& index)
     IInteractive::Result result
         = interactive()->question("", mu::trc("palette",
                                               "Do you want to restore this palette to its default state? All changes to this palette will be lost."), {
-            IInteractive::Button::No, IInteractive::Button::Yes
-        });
+        IInteractive::Button::No, IInteractive::Button::Yes
+    });
     if (result.standardButton() != IInteractive::Button::Yes) {
         return false;
     }
@@ -847,18 +886,17 @@ QString PaletteProvider::getPaletteFilename(bool open, const QString& name) cons
     QString title;
     QString filter;
 #if defined(WIN_PORTABLE)
-    QString wd = QDir::cleanPath(QString("%1/../../../Data/settings").arg(QCoreApplication::applicationDirPath())
-                                 .arg(QCoreApplication::applicationName()));
+    QString wd = QDir::cleanPath(QString("%1/../../../Data/settings").arg(QCoreApplication::applicationDirPath()));
 #else
     QString wd = QString("%1/%2").arg(QStandardPaths::writableLocation(QStandardPaths::HomeLocation))
                  .arg(QCoreApplication::applicationName());
 #endif
     if (open) {
-        title  = mu::qtrc("palette", "Load palette");
+        title  = mu::qtrc("palette", "Load Palette");
         filter = mu::qtrc("palette", "MuseScore Palette") + " (*.mpal)";
     } else {
         title  = mu::qtrc("palette", "Save Palette");
-        filter = mu::qtrc("palette", "MuseScore palette") + " (*.mpal)";
+        filter = mu::qtrc("palette", "MuseScore Palette") + " (*.mpal)";
     }
 
     QFileInfo myPalettes(wd);
@@ -872,7 +910,7 @@ QString PaletteProvider::getPaletteFilename(bool open, const QString& name) cons
         defaultPath = myName.absoluteFilePath();
     }
 
-    mu::io::path fn;
+    mu::io::path_t fn;
     if (open) {
         fn = interactive()->selectOpeningFile(title, defaultPath, filter);
     } else {
@@ -939,6 +977,11 @@ void PaletteProvider::setDefaultPaletteTree(PaletteTreePtr tree)
     }
 }
 
+mu::async::Channel<ElementPtr> PaletteProvider::addCustomItemRequested() const
+{
+    return m_addCustomItemRequested;
+}
+
 void PaletteProvider::write(XmlWriter& xml) const
 {
     if (!m_userPaletteModel) {
@@ -960,4 +1003,3 @@ bool PaletteProvider::read(XmlReader& e)
 
     return true;
 }
-} // namespace Ms

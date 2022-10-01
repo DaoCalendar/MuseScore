@@ -21,16 +21,18 @@
  */
 #include "appmenumodel.h"
 
-#include "translation.h"
+#include "types/translatablestring.h"
 
 #include "log.h"
 #include "config.h"
 
 using namespace mu::appshell;
 using namespace mu::ui;
+using namespace mu::uicomponents;
 using namespace mu::project;
 using namespace mu::workspace;
 using namespace mu::actions;
+using namespace mu::plugins;
 
 static QString makeId(const ActionCode& actionCode, int itemIndex)
 {
@@ -49,27 +51,26 @@ void AppMenuModel::load()
     AbstractMenuModel::load();
 
     MenuItemList items {
-        fileItem(),
-        editItem(),
-        viewItem(),
-        addItem(),
-        formatItem(),
-        toolsItem(),
-        helpItem(),
+        makeFileMenu(),
+        makeEditMenu(),
+        makeViewMenu(),
+        makeAddMenu(),
+        makeFormatMenu(),
+        makeToolsMenu(),
+        makePluginsMenu(),
+        makeHelpMenu(),
 #ifdef BUILD_DIAGNOSTICS
-        diagnosticItem()
+        makeDiagnosticMenu()
 #endif
     };
 
     setItems(items);
 
     setupConnections();
-}
 
-void AppMenuModel::onActionsStateChanges(const actions::ActionCodeList& codes)
-{
-    AbstractMenuModel::onActionsStateChanges(codes);
-    emit itemsChanged();
+    //! NOTE: removes some undesired platform-specific items
+    //! (such as "Start Dictation" and "Special Characters" on macOS)
+    appMenuModelHook()->onAppMenuInited();
 }
 
 void AppMenuModel::setupConnections()
@@ -77,36 +78,52 @@ void AppMenuModel::setupConnections()
     recentProjectsProvider()->recentProjectListChanged().onNotify(this, [this]() {
         MenuItem& recentScoreListItem = findMenu("menu-file-open");
 
-        MenuItemList recentScoresList = recentScores();
+        MenuItemList recentScoresList = makeRecentScoresItems();
         bool openRecentEnabled = !recentScoresList.empty();
 
         if (!recentScoresList.empty()) {
             recentScoresList = appendClearRecentSection(recentScoresList);
         }
 
-        recentScoreListItem.state.enabled = openRecentEnabled;
-        recentScoreListItem.subitems = recentScoresList;
+        UiActionState state = recentScoreListItem.state();
+        state.enabled = openRecentEnabled;
+        recentScoreListItem.setState(state);
 
-        emit itemsChanged();
+        recentScoreListItem.setSubitems(recentScoresList);
     });
 
     workspacesManager()->currentWorkspaceChanged().onNotify(this, [this]() {
-        MenuItem& workspacesItem = findMenu("menu-select-workspace");
-        workspacesItem.subitems = workspacesItems();
-        emit itemsChanged();
+        MenuItem& workspacesItem = findMenu("menu-workspaces");
+        workspacesItem.setSubitems(makeWorkspacesItems());
     });
 
     workspacesManager()->workspacesListChanged().onNotify(this, [this]() {
-        MenuItem& workspacesItem = findMenu("menu-select-workspace");
-        workspacesItem.subitems = workspacesItems();
-        emit itemsChanged();
+        MenuItem& workspacesItem = findMenu("menu-workspaces");
+        workspacesItem.setSubitems(makeWorkspacesItems());
+    });
+
+    pluginsService()->pluginsChanged().onNotify(this, [this]() {
+        MenuItem& pluginsMenu = findMenu("menu-plugins");
+        pluginsMenu.setSubitems(makePluginsMenuSubitems());
+    });
+
+    pluginsService()->pluginChanged().onReceive(this, [this](const PluginInfo&) {
+        MenuItem& pluginsItem = findMenu("menu-plugins");
+        pluginsItem.setSubitems(makePluginsMenuSubitems());
     });
 }
 
-MenuItem AppMenuModel::fileItem() const
+MenuItem* AppMenuModel::makeMenuItem(const actions::ActionCode& actionCode, MenuItemRole menuRole)
 {
-    MenuItemList recentScoresList = recentScores();
-    bool openRecentEnabled = true;
+    MenuItem* item = makeMenuItem(actionCode);
+    item->setRole(menuRole);
+    return item;
+}
+
+MenuItem* AppMenuModel::makeFileMenu()
+{
+    MenuItemList recentScoresList = makeRecentScoresItems();
+    bool openRecentEnabled = !recentScoresList.isEmpty();
 
     if (!recentScoresList.empty()) {
         recentScoresList = appendClearRecentSection(recentScoresList);
@@ -115,56 +132,60 @@ MenuItem AppMenuModel::fileItem() const
     MenuItemList fileItems {
         makeMenuItem("file-new"),
         makeMenuItem("file-open"),
-        makeMenu(qtrc("appshell", "Open &recent"), recentScoresList, openRecentEnabled, "menu-file-open"),
+        makeMenu(TranslatableString("appshell/menu/file", "Open &recent"), recentScoresList, "menu-file-open", openRecentEnabled),
         makeSeparator(),
         makeMenuItem("file-close"),
         makeMenuItem("file-save"),
         makeMenuItem("file-save-as"),
         makeMenuItem("file-save-a-copy"),
         makeMenuItem("file-save-selection"),
-        makeMenuItem("file-save-online"), // need implement
+        makeMenuItem("file-save-to-cloud"),
+        makeMenuItem("file-publish"),
         makeSeparator(),
         makeMenuItem("file-import-pdf"),
-        makeMenuItem("file-export"), // need implement
+        makeMenuItem("file-export"),
         makeSeparator(),
-        makeMenuItem("edit-info"),
+        makeMenuItem("project-properties"),
         makeMenuItem("parts"),
         makeSeparator(),
-        makeMenuItem("print"), // need implement
+        makeMenuItem("print"),
         makeSeparator(),
-        makeMenuItem("quit")
+        makeMenuItem("quit", MenuItemRole::QuitRole)
     };
 
-    return makeMenu(qtrc("appshell", "&File"), fileItems);
+    return makeMenu(TranslatableString("appshell/menu/file", "&File"), fileItems, "menu-file");
 }
 
-MenuItem AppMenuModel::editItem() const
+MenuItem* AppMenuModel::makeEditMenu()
 {
     MenuItemList editItems {
         makeMenuItem("undo"),
         makeMenuItem("redo"),
         makeSeparator(),
-        makeMenuItem("cut"),
-        makeMenuItem("copy"),
-        makeMenuItem("paste"),
-        makeMenuItem("paste-half"),
-        makeMenuItem("paste-double"),
-        makeMenuItem("swap"),
-        makeMenuItem("delete"),
+        makeMenuItem("notation-cut"),
+        makeMenuItem("notation-copy"),
+        makeMenuItem("notation-paste"),
+        makeMenuItem("notation-paste-half"),
+        makeMenuItem("notation-paste-double"),
+        makeMenuItem("notation-swap"),
+        makeMenuItem("notation-delete"),
         makeSeparator(),
-        makeMenuItem("select-all"),
-        makeMenuItem("select-section"),
+        makeMenuItem("notation-select-all"),
+        makeMenuItem("notation-select-section"),
         makeMenuItem("find"),
         makeSeparator(),
-        makeMenuItem("preference-dialog")
+        makeMenuItem("preference-dialog", MenuItemRole::PreferencesRole)
     };
 
-    return makeMenu(qtrc("appshell", "&Edit"), editItems);
+    return makeMenu(TranslatableString("appshell/menu/edit", "&Edit"), editItems, "menu-edit");
 }
 
-MenuItem AppMenuModel::viewItem() const
+MenuItem* AppMenuModel::makeViewMenu()
 {
     MenuItemList viewItems {
+#ifndef Q_OS_MAC
+        makeMenuItem("fullscreen"),
+#endif
         makeMenuItem("toggle-palettes"),
         makeMenuItem("masterpalette"),
         makeMenuItem("toggle-instruments"),
@@ -173,49 +194,38 @@ MenuItem AppMenuModel::viewItem() const
         makeMenuItem("toggle-navigator"),
         makeMenuItem("toggle-timeline"),
         makeMenuItem("toggle-mixer"),
-        makeMenuItem("synth-control"), // need implement
-        makeMenuItem("toggle-piano"), // need implement
-        makeMenuItem("toggle-scorecmp-tool"), // need implement
+        makeMenuItem("toggle-piano-keyboard"),
+        makeMenuItem("playback-setup"),
+        //makeMenuItem("toggle-scorecmp-tool"), // not implemented
         makeSeparator(),
-        makeMenuItem("zoomin"),
-        makeMenuItem("zoomout"),
+        makeMenu(TranslatableString("appshell/menu/view", "&Toolbars"), makeToolbarsItems(), "menu-toolbars"),
+        makeMenu(TranslatableString("appshell/menu/view", "W&orkspaces"), makeWorkspacesItems(), "menu-workspaces"),
         makeSeparator(),
-        makeMenu(qtrc("appshell", "&Toolbars"), toolbarsItems()),
-        makeMenu(qtrc("appshell", "W&orkspaces"), workspacesItems(), true, "menu-select-workspace"),
-        makeMenuItem("toggle-statusbar"),
+        makeMenu(TranslatableString("appshell/menu/view", "&Show"), makeShowItems(), "menu-show"),
         makeSeparator(),
-        makeMenuItem("split-h"), // need implement
-        makeMenuItem("split-v"), // need implement
-        makeSeparator(),
-        makeMenuItem("show-invisible"),
-        makeMenuItem("show-unprintable"),
-        makeMenuItem("show-frames"),
-        makeMenuItem("show-pageborders"),
-        makeMenuItem("mark-irregular"),
-        makeSeparator(),
-        makeMenuItem("fullscreen")
+        makeMenuItem("dock-restore-default-layout")
     };
 
-    return makeMenu(qtrc("appshell", "&View"), viewItems);
+    return makeMenu(TranslatableString("appshell/menu/view", "&View"), viewItems, "menu-view");
 }
 
-MenuItem AppMenuModel::addItem() const
+MenuItem* AppMenuModel::makeAddMenu()
 {
     MenuItemList addItems {
-        makeMenu(qtrc("appshell", "N&otes"), notesItems()),
-        makeMenu(qtrc("appshell", "&Intervals"), intervalsItems()),
-        makeMenu(qtrc("appshell", "T&uplets"), tupletsItems()),
+        makeMenu(TranslatableString("appshell/menu/add", "&Notes"), makeNotesItems(), "menu-notes"),
+        makeMenu(TranslatableString("appshell/menu/add", "&Intervals"), makeIntervalsItems(), "menu-intervals"),
+        makeMenu(TranslatableString("appshell/menu/add", "T&uplets"), makeTupletsItems(), "menu-tuplets"),
         makeSeparator(),
-        makeMenu(qtrc("appshell", "&Measures"), measuresItems()),
-        makeMenu(qtrc("appshell", "&Frames"), framesItems()),
-        makeMenu(qtrc("appshell", "&Text"), textItems()),
-        makeMenu(qtrc("appshell", "&Lines"), linesItems()),
+        makeMenu(TranslatableString("appshell/menu/add", "&Measures"), makeMeasuresItems(), "menu-measures"),
+        makeMenu(TranslatableString("appshell/menu/add", "&Frames"), makeFramesItems(), "menu-frames"),
+        makeMenu(TranslatableString("appshell/menu/add", "&Text"), makeTextItems(), "menu-notes"),
+        makeMenu(TranslatableString("appshell/menu/add", "&Lines"), makeLinesItems(), "menu-lines"),
     };
 
-    return makeMenu(qtrc("appshell", "&Add"), addItems);
+    return makeMenu(TranslatableString("appshell/menu/add", "&Add"), addItems, "menu-add");
 }
 
-MenuItem AppMenuModel::formatItem() const
+MenuItem* AppMenuModel::makeFormatMenu()
 {
     MenuItemList stretchItems {
         makeMenuItem("stretch+"),
@@ -225,23 +235,23 @@ MenuItem AppMenuModel::formatItem() const
 
     MenuItemList formatItems {
         makeMenuItem("edit-style"),
-        makeMenuItem("page-settings"), // need implement
+        makeMenuItem("page-settings"),
         makeSeparator(),
         makeMenuItem("add-remove-breaks"),
-        makeMenu(qtrc("appshell", "&Stretch"), stretchItems),
+        makeMenu(TranslatableString("appshell/menu/format", "Str&etch"), stretchItems, "menu-stretch"),
         makeSeparator(),
         makeMenuItem("reset-text-style-overrides"),
         makeMenuItem("reset-beammode"),
         makeMenuItem("reset"),
         makeSeparator(),
-        makeMenuItem("load-style"), // need implement
-        makeMenuItem("save-style") // need implement
+        makeMenuItem("load-style"),
+        makeMenuItem("save-style")
     };
 
-    return makeMenu(qtrc("appshell", "F&ormat"), formatItems);
+    return makeMenu(TranslatableString("appshell/menu/format", "F&ormat"), formatItems, "menu-format");
 }
 
-MenuItem AppMenuModel::toolsItem() const
+MenuItem* AppMenuModel::makeToolsMenu()
 {
     MenuItemList voicesItems {
         makeMenuItem("voice-x12"),
@@ -263,8 +273,8 @@ MenuItem AppMenuModel::toolsItem() const
         makeMenuItem("explode"),
         makeMenuItem("implode"),
         makeMenuItem("realize-chord-symbols"),
-        makeMenu(qtrc("appshell", "&Voices"), voicesItems),
-        makeMenu(qtrc("appshell", "&Measures"), measuresItems),
+        makeMenu(TranslatableString("appshell/menu/tools", "&Voices"), voicesItems, "menu-voices"),
+        makeMenu(TranslatableString("appshell/menu/tools", "&Measures"), measuresItems, "menu-tools-measures"),
         makeMenuItem("time-delete"),
         makeSeparator(),
         makeMenuItem("slash-fill"),
@@ -273,50 +283,70 @@ MenuItem AppMenuModel::toolsItem() const
         makeMenuItem("pitch-spell"),
         makeMenuItem("reset-groupings"),
         makeMenuItem("resequence-rehearsal-marks"),
+        /*
+         * TODO: https://github.com/musescore/MuseScore/issues/9670
         makeMenuItem("unroll-repeats"),
+         */
         makeSeparator(),
         makeMenuItem("copy-lyrics-to-clipboard"),
-        makeMenuItem("fotomode"), // need implement
         makeMenuItem("del-empty-measures"),
     };
 
-    return makeMenu(qtrc("appshell", "&Tools"), toolsItems);
+    return makeMenu(TranslatableString("appshell/menu/tools", "&Tools"), toolsItems, "menu-tools");
 }
 
-MenuItem AppMenuModel::helpItem() const
+MenuItem* AppMenuModel::makePluginsMenu()
 {
-    MenuItemList toursItems {
-        makeMenuItem("show-tours"), // need implement
-        makeMenuItem("reset-tours") // need implement
+    return makeMenu(TranslatableString("appshell/menu/plugins", "&Plugins"), makePluginsMenuSubitems(), "menu-plugins");
+}
+
+MenuItemList AppMenuModel::makePluginsMenuSubitems()
+{
+    MenuItemList subitems {
+        makeMenuItem("manage-plugins"),
     };
 
-    MenuItemList helpItems {
-        makeMenuItem("online-handbook"),
-        makeMenu(qtrc("appshell", "&Tours"), toursItems),
-        makeSeparator(),
-        makeMenuItem("about"),
-        makeMenuItem("about-qt"),
-        makeMenuItem("about-musicxml")
-    };
+    MenuItemList enabledPlugins = makePluginsItems();
 
-    if (configuration()->isAppUpdatable()) {
-        helpItems << makeMenuItem("check-update"); // need implement
+    if (!enabledPlugins.empty()) {
+        subitems << makeSeparator();
     }
 
-    helpItems << makeSeparator()
-              << makeMenuItem("ask-help")
-              << makeMenuItem("report-bug")
-              << makeMenuItem("leave-feedback")
-              << makeSeparator()
-              << makeMenuItem("revert-factory");
+    subitems << enabledPlugins;
 
-    return makeMenu(qtrc("appshell", "&Help"), helpItems);
+    return subitems;
 }
 
-MenuItem AppMenuModel::diagnosticItem() const
+MenuItem* AppMenuModel::makeHelpMenu()
+{
+    MenuItemList helpItems {
+        makeMenuItem("online-handbook"),
+        makeSeparator(),
+        makeMenuItem("ask-help"),
+        makeMenuItem("report-bug"),
+        makeMenuItem("leave-feedback"),
+        makeSeparator(),
+        makeMenuItem("about", MenuItemRole::AboutRole),
+        makeMenuItem("about-qt", MenuItemRole::AboutQtRole),
+        makeMenuItem("about-musicxml"),
+        makeSeparator(),
+        makeMenuItem("revert-factory")
+    };
+
+    // put on top
+    if (updateConfiguration()->isAppUpdatable()) {
+        helpItems.push_front(makeSeparator());
+        helpItems.push_front(makeMenuItem("check-update"));
+    }
+
+    return makeMenu(TranslatableString("appshell/menu/help", "&Help"), helpItems, "menu-help");
+}
+
+MenuItem* AppMenuModel::makeDiagnosticMenu()
 {
     MenuItemList systemItems {
         makeMenuItem("diagnostic-show-paths"),
+        makeMenuItem("diagnostic-show-profiler"),
     };
 
     MenuItemList accessibilityItems {
@@ -327,37 +357,53 @@ MenuItem AppMenuModel::diagnosticItem() const
 
     MenuItemList engravingItems {
         makeMenuItem("diagnostic-show-engraving-elements"),
+        makeSeparator(),
+        makeMenuItem("show-element-bounding-rects"),
+        makeMenuItem("color-element-shapes"),
+        makeMenuItem("show-segment-shapes"),
+        makeMenuItem("color-segment-shapes"),
+        makeMenuItem("show-skylines"),
+        makeMenuItem("show-system-bounding-rects"),
+        makeMenuItem("show-corrupted-measures")
     };
 
     MenuItemList autobotItems {
         makeMenuItem("autobot-show-scripts"),
-        makeMenuItem("autobot-show-batchtests"),
     };
 
     MenuItemList items {
-        makeMenu(qtrc("appshell", "System"), systemItems),
-        makeMenu(qtrc("appshell", "Accessibility"), accessibilityItems),
-        makeMenu(qtrc("appshell", "Engraving"), engravingItems),
-        makeMenu(qtrc("appshell", "Autobot"), autobotItems),
+        makeMenu(TranslatableString("appshell/menu/diagnostic", "&System"), systemItems, "menu-system"),
+        makeMenu(TranslatableString("appshell/menu/diagnostic", "&Accessibility"), accessibilityItems, "menu-accessibility"),
+        makeMenu(TranslatableString("appshell/menu/diagnostic", "&Engraving"), engravingItems, "menu-engraving"),
+        makeMenu(TranslatableString("appshell/menu/diagnostic", "Auto&bot"), autobotItems, "menu-autobot"),
+        makeMenuItem("multiinstances-dev-show-info")
     };
 
-    return makeMenu(qtrc("appshell", "Diagnostic"), items);
+    return makeMenu(TranslatableString("appshell/menu/diagnostic", "&Diagnostic"), items, "menu-diagnostic");
 }
 
-MenuItemList AppMenuModel::recentScores() const
+MenuItemList AppMenuModel::makeRecentScoresItems()
 {
     MenuItemList items;
     ProjectMetaList recentProjects = recentProjectsProvider()->recentProjectList();
 
     int index = 0;
     for (const ProjectMeta& meta : recentProjects) {
-        MenuItem item;
-        item.id = makeId(item.code, index++);
-        item.code = "file-open";
-        item.title = !meta.title.isEmpty() ? meta.title : meta.fileName.toQString();
-        item.args = ActionData::make_arg1<io::path>(meta.filePath);
-        item.state.enabled = true;
-        item.selectable = true;
+        MenuItem* item = new MenuItem(this);
+
+        UiAction action;
+        action.code = "file-open";
+        action.title = TranslatableString::untranslatable(meta.fileName().toString());
+        item->setAction(action);
+
+        item->setId(makeId(item->action().code, index++));
+
+        UiActionState state;
+        state.enabled = true;
+        item->setState(state);
+
+        item->setSelectable(true);
+        item->setArgs(ActionData::make_arg1<io::path_t>(meta.filePath));
 
         items << item;
     }
@@ -365,7 +411,7 @@ MenuItemList AppMenuModel::recentScores() const
     return items;
 }
 
-MenuItemList AppMenuModel::appendClearRecentSection(const ui::MenuItemList& recentScores) const
+MenuItemList AppMenuModel::appendClearRecentSection(const uicomponents::MenuItemList& recentScores)
 {
     MenuItemList result = recentScores;
     result << makeSeparator()
@@ -374,7 +420,7 @@ MenuItemList AppMenuModel::appendClearRecentSection(const ui::MenuItemList& rece
     return result;
 }
 
-MenuItemList AppMenuModel::notesItems() const
+MenuItemList AppMenuModel::makeNotesItems()
 {
     MenuItemList items {
         makeMenuItem("note-input"),
@@ -399,7 +445,7 @@ MenuItemList AppMenuModel::notesItems() const
     return items;
 }
 
-MenuItemList AppMenuModel::intervalsItems() const
+MenuItemList AppMenuModel::makeIntervalsItems()
 {
     MenuItemList items {
         makeMenuItem("interval1"),
@@ -425,7 +471,7 @@ MenuItemList AppMenuModel::intervalsItems() const
     return items;
 }
 
-MenuItemList AppMenuModel::tupletsItems() const
+MenuItemList AppMenuModel::makeTupletsItems()
 {
     MenuItemList items {
         makeMenuItem("duplet"),
@@ -442,20 +488,20 @@ MenuItemList AppMenuModel::tupletsItems() const
     return items;
 }
 
-MenuItemList AppMenuModel::measuresItems() const
+MenuItemList AppMenuModel::makeMeasuresItems()
 {
     MenuItemList items {
-        makeMenuItem("insert-measure"),
-        makeMenuItem("insert-measures"),
+        makeMenuItem("insert-measures-after-selection", TranslatableString("notation", "Insert &after selection…")),
+        makeMenuItem("insert-measures", TranslatableString("notation", "Insert &before selection…")),
         makeSeparator(),
-        makeMenuItem("append-measure"),
-        makeMenuItem("append-measures")
+        makeMenuItem("insert-measures-at-start-of-score", TranslatableString("notation", "Insert at &start of score…")),
+        makeMenuItem("append-measures", TranslatableString("notation", "Insert at &end of score…"))
     };
 
     return items;
 }
 
-MenuItemList AppMenuModel::framesItems() const
+MenuItemList AppMenuModel::makeFramesItems()
 {
     MenuItemList items {
         makeMenuItem("insert-hbox"),
@@ -470,7 +516,7 @@ MenuItemList AppMenuModel::framesItems() const
     return items;
 }
 
-MenuItemList AppMenuModel::textItems() const
+MenuItemList AppMenuModel::makeTextItems()
 {
     MenuItemList items {
         makeMenuItem("title-text"),
@@ -498,7 +544,7 @@ MenuItemList AppMenuModel::textItems() const
     return items;
 }
 
-MenuItemList AppMenuModel::linesItems() const
+MenuItemList AppMenuModel::makeLinesItems()
 {
     MenuItemList items {
         makeMenuItem("add-slur"),
@@ -512,19 +558,18 @@ MenuItemList AppMenuModel::linesItems() const
     return items;
 }
 
-MenuItemList AppMenuModel::toolbarsItems() const
+MenuItemList AppMenuModel::makeToolbarsItems()
 {
     MenuItemList items {
         makeMenuItem("toggle-transport"),
         makeMenuItem("toggle-noteinput"),
-        makeMenuItem("toggle-notationtoolbar"),
-        makeMenuItem("toggle-undoredo")
+        makeMenuItem("toggle-statusbar")
     };
 
     return items;
 }
 
-MenuItemList AppMenuModel::workspacesItems() const
+MenuItemList AppMenuModel::makeWorkspacesItems()
 {
     MenuItemList items;
 
@@ -537,14 +582,21 @@ MenuItemList AppMenuModel::workspacesItems() const
 
     int index = 0;
     for (const IWorkspacePtr& workspace : workspaces) {
-        MenuItem item = uiactionsRegister()->action("select-workspace");
-        item.id = makeId(item.code, index++);
-        item.title = QString::fromStdString(workspace->title());
-        item.args = ActionData::make_arg1<std::string>(workspace->name());
+        MenuItem* item = new MenuItem(uiActionsRegister()->action("select-workspace"), this);
+        item->setId(makeId(item->action().code, index++));
 
-        item.selectable = true;
-        item.selected = (workspace == currentWorkspace);
-        item.state.enabled = true;
+        UiAction action = item->action();
+        action.title = TranslatableString::untranslatable(String::fromStdString(workspace->title()));
+
+        item->setAction(action);
+        item->setArgs(ActionData::make_arg1<std::string>(workspace->name()));
+        item->setSelectable(true);
+        item->setSelected(workspace == currentWorkspace);
+
+        UiActionState state;
+        state.enabled = true;
+        state.checked = item->selected();
+        item->setState(state);
 
         items << item;
     }
@@ -553,4 +605,56 @@ MenuItemList AppMenuModel::workspacesItems() const
           << makeMenuItem("configure-workspaces");
 
     return items;
+}
+
+MenuItemList AppMenuModel::makeShowItems()
+{
+    MenuItemList items {
+        makeMenuItem("show-invisible"),
+        makeMenuItem("show-unprintable"),
+        makeMenuItem("show-frames"),
+        makeMenuItem("show-pageborders"),
+        makeMenuItem("show-irregular")
+    };
+
+    return items;
+}
+
+MenuItemList AppMenuModel::makePluginsItems()
+{
+    MenuItemList result;
+
+    IPluginsService::CategoryInfoMap categories = pluginsService()->categories();
+    PluginInfoMap enabledPlugins = pluginsService()->plugins(IPluginsService::Enabled).val;
+
+    std::map<std::string, MenuItemList> categoriesMap;
+    MenuItemList pluginsWithoutCategories;
+    for (const PluginInfo& plugin : values(enabledPlugins)) {
+        std::string categoryStr = plugin.categoryCode.toStdString();
+        if (contains(categories, categoryStr)) {
+            MenuItemList& items = categoriesMap[categoryStr];
+            items << makeMenuItem(plugin.codeKey.toStdString(), TranslatableString::untranslatable(plugin.name));
+        } else {
+            pluginsWithoutCategories << makeMenuItem(plugin.codeKey.toStdString(), TranslatableString::untranslatable(plugin.name));
+        }
+    }
+
+    for (const auto& it : categoriesMap) {
+        TranslatableString categoryTitle = value(categories, it.first, {});
+        result << makeMenu(categoryTitle, it.second);
+    }
+
+    std::sort(result.begin(), result.end(), [](const MenuItem& l, const MenuItem& r) {
+        return l.translatedTitle() < r.translatedTitle();
+    });
+
+    std::sort(pluginsWithoutCategories.begin(), pluginsWithoutCategories.end(), [](const MenuItem& l, const MenuItem& r) {
+        return l.translatedTitle() < r.translatedTitle();
+    });
+
+    for (MenuItem* plugin : pluginsWithoutCategories) {
+        result << plugin;
+    }
+
+    return result;
 }

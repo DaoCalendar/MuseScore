@@ -23,6 +23,7 @@
 #define MU_NOTATION_EDITSTYLE_H
 
 #include "ui_editstyle.h"
+
 #include "modularity/ioc.h"
 #include "context/iglobalcontext.h"
 #include "inotationconfiguration.h"
@@ -39,17 +40,26 @@ class EditStyle : public QDialog, private Ui::EditStyleBase
     INJECT(notation, mu::framework::IInteractive, interactive)
     INJECT(notation, mu::ui::IUiEngine, uiEngine)
 
+    Q_PROPERTY(QString currentPageCode READ currentPageCode WRITE setCurrentPageCode NOTIFY currentPageChanged)
+    Q_PROPERTY(QString currentSubPageCode READ currentSubPageCode WRITE setCurrentSubPageCode NOTIFY currentSubPageChanged)
+
 public:
     EditStyle(QWidget* = nullptr);
     EditStyle(const EditStyle&);
 
-    void setPage(int idx);
-    void gotoElement(EngravingItem* e);
-    static bool elementHasPage(EngravingItem* e);
+    QString currentPageCode() const;
+    QString currentSubPageCode() const;
 
 public slots:
     void accept();
     void reject();
+
+    void setCurrentPageCode(const QString& code);
+    void setCurrentSubPageCode(const QString& code);
+
+signals:
+    void currentPageChanged();
+    void currentSubPageChanged();
 
 private:
     void showEvent(QShowEvent*);
@@ -67,32 +77,32 @@ private:
     static EditStylePage pageForElement(EngravingItem*);
 
     struct StyleWidget {
-        StyleId idx;
-        bool showPercent;
-        QObject* widget;
-        QToolButton* reset;
+        StyleId idx = StyleId::NOSTYLE;
+        bool showPercent = false;
+        QObject* widget = nullptr;
+        QToolButton* reset = nullptr;
     };
 
     QVector<StyleWidget> styleWidgets;
     const StyleWidget& styleWidget(StyleId id) const;
 
-    std::vector<QComboBox*> lineStyleComboBoxes;
+    class LineStyleSelect;
+    std::vector<LineStyleSelect*> m_lineStyleSelects;
+
     std::vector<QComboBox*> verticalPlacementComboBoxes;
     std::vector<QComboBox*> horizontalPlacementComboBoxes;
 
     QPushButton* buttonApplyToAllParts = nullptr;
 
     void unhandledType(const StyleWidget);
-    QVariant getValue(StyleId idx);
+    PropertyValue getValue(StyleId idx);
     void setValues();
 
-    QVariant styleValue(StyleId id) const;
-    QVariant defaultStyleValue(StyleId id) const;
+    PropertyValue styleValue(StyleId id) const;
+    PropertyValue defaultStyleValue(StyleId id) const;
     bool hasDefaultStyleValue(StyleId id) const;
-    void setStyleValue(StyleId id, const QVariant& value);
-
-    int numberOfPage;
-    int pageListMap[50];
+    void setStyleQVariantValue(StyleId id, const QVariant& value);
+    void setStyleValue(StyleId id, const PropertyValue& value);
 
 private slots:
     void selectChordDescriptionFile();
@@ -112,20 +122,19 @@ private slots:
     void resetStyleValue(int);
     void valueChanged(int);
     void textStyleChanged(int);
-    void resetTextStyle(Ms::Pid);
-    void textStyleValueChanged(Ms::Pid, QVariant);
+    void resetTextStyle(mu::engraving::Pid);
+    void textStyleValueChanged(mu::engraving::Pid, QVariant);
     void on_comboFBFont_currentIndexChanged(int index);
     void on_buttonTogglePagelist_clicked();
     void on_resetStylesButton_clicked();
+    void on_resetTabStylesButton_clicked();
     void editUserStyleName();
     void endEditUserStyleName();
     void resetUserStyleName();
-    void pageListRowChanged(int);
-    void pageListResetOrder();
-    void pageListMoved(QModelIndex, int, int, QModelIndex, int);
-    void stringToArray(std::string, int*);
-    std::string arrayToString(int*);
-    std::string ConsecutiveStr(int);
+
+private:
+    QString m_currentPageCode;
+    QString m_currentSubPageCode;
 };
 }
 

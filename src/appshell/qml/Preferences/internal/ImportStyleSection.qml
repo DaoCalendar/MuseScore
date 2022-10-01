@@ -27,7 +27,7 @@ import MuseScore.UiComponents 1.0
 BaseSection {
     id: root
 
-    title: qsTrc("appshell", "Style used for import")
+    title: qsTrc("appshell/preferences", "Style used for import")
 
     navigation.direction: NavigationPanel.Both
 
@@ -46,9 +46,9 @@ BaseSection {
 
     RoundedRadioButton {
         id: builtInStyleButton
-        width: 193
+        width: root.columnWidth
 
-        text: qsTrc("appshell", "Built-in style")
+        text: qsTrc("appshell/preferences", "Built-in style")
         checked: !prv.useStyleFile
 
         navigation.name: "BuiltInStyleButton"
@@ -64,14 +64,15 @@ BaseSection {
 
     Row {
         width: parent.width
+        spacing: root.columnSpacing
 
         RoundedRadioButton {
             id: useStyleFileButton
 
-            width: 193
+            width: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
-            text: qsTrc("appshell", "Use style file:")
+            text: qsTrc("appshell/preferences", "Use style file:")
             checked: prv.useStyleFile
 
             navigation.name: "UseStyleButton"
@@ -87,7 +88,7 @@ BaseSection {
         FilePicker {
             id: styleFilePicker
 
-            width: 246
+            pathFieldWidth: root.columnWidth
             anchors.verticalCenter: parent.verticalCenter
 
             dialogTitle: root.fileChooseTitle
@@ -102,7 +103,7 @@ BaseSection {
             navigationRowOrderStart: 1
             navigationColumnOrderStart: 1
 
-            onPathEdited: {
+            onPathEdited: function(newPath) {
                 root.styleFileImportPathChangeRequested(newPath)
             }
         }

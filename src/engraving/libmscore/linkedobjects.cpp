@@ -21,12 +21,14 @@
  */
 #include "linkedobjects.h"
 
-#include "score.h"
 #include "masterscore.h"
 #include "measure.h"
+#include "score.h"
 #include "staff.h"
 
-using namespace Ms;
+#include "log.h"
+
+using namespace mu::engraving;
 
 LinkedObjects::LinkedObjects(Score* score)
 {
@@ -51,6 +53,11 @@ void LinkedObjects::setLid(Score* score, int id)
     score->linkId(id);
 }
 
+bool LinkedObjects::contains(const EngravingObject* o) const
+{
+    return std::find(this->begin(), this->end(), o) != this->end();
+}
+
 //---------------------------------------------------------
 //   mainElement
 //    Returns "main" linked element which is expected to
@@ -59,12 +66,12 @@ void LinkedObjects::setLid(Score* score, int id)
 
 EngravingObject* LinkedObjects::mainElement()
 {
-    if (isEmpty()) {
+    if (empty()) {
         return nullptr;
     }
-    MasterScore* ms = at(0)->score()->masterScore();
-    const bool elements = at(0)->isEngravingItem();
-    const bool staves = at(0)->isStaff();
+    MasterScore* ms = front()->score()->masterScore();
+    const bool elements = front()->isEngravingItem();
+    const bool staves = front()->isStaff();
     return *std::min_element(begin(), end(), [ms, elements, staves](EngravingObject* s1, EngravingObject* s2) {
         if (s1->score() == ms && s2->score() != ms) {
             return true;
@@ -80,8 +87,8 @@ EngravingObject* LinkedObjects::mainElement()
             // or two elements from excerpt.
             EngravingItem* e1 = toEngravingItem(s1);
             EngravingItem* e2 = toEngravingItem(s2);
-            const int tr1 = e1->track();
-            const int tr2 = e2->track();
+            const track_idx_t tr1 = e1->track();
+            const track_idx_t tr2 = e2->track();
             if (tr1 == tr2) {
                 const Fraction tick1 = e1->tick();
                 const Fraction tick2 = e2->tick();

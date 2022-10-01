@@ -39,20 +39,20 @@ Column {
 
     spacing: 12
 
-    function focusOnFirst() {
+    function forceFocusIn() {
         horizontalSpacingSection.focusOnFirst()
     }
 
     HorizontalSpacingSection {
         id: horizontalSpacingSection
         leadingSpace: model ? model.leadingSpace : null
-        barWidth: model ? model.barWidth : null
+        measureWidth: model ? model.measureWidth : null
 
         navigationPanel: root.navigationPanel
         navigationRowStart: 0
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     VerticalSpacingSection {
         id: verticalSpacingSection
@@ -63,7 +63,7 @@ Column {
         navigationRowStart: horizontalSpacingSection.navigationRowEnd + 1
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     AppearanceOffsetSection {
         id: offsetSection
@@ -75,7 +75,7 @@ Column {
         navigationPanel: root.navigationPanel
         navigationRowStart: verticalSpacingSection.navigationRowEnd + 1
 
-        onSnapToGridToggled: {
+        onSnapToGridToggled: function(snap) {
             if (model) {
                 model.isSnappedToGrid = snap
             }
@@ -88,7 +88,7 @@ Column {
         }
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     ArrangeSection {
         id: arrangeSection
@@ -96,20 +96,32 @@ Column {
         navigationPanel: root.navigationPanel
         navigationRowStart: offsetSection.navigationRowEnd
 
-        onPushBackRequested: {
+        onPushBackwardsRequested: {
             if (root.model) {
-                root.model.pushBackInOrder()
+                root.model.pushBackwardsInOrder()
             }
         }
 
-        onPushFrontRequested: {
+        onPushForwardsRequested: {
             if (root.model) {
-                root.model.pushFrontInOrder()
+                root.model.pushForwardsInOrder()
+            }
+        }
+
+        onPushToBackRequested: {
+            if (root.model) {
+                root.model.pushToBackInOrder()
+            }
+        }
+
+        onPushToFrontRequested: {
+            if (root.model) {
+                root.model.pushToFrontInOrder()
             }
         }
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     ColorSection {
         propertyItem: root.model ? root.model.color : null

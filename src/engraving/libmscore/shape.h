@@ -23,28 +23,31 @@
 #ifndef __SHAPE_H__
 #define __SHAPE_H__
 
-#include "infrastructure/draw/geometry.h"
+#include "global/allocator.h"
+#include "draw/types/geometry.h"
 
-namespace Ms {
-#ifndef NDEBUG
-// #define DEBUG_SHAPES    // enable shape debugging
-#endif
+namespace mu::draw {
+class Painter;
+}
 
-class Segment;
+namespace mu::engraving {
+class EngravingItem;
+class Score;
 
 //---------------------------------------------------------
 //   ShapeElement
 //---------------------------------------------------------
 
 struct ShapeElement : public mu::RectF {
-#ifndef NDEBUG
-    const char* text;
-    void dump() const;
-    ShapeElement(const mu::RectF& f, const char* t = 0)
-        : mu::RectF(f), text(t) {}
-#else
+    OBJECT_ALLOCATOR(engraving, ShapeElement)
+public:
+    const EngravingItem* toItem = nullptr;
+    ShapeElement(const mu::RectF& f, const EngravingItem* p)
+        : mu::RectF(f), toItem(p) {}
     ShapeElement(const mu::RectF& f)
         : mu::RectF(f) {}
+#ifndef NDEBUG
+    void dump() const;
 #endif
 };
 
@@ -54,7 +57,7 @@ struct ShapeElement : public mu::RectF {
 
 class Shape : public std::vector<ShapeElement>
 {
-// class Shape : std::vector<ShapeElement> {
+    OBJECT_ALLOCATOR(engraving, Shape)
 public:
     enum HorizontalSpacingType {
         SPACING_GENERAL = 0,
@@ -63,35 +66,30 @@ public:
     };
 
     Shape() {}
-#ifndef NDEBUG
-    Shape(const mu::RectF& r, const char* s = 0) { add(r, s); }
-#else
-    Shape(const mu::RectF& r) { add(r); }
-#endif
+    Shape(const mu::RectF& r, const EngravingItem* p = nullptr) { add(r, p); }
+
     void add(const Shape& s) { insert(end(), s.begin(), s.end()); }
-#ifndef NDEBUG
-    void add(const mu::RectF& r, const char* t = 0);
-#else
-    void add(const mu::RectF& r) { push_back(r); }
-#endif
+    void add(const mu::RectF& r, const EngravingItem* p) { push_back(ShapeElement(r, p)); }
+    void add(const mu::RectF& r) { push_back(ShapeElement(r)); }
+
     void remove(const mu::RectF&);
     void remove(const Shape&);
 
-    void addHorizontalSpacing(HorizontalSpacingType type, qreal left, qreal right);
+    void addHorizontalSpacing(EngravingItem* item, double left, double right);
 
     void translate(const mu::PointF&);
-    void translateX(qreal);
-    void translateY(qreal);
+    void translateX(double);
+    void translateY(double);
     Shape translated(const mu::PointF&) const;
 
-    qreal minHorizontalDistance(const Shape&) const;
-    qreal minVerticalDistance(const Shape&) const;
-    qreal topDistance(const mu::PointF&) const;
-    qreal bottomDistance(const mu::PointF&) const;
-    qreal left() const;
-    qreal right() const;
-    qreal top() const;
-    qreal bottom() const;
+    double minHorizontalDistance(const Shape&, Score* score) const;
+    double minVerticalDistance(const Shape&) const;
+    double topDistance(const mu::PointF&) const;
+    double bottomDistance(const mu::PointF&) const;
+    double left() const;
+    double right() const;
+    double top() const;
+    double bottom() const;
 
     size_t size() const { return std::vector<ShapeElement>::size(); }
     bool empty() const { return std::vector<ShapeElement>::empty(); }
@@ -100,7 +98,9 @@ public:
     bool contains(const mu::PointF&) const;
     bool intersects(const mu::RectF& rr) const;
     bool intersects(const Shape&) const;
+    bool clearsVertically(const Shape& a) const;
 
+    void paint(mu::draw::Painter& painter) const;
 #ifndef NDEBUG
     void dump(const char*) const;
 #endif
@@ -110,7 +110,7 @@ public:
 //   intersects
 //---------------------------------------------------------
 
-inline static bool intersects(qreal a, qreal b, qreal c, qreal d)
+inline static bool intersects(double a, double b, double c, double d, double verticalClearance)
 {
     // return (a >= c && a < d) || (b >= c && b < d) || (a < c && b >= b);
     // return (std::max(a,b) > std::min(c,d)) && (std::min(a,b) < std::max(c,d));
@@ -118,12 +118,8 @@ inline static bool intersects(qreal a, qreal b, qreal c, qreal d)
     if (a == b || c == d) {   // zero height
         return false;
     }
-    return (b > c) && (a < d);
+    return (b + verticalClearance > c) && (a < d + verticalClearance);
 }
-
-#ifdef DEBUG_SHAPES
-extern void testShapes();
-#endif
-} // namespace Ms
+} // namespace mu::engraving
 
 #endif

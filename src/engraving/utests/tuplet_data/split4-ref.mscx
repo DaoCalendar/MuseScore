@@ -29,7 +29,7 @@
     <metaTag name="translator"></metaTag>
     <metaTag name="workNumber"></metaTag>
     <metaTag name="workTitle">tuplet</metaTag>
-    <Part>
+    <Part id="1">
       <Staff id="1">
         <StaffType group="pitched">
           <name>stdNormal</name>
@@ -115,7 +115,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -131,13 +131,13 @@
             <actualNotes>3</actualNotes>
             <baseNote>16th</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
           <Beam>
-            <l1>1</l1>
-            <l2>1</l2>
+            <l1>10</l1>
+            <l2>10</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -151,7 +151,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>32nd</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -191,7 +191,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>eighth</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -200,7 +200,7 @@
             <actualNotes>3</actualNotes>
             <baseNote>16th</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
@@ -209,13 +209,13 @@
             <actualNotes>3</actualNotes>
             <baseNote>32nd</baseNote>
             <Number>
-              <style>Tuplet</style>
+              <style>tuplet</style>
               <text>3</text>
               </Number>
             </Tuplet>
           <Beam>
-            <l1>5</l1>
-            <l2>1</l2>
+            <l1>6</l1>
+            <l2>6</l2>
             </Beam>
           <Chord>
             <durationType>32nd</durationType>
@@ -296,8 +296,8 @@
             <durationType>quarter</durationType>
             </Rest>
           <Beam>
-            <l1>15</l1>
-            <l2>15</l2>
+            <l1>30</l1>
+            <l2>30</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -314,8 +314,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>15</l1>
-            <l2>15</l2>
+            <l1>30</l1>
+            <l2>30</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -336,8 +336,8 @@
       <Measure>
         <voice>
           <Beam>
-            <l1>15</l1>
-            <l2>15</l2>
+            <l1>30</l1>
+            <l2>30</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>
@@ -354,8 +354,8 @@
               </Note>
             </Chord>
           <Beam>
-            <l1>15</l1>
-            <l2>15</l2>
+            <l1>30</l1>
+            <l2>30</l2>
             </Beam>
           <Chord>
             <durationType>eighth</durationType>

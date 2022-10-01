@@ -22,13 +22,13 @@
 
 #include "sticking.h"
 
-#include "io/xml.h"
+#include "rw/xml.h"
 
 #include "segment.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   stickingStyle
 //---------------------------------------------------------
@@ -43,7 +43,7 @@ static const ElementStyle stickingStyle {
 //---------------------------------------------------------
 
 Sticking::Sticking(Segment* parent)
-    : TextBase(ElementType::STICKING, parent, Tid::STICKING, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+    : TextBase(ElementType::STICKING, parent, TextStyleType::STICKING, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
 {
     initElementStyle(&stickingStyle);
 }
@@ -54,12 +54,12 @@ Sticking::Sticking(Segment* parent)
 
 void Sticking::write(XmlWriter& xml) const
 {
-    if (!xml.canWrite(this)) {
+    if (!xml.context()->canWrite(this)) {
         return;
     }
-    xml.startObject(this);
+    xml.startElement(this);
     TextBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -69,6 +69,24 @@ void Sticking::write(XmlWriter& xml) const
 void Sticking::read(XmlReader& e)
 {
     TextBase::read(e);
+}
+
+bool Sticking::isEditAllowed(EditData& ed) const
+{
+    if (isTextNavigationKey(ed.key, ed.modifiers)) {
+        return false;
+    }
+
+    return TextBase::isEditAllowed(ed);
+}
+
+bool Sticking::edit(EditData& ed)
+{
+    if (!isEditAllowed(ed)) {
+        return false;
+    }
+
+    return TextBase::edit(ed);
 }
 
 //---------------------------------------------------------
@@ -85,11 +103,11 @@ void Sticking::layout()
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Sticking::propertyDefault(Pid id) const
+engraving::PropertyValue Sticking::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::STICKING);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::STICKING;
     default:
         return TextBase::propertyDefault(id);
     }

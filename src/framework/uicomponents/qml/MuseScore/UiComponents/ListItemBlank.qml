@@ -37,15 +37,14 @@ FocusableControl {
 
     signal clicked(var mouse)
     signal doubleClicked(var mouse)
-    signal hovered(var isHovered, var mouseX, int mouseY)
+    signal hovered(var isHovered, real mouseX, real mouseY)
+    signal removeSelectionRequested()
 
     implicitHeight: 30
     implicitWidth: Boolean(ListView.view) ? ListView.view.width : 30
 
-    Accessible.selectable: true
-    Accessible.selected: isSelected
-
     navigation.accessible.role: MUAccessible.ListItem
+    navigation.accessible.selected: isSelected
 
     background.color: normalColor
     background.opacity: root.enabled ? 1 : ui.theme.itemOpacityDisabled
@@ -55,7 +54,11 @@ FocusableControl {
     mouseArea.hoverEnabled: root.visible
     mouseArea.onHoveredChanged: root.hovered(mouseArea.containsMouse, mouseArea.mouseX, mouseArea.mouseY)
 
-    mouseArea.onClicked: function(mouse) { root.clicked(mouse) }
+    mouseArea.onClicked: function(mouse) {
+        navigation.requestActiveByInteraction()
+
+        root.clicked(mouse)
+    }
     mouseArea.onDoubleClicked: function(mouse) { root.doubleClicked(mouse) }
 
     mouseArea.onContainsMouseChanged: {
@@ -64,13 +67,29 @@ FocusableControl {
         }
 
         if (mouseArea.containsMouse) {
-            ui.tooltip.show(this, root.hint)
+            ui.tooltip.show(root, root.hint)
         } else {
-            ui.tooltip.hide(this)
+            ui.tooltip.hide(root)
         }
     }
 
+    mouseArea.onPressed: {
+        ui.tooltip.hide(root, true)
+    }
+
     onNavigationTriggered: root.clicked(null)
+
+    Keys.onShortcutOverride: function(event) {
+        switch (event.key) {
+        case Qt.Key_Backspace:
+        case Qt.Key_Delete:
+            event.accepted = true
+            root.removeSelectionRequested()
+            break
+        default:
+            break
+        }
+    }
 
     states: [
         State {

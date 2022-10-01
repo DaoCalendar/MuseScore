@@ -22,22 +22,21 @@
 
 #include "instrchange.h"
 
-#include "io/xml.h"
+#include "translation.h"
+#include "rw/xml.h"
 
+#include "keysig.h"
+#include "measure.h"
+#include "mscore.h"
+#include "part.h"
 #include "score.h"
 #include "segment.h"
 #include "staff.h"
-#include "part.h"
 #include "undo.h"
-#include "mscore.h"
-#include "measure.h"
-#include "system.h"
-#include "chord.h"
-#include "keysig.h"
 
 using namespace mu;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   instrumentChangeStyle
 //---------------------------------------------------------
@@ -52,14 +51,14 @@ static const ElementStyle instrumentChangeStyle {
 //---------------------------------------------------------
 
 InstrumentChange::InstrumentChange(EngravingItem* parent)
-    : TextBase(ElementType::INSTRUMENT_CHANGE, parent, Tid::INSTRUMENT_CHANGE, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+    : TextBase(ElementType::INSTRUMENT_CHANGE, parent, TextStyleType::INSTRUMENT_CHANGE, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
 {
     initElementStyle(&instrumentChangeStyle);
     _instrument = new Instrument();
 }
 
 InstrumentChange::InstrumentChange(const Instrument& i, EngravingItem* parent)
-    : TextBase(ElementType::INSTRUMENT_CHANGE, parent, Tid::INSTRUMENT_CHANGE, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+    : TextBase(ElementType::INSTRUMENT_CHANGE, parent, TextStyleType::INSTRUMENT_CHANGE, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
 {
     initElementStyle(&instrumentChangeStyle);
     _instrument = new Instrument(i);
@@ -92,7 +91,7 @@ void InstrumentChange::setupInstrument(const Instrument* instrument)
         Interval oldV = part->instrument(tickStart)->transpose();
 
         // change the clef for each staff
-        for (int i = 0; i < part->nstaves(); i++) {
+        for (size_t i = 0; i < part->nstaves(); i++) {
             if (part->instrument(tickStart)->clefType(i) != instrument->clefType(i)) {
                 ClefType clefType
                     = score()->styleB(Sid::concertPitch) ? instrument->clefType(i)._concertClef : instrument->clefType(i)._transposingClef;
@@ -104,7 +103,7 @@ void InstrumentChange::setupInstrument(const Instrument* instrument)
 
         // Change key signature if necessary
         if (instrument->transpose() != oldV) {
-            for (int i = 0; i < part->nstaves(); i++) {
+            for (size_t i = 0; i < part->nstaves(); i++) {
                 if (!part->staff(i)->keySigEvent(tickStart).isAtonal()) {
                     KeySigEvent ks;
                     ks.setForInstrumentChange(true);
@@ -128,9 +127,9 @@ void InstrumentChange::setupInstrument(const Instrument* instrument)
         // transpose for current score only
         // this automatically propagates to linked scores
         if (part->instrument(tickStart)->transpose() != oldV) {
-            auto i = part->instruments()->upper_bound(tickStart.ticks());          // find(), ++i
+            auto i = part->instruments().upper_bound(tickStart.ticks());          // find(), ++i
             Fraction tickEnd;
-            if (i == part->instruments()->end()) {
+            if (i == part->instruments().end()) {
                 tickEnd = Fraction(-1, 1);
             } else {
                 tickEnd = Fraction::fromTicks(i->first);
@@ -138,7 +137,8 @@ void InstrumentChange::setupInstrument(const Instrument* instrument)
             score()->transpositionChanged(part, oldV, tickStart, tickEnd);
         }
 
-        const QString newInstrChangeText = tr("To %1").arg(instrument->trackName());
+        //: The text of an "instrument change" marking. It is an instruction to the player to switch to another instrument.
+        const String newInstrChangeText = mtrc("engraving", "To %1").arg(instrument->trackName());
         undoChangeProperty(Pid::TEXT, TextBase::plainToXmlText(newInstrChangeText));
     }
 }
@@ -152,10 +152,10 @@ std::vector<KeySig*> InstrumentChange::keySigs() const
     std::vector<KeySig*> keysigs;
     Segment* seg = segment()->prev1(SegmentType::KeySig);
     if (seg) {
-        int startVoice = part()->staff(0)->idx() * VOICES;
-        int endVoice = part()->staff(part()->nstaves() - 1)->idx() * VOICES;
+        voice_idx_t startVoice = part()->staff(0)->idx() * VOICES;
+        voice_idx_t endVoice = part()->staff(part()->nstaves() - 1)->idx() * VOICES;
         Fraction t = tick();
-        for (int i = startVoice; i <= endVoice; i += VOICES) {
+        for (voice_idx_t i = startVoice; i <= endVoice; i += VOICES) {
             KeySig* ks = toKeySig(seg->element(i));
             if (ks && ks->forInstrumentChange() && ks->tick() == t) {
                 keysigs.push_back(ks);
@@ -174,10 +174,10 @@ std::vector<Clef*> InstrumentChange::clefs() const
     std::vector<Clef*> clefs;
     Segment* seg = segment()->prev1(SegmentType::Clef);
     if (seg) {
-        int startVoice = part()->staff(0)->idx() * VOICES;
-        int endVoice = part()->staff(part()->nstaves() - 1)->idx() * VOICES;
+        voice_idx_t startVoice = part()->staff(0)->idx() * VOICES;
+        voice_idx_t endVoice = part()->staff(part()->nstaves() - 1)->idx() * VOICES;
         Fraction t = tick();
-        for (int i = startVoice; i <= endVoice; i += VOICES) {
+        for (voice_idx_t i = startVoice; i <= endVoice; i += VOICES) {
             Clef* clef = toClef(seg->element(i));
             if (clef && clef->forInstrumentChange() && clef->tick() == t) {
                 clefs.push_back(clef);
@@ -193,13 +193,13 @@ std::vector<Clef*> InstrumentChange::clefs() const
 
 void InstrumentChange::write(XmlWriter& xml) const
 {
-    xml.startObject(this);
+    xml.startElement(this);
     _instrument->write(xml, part());
     if (_init) {
         xml.tag("init", _init);
     }
     TextBase::writeProperties(xml);
-    xml.endObject();
+    xml.endElement();
 }
 
 //---------------------------------------------------------
@@ -209,7 +209,7 @@ void InstrumentChange::write(XmlWriter& xml) const
 void InstrumentChange::read(XmlReader& e)
 {
     while (e.readNextStartElement()) {
-        const QStringRef& tag(e.name());
+        const AsciiStringView tag(e.name());
         if (tag == "Instrument") {
             _instrument->read(e, part());
         } else if (tag == "init") {
@@ -238,11 +238,11 @@ void InstrumentChange::read(XmlReader& e)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant InstrumentChange::propertyDefault(Pid propertyId) const
+engraving::PropertyValue InstrumentChange::propertyDefault(Pid propertyId) const
 {
     switch (propertyId) {
-    case Pid::SUB_STYLE:
-        return int(Tid::INSTRUMENT_CHANGE);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::INSTRUMENT_CHANGE;
     default:
         return TextBase::propertyDefault(propertyId);
     }

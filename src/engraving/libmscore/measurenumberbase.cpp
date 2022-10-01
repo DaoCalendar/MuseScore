@@ -21,19 +21,22 @@
  */
 
 #include "measurenumberbase.h"
-#include "io/xml.h"
-#include "score.h"
+
+#include "rw/xml.h"
+
 #include "measure.h"
+#include "score.h"
 #include "staff.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   MeasureNumberBase
 //---------------------------------------------------------
 
-MeasureNumberBase::MeasureNumberBase(const ElementType& type, Measure* parent, Tid tid)
+MeasureNumberBase::MeasureNumberBase(const ElementType& type, Measure* parent, TextStyleType tid)
     : TextBase(type, parent, tid)
 {
     setFlag(ElementFlag::ON_STAFF, true);
@@ -55,7 +58,7 @@ MeasureNumberBase::MeasureNumberBase(const MeasureNumberBase& other)
 //   getProperty
 //---------------------------------------------------------
 
-QVariant MeasureNumberBase::getProperty(Pid id) const
+engraving::PropertyValue MeasureNumberBase::getProperty(Pid id) const
 {
     switch (id) {
     case Pid::HPLACEMENT:
@@ -69,11 +72,11 @@ QVariant MeasureNumberBase::getProperty(Pid id) const
 //   setProperty
 //---------------------------------------------------------
 
-bool MeasureNumberBase::setProperty(Pid id, const QVariant& val)
+bool MeasureNumberBase::setProperty(Pid id, const PropertyValue& val)
 {
     switch (id) {
     case Pid::HPLACEMENT:
-        setHPlacement(HPlacement(val.toInt()));
+        setHPlacement(val.value<PlacementH>());
         setLayoutInvalid();
         triggerLayout();
         return true;
@@ -86,11 +89,11 @@ bool MeasureNumberBase::setProperty(Pid id, const QVariant& val)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant MeasureNumberBase::propertyDefault(Pid id) const
+PropertyValue MeasureNumberBase::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::DEFAULT);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::DEFAULT;
     default:
         return TextBase::propertyDefault(id);
     }
@@ -116,7 +119,7 @@ bool MeasureNumberBase::readProperties(XmlReader& xml)
 void MeasureNumberBase::layout()
 {
     setPos(PointF());
-    if (!parent()) {
+    if (!explicitParent()) {
         setOffset(0.0, 0.0);
     }
 
@@ -125,12 +128,12 @@ void MeasureNumberBase::layout()
     TextBase::layout1();
     // this could be if (!measure()) but it is the same as current and slower
     // See implementation of MeasureNumberBase::measure().
-    if (!parent()) {
+    if (!explicitParent()) {
         return;
     }
 
     if (placeBelow()) {
-        qreal yoff = bbox().height();
+        double yoff = bbox().height();
 
         // If there is only one line, the barline spans outside the staff lines, so the default position is not correct.
         if (staff()->constStaffType(measure()->tick())->lines() == 1) {
@@ -139,19 +142,19 @@ void MeasureNumberBase::layout()
             yoff += staff()->height();
         }
 
-        rypos() = yoff;
+        setPosY(yoff);
     } else {
-        qreal yoff = 0.0;
+        double yoff = 0.0;
 
         // If there is only one line, the barline spans outside the staff lines, so the default position is not correct.
         if (staff()->constStaffType(measure()->tick())->lines() == 1) {
             yoff -= 2.0 * spatium();
         }
 
-        rypos() = yoff;
+        setPosY(yoff);
     }
 
-    if (hPlacement() == HPlacement::CENTER) {
+    if (hPlacement() == PlacementH::CENTER) {
         // measure numbers should be centered over where there can be notes.
         // This means that header and trailing segments should be ignored,
         // which includes all timesigs, clefs, keysigs, etc.
@@ -188,12 +191,12 @@ void MeasureNumberBase::layout()
         }
 
         // if s1/s2 does not exist, it means there is no header/trailer segment. Align with start/end of measure.
-        qreal x1 = s1 ? s1->x() + s1->minRight() : 0;
-        qreal x2 = s2 ? s2->x() - s2->minLeft() : mea->width();
+        double x1 = s1 ? s1->x() + s1->minRight() : 0;
+        double x2 = s2 ? s2->x() - s2->minLeft() : mea->width();
 
-        rxpos() = (x1 + x2) * 0.5;
-    } else if (hPlacement() == HPlacement::RIGHT) {
-        rxpos() = measure()->width();
+        setPosX((x1 + x2) * 0.5);
+    } else if (hPlacement() == PlacementH::RIGHT) {
+        setPosX(measure()->width());
     }
 }
 } // namespace MS

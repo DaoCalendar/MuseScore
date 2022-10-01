@@ -27,24 +27,24 @@ import MuseScore.UiComponents 1.0
 Column {
     id: root
 
+    default property alias contentData: sectionContent.data
+
     width: parent.width
     spacing: 18
 
-    //! NOTE: Added to prevent components clipping when navigating
-    padding: 2
-
     property alias title: titleLabel.text
-    property int columnWidth: 216
-    property alias titleOpacity: titleLabel.opacity
+    property int columnWidth: 208
+    property int columnSpacing: 12
+    property int rowSpacing: 12
 
     property int navigationOrderStart: 0
     property NavigationPanel navigation: NavigationPanel {
         name: root.title
         direction: NavigationPanel.Vertical
         accessible.name: root.title
-        enabled: root.visible
+        enabled: root.enabled && root.visible
 
-        onActiveChanged: {
+        onActiveChanged: function(active) {
             if (active) {
                 root.forceActiveFocus()
             }
@@ -54,5 +54,11 @@ Column {
     StyledTextLabel {
         id: titleLabel
         font: ui.theme.bodyBoldFont
+    }
+
+    Column {
+        id: sectionContent
+        width: parent.width
+        spacing: root.rowSpacing
     }
 }

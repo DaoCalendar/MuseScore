@@ -23,11 +23,12 @@
 #ifndef __REST_H__
 #define __REST_H__
 
+#include "containers.h"
+
 #include "chordrest.h"
 #include "notedot.h"
-#include "symid.h"
 
-namespace Ms {
+namespace mu::engraving {
 class TDuration;
 
 //---------------------------------------------------------
@@ -37,27 +38,27 @@ class TDuration;
 
 class Rest : public ChordRest
 {
+    OBJECT_ALLOCATOR(engraving, Rest)
 public:
 
-    ~Rest() { qDeleteAll(m_dots); }
+    ~Rest() { DeleteAll(m_dots); }
 
     void hack_toRestType();
 
     // Score Tree functions
     EngravingObject* scanParent() const override;
-    EngravingObject* scanChild(int idx) const override;
-    int scanChildCount() const override;
+    EngravingObjectList scanChildren() const override;
 
     Rest& operator=(const Rest&) = delete;
 
     Rest* clone() const override { return new Rest(*this, false); }
     EngravingItem* linkedClone() override { return new Rest(*this, true); }
-    Measure* measure() const override { return parent() ? toMeasure(parent()->parent()) : 0; }
-    qreal mag() const override;
+    Measure* measure() const override { return explicitParent() ? toMeasure(explicitParent()->explicitParent()) : 0; }
+    double mag() const override;
 
     void draw(mu::draw::Painter*) const override;
     void scanElements(void* data, void (* func)(void*, EngravingItem*), bool all = true) override;
-    void setTrack(int val) override;
+    void setTrack(track_idx_t val) override;
 
     bool acceptDrop(EditData&) const override;
     EngravingItem* drop(EditData&) override;
@@ -66,21 +67,19 @@ public:
     bool isGap() const { return m_gap; }
     virtual void setGap(bool v) { m_gap = v; }
 
-    void reset() override;
-
     virtual void add(EngravingItem*) override;
     virtual void remove(EngravingItem*) override;
 
     void read(XmlReader&) override;
     void write(XmlWriter& xml) const override;
 
-    SymId getSymbol(TDuration::DurationType type, int line, int lines,  int* yoffset);
+    SymId getSymbol(DurationType type, int line, int lines,  int* yoffset);
 
     void checkDots();
     void layoutDots();
     NoteDot* dot(int n);
     int getDotline() const { return m_dotline; }
-    static int getDotline(TDuration::DurationType durationType);
+    static int getDotline(DurationType durationType);
     SymId sym() const { return m_sym; }
     bool accent();
     void setAccent(bool flag);
@@ -89,21 +88,21 @@ public:
     int upLine() const override;
     int downLine() const override;
     mu::PointF stemPos() const override;
-    qreal stemPosX() const override;
+    double stemPosX() const override;
     mu::PointF stemPosBeam() const override;
-    qreal rightEdge() const override;
+    double rightEdge() const override;
 
-    void localSpatiumChanged(qreal oldValue, qreal newValue) override;
-    QVariant propertyDefault(Pid) const override;
+    void localSpatiumChanged(double oldValue, double newValue) override;
+    PropertyValue propertyDefault(Pid) const override;
     void resetProperty(Pid id) override;
-    bool setProperty(Pid propertyId, const QVariant& v) override;
-    QVariant getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue& v) override;
+    PropertyValue getProperty(Pid propertyId) const override;
     void undoChangeDotsVisible(bool v);
 
     EngravingItem* nextElement() override;
     EngravingItem* prevElement() override;
-    QString accessibleInfo() const override;
-    QString screenReaderInfo() const override;
+    String accessibleInfo() const override;
+    String screenReaderInfo() const override;
     Shape shape() const override;
     void editDrag(EditData& editData) override;
 
@@ -119,7 +118,7 @@ protected:
 
 private:
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
     Rest(Segment* parent);
     Rest(Segment* parent, const TDuration&);
 
@@ -130,9 +129,11 @@ private:
     std::vector<NoteDot*> m_dots;
 
     mu::RectF drag(EditData&) override;
-    qreal upPos() const override;
-    qreal downPos() const override;
+    double upPos() const override;
+    double downPos() const override;
     void setOffset(const mu::PointF& o) override;
+
+    bool sameVoiceKerningLimited() const override { return true; }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

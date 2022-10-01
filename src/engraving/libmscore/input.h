@@ -25,18 +25,25 @@
 
 #include <set>
 
-#include "mscore.h"
 #include "durationtype.h"
-#include "beam.h"
+#include "mscore.h"
+#include "types.h"
 
-namespace Ms {
-class EngravingItem;
-class Slur;
+#include "types/types.h"
+
+namespace mu::engraving {
 class ChordRest;
 class Drumset;
-class Segment;
+class EngravingItem;
+class Note;
 class Score;
+class Segment;
 class Selection;
+class Slur;
+
+// no ordinal for the visual repres. of string
+// (topmost in TAB varies according to visual order and presence of bass strings)
+static constexpr int VISUAL_INVALID_STRING_INDEX = -100;
 
 //---------------------------------------------------------
 //   NoteEntryMethod
@@ -52,8 +59,8 @@ enum class NoteEntryMethod : char {
 
 class InputState
 {
-    int _track     { 0 };
-    int _prevTrack { 0 }; // used for navigation
+    track_idx_t _track     { 0 };
+    track_idx_t _prevTrack { 0 }; // used for navigation
 
     int _drumNote { -1 };
     int _string   { VISUAL_INVALID_STRING_INDEX }; // visual string selected for input (TAB staves only)
@@ -64,11 +71,11 @@ class InputState
     bool _noteEntryMode { false };
     NoteEntryMethod _noteEntryMethod { NoteEntryMethod::STEPTIME };
 
-    TDuration _duration { TDuration::DurationType::V_INVALID }; // currently duration
+    TDuration _duration { DurationType::V_INVALID }; // currently duration
     bool _rest { false }; // rest mode
 
     NoteType _noteType { NoteType::NORMAL };
-    Beam::Mode _beamMode { Beam::Mode::AUTO };
+    BeamMode _beamMode { BeamMode::AUTO };
 
     AccidentalType _accidentalType { AccidentalType::NONE };
     Slur* _slur = nullptr;
@@ -99,11 +106,11 @@ public:
     int drumNote() const { return _drumNote; }
     void setDrumNote(int v) { _drumNote = v; }
 
-    int voice() const { return _track == -1 ? 0 : (_track % VOICES); }
-    void setVoice(int v) { setTrack((_track / VOICES) * VOICES + v); }
-    int track() const { return _track; }
-    void setTrack(int v) { _prevTrack = _track; _track = v; }
-    int prevTrack() const { return _prevTrack; }
+    voice_idx_t voice() const { return _track == mu::nidx ? 0 : (_track % VOICES); }
+    void setVoice(voice_idx_t v) { setTrack((_track / VOICES) * VOICES + v); }
+    track_idx_t track() const { return _track; }
+    void setTrack(track_idx_t v) { _prevTrack = _track; _track = v; }
+    track_idx_t prevTrack() const { return _prevTrack; }
 
     int string() const { return _string; }
     void setString(int val) { _string = val; }
@@ -116,8 +123,8 @@ public:
     NoteType noteType() const { return _noteType; }
     void setNoteType(NoteType t) { _noteType = t; }
 
-    Beam::Mode beamMode() const { return _beamMode; }
-    void setBeamMode(Beam::Mode m) { _beamMode = m; }
+    BeamMode beamMode() const { return _beamMode; }
+    void setBeamMode(BeamMode m) { _beamMode = m; }
 
     bool noteEntryMode() const { return _noteEntryMode; }
     void setNoteEntryMode(bool v) { _noteEntryMode = v; }
@@ -147,5 +154,5 @@ public:
     static Note* note(EngravingItem*);
     static ChordRest* chordRest(EngravingItem*);
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

@@ -35,12 +35,28 @@ InspectorPropertyView {
     property alias horizontalOffsetControl: horizontalOffsetControl
     property alias verticalOffsetControl: verticalOffsetControl
 
-    navigationRowEnd: verticalOffsetControl.navigation.row
+    property var onlyOne: (Boolean(horizontalOffset) && !Boolean(verticalOffset))
+                          || (Boolean(verticalOffset) && !Boolean(horizontalOffset))
 
     titleText: qsTrc("inspector", "Offset")
-    propertyItem: root.horizontalOffset
+    propertyItem: Boolean(horizontalOffset) ? horizontalOffset : verticalOffset
 
+    navigationName: "OffsetSection"
+    navigationRowEnd: verticalOffsetControl.navigation.row
+
+    isModified: (Boolean(horizontalOffset) ? horizontalOffset.isModified : false)
+                || (Boolean(verticalOffset) ? verticalOffset.isModified : false)
     visible: Boolean(horizontalOffset) || Boolean(verticalOffset)
+
+    onRequestResetToDefault: {
+        if(Boolean(horizontalOffset)) {
+            horizontalOffset.resetToDefault()
+        }
+
+        if(Boolean(verticalOffset)) {
+            verticalOffset.resetToDefault()
+        }
+    }
 
     RowLayout {
         id: row
@@ -53,12 +69,11 @@ InspectorPropertyView {
         IncrementalPropertyControl {
             id: horizontalOffsetControl
 
-            Layout.preferredWidth: parent.width / 2 - row.spacing / 2
+            Layout.preferredWidth: onlyOne ? parent.width : parent.width / 2 - row.spacing / 2
 
             navigation.name: "HorizontalOffsetControl"
             navigation.panel: root.navigationPanel
             navigation.row: root.navigationRowStart + 1
-            navigation.enabled: root.enabled && root.navigationEnabled && root.visible
             navigation.accessible.name: root.titleText + " " + qsTrc("inspector", "Horizontal") + " " + currentValue
 
             icon: IconCode.HORIZONTAL
@@ -69,7 +84,7 @@ InspectorPropertyView {
             isIndeterminate: root.horizontalOffset && enabled ? root.horizontalOffset.isUndefined : false
             currentValue: root.horizontalOffset ? root.horizontalOffset.value : 0
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 root.horizontalOffset.value = newValue
             }
         }
@@ -77,7 +92,7 @@ InspectorPropertyView {
         IncrementalPropertyControl {
             id: verticalOffsetControl
 
-            Layout.preferredWidth: parent.width / 2 - row.spacing / 2
+            Layout.preferredWidth: onlyOne ? parent.width : parent.width / 2 - row.spacing / 2
 
             navigation.name: "VerticalOffsetControl"
             navigation.panel: root.navigationPanel
@@ -92,7 +107,7 @@ InspectorPropertyView {
             isIndeterminate: root.verticalOffset && enabled ? root.verticalOffset.isUndefined : false
             currentValue: root.verticalOffset ? root.verticalOffset.value : 0
 
-            onValueEdited: {
+            onValueEdited: function(newValue) {
                 root.verticalOffset.value = newValue
             }
         }

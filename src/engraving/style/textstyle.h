@@ -23,22 +23,16 @@
 #define MU_ENGRAVING_TEXTSTYLE_H
 
 #include "styledef.h"
-#include "libmscore/types.h"
+#include "types/types.h"
 
-namespace Ms {
-#define TEXT_STYLE_SIZE 14
+namespace mu::engraving {
+constexpr size_t TEXT_STYLE_SIZE = 14;
 
 typedef std::array<StyledProperty, TEXT_STYLE_SIZE> TextStyle;
 
-const TextStyle* textStyle(Tid);
-const TextStyle* textStyle(const char*);
-
-const char* textStyleName(Tid);
-QString textStyleUserName(Tid);
-Tid textStyleFromName(const QString&);
-
-const std::vector<Tid>& allTextStyles();
-const std::vector<Tid>& primaryTextStyles();
+const TextStyle* textStyle(TextStyleType);
+const std::vector<TextStyleType>& allTextStyles();
+const std::vector<TextStyleType>& primaryTextStyles();
 }
 
 #endif // MU_ENGRAVING_TEXTSTYLE_H

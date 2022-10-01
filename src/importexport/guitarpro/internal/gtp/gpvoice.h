@@ -5,7 +5,7 @@
 
 #include "gpbeat.h"
 
-namespace Ms {
+namespace mu::engraving {
 class GPVoice
 {
 public:
@@ -17,8 +17,6 @@ public:
     const std::vector<std::shared_ptr<GPBeat> >& beats() const { return _beats; }
 
 private:
-
-    friend class GP67DomFixer;
 
     int _id{ -1 };
     std::vector<std::shared_ptr<GPBeat> > _beats;

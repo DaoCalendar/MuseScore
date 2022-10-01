@@ -21,13 +21,16 @@
  */
 
 #include "mmrestrange.h"
-#include "io/xml.h"
-#include "score.h"
+
+#include "rw/xml.h"
+
 #include "measure.h"
+#include "score.h"
 
 using namespace mu;
+using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   mmRestRangeStyle
 //---------------------------------------------------------
@@ -39,7 +42,7 @@ static const ElementStyle mmRestRangeStyle {
 };
 
 MMRestRange::MMRestRange(Measure* parent)
-    : MeasureNumberBase(ElementType::MMREST_RANGE, parent, Tid::MMREST_RANGE)
+    : MeasureNumberBase(ElementType::MMREST_RANGE, parent, TextStyleType::MMREST_RANGE)
 {
     initElementStyle(&mmRestRangeStyle);
 }
@@ -55,7 +58,7 @@ MMRestRange::MMRestRange(const MMRestRange& other)
     initElementStyle(&mmRestRangeStyle);
 }
 
-QVariant MMRestRange::getProperty(Pid id) const
+PropertyValue MMRestRange::getProperty(Pid id) const
 {
     switch (id) {
     case Pid::MMREST_RANGE_BRACKET_TYPE:
@@ -65,7 +68,7 @@ QVariant MMRestRange::getProperty(Pid id) const
     }
 }
 
-bool MMRestRange::setProperty(Pid id, const QVariant& val)
+bool MMRestRange::setProperty(Pid id, const PropertyValue& val)
 {
     switch (id) {
     case Pid::MMREST_RANGE_BRACKET_TYPE:
@@ -78,11 +81,11 @@ bool MMRestRange::setProperty(Pid id, const QVariant& val)
     }
 }
 
-QVariant MMRestRange::propertyDefault(Pid id) const
+PropertyValue MMRestRange::propertyDefault(Pid id) const
 {
     switch (id) {
-    case Pid::SUB_STYLE:
-        return int(Tid::MMREST_RANGE);
+    case Pid::TEXT_STYLE:
+        return TextStyleType::MMREST_RANGE;
     case Pid::PLACEMENT:
         return score()->styleV(Sid::mmRestRangeVPlacement);
     case Pid::HPLACEMENT:
@@ -106,14 +109,14 @@ bool MMRestRange::readProperties(XmlReader& xml)
 ///   This is reimplemented from TextBase::setXmlText to take care of the brackets
 //---------------------------------------------------------
 
-void MMRestRange::setXmlText(const QString& s)
+void MMRestRange::setXmlText(const String& s)
 {
     switch (bracketType()) {
     case MMRestRangeBracketType::BRACKETS:
-        TextBase::setXmlText("[" + s + "]");
+        TextBase::setXmlText(u"[" + s + u"]");
         break;
     case MMRestRangeBracketType::PARENTHESES:
-        TextBase::setXmlText("(" + s + ")");
+        TextBase::setXmlText(u"(" + s + u")");
         break;
     case MMRestRangeBracketType::NONE:
     default:

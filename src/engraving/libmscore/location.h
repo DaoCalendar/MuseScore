@@ -23,11 +23,11 @@
 #ifndef __POINT_H__
 #define __POINT_H__
 
-#include "fraction.h"
-
 #include <climits>
 
-namespace Ms {
+#include "types/propertyvalue.h"
+
+namespace mu::engraving {
 class EngravingItem;
 class XmlReader;
 class XmlWriter;
@@ -94,10 +94,10 @@ public:
     void fillPositionForElement(const EngravingItem* e, bool absfrac = true);
     static Location forElement(const EngravingItem* e, bool absfrac = true);
     static Location positionForElement(const EngravingItem* e, bool absfrac = true);
-    static QVariant getLocationProperty(Pid pid, const EngravingItem* start, const EngravingItem* end);
+    static PropertyValue getLocationProperty(Pid pid, const EngravingItem* start, const EngravingItem* end);
 
     bool operator==(const Location& other) const;
     bool operator!=(const Location& other) const { return !(*this == other); }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

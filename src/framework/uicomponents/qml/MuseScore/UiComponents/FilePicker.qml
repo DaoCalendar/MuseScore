@@ -30,7 +30,8 @@ Item {
 
     enum PickerType {
         File,
-        Directory
+        Directory,
+        MultipleDirectories
     }
     property int pickerType: FilePicker.PickerType.File
 
@@ -44,24 +45,32 @@ Item {
     property int navigationRowOrderStart: 0
     property int navigationColumnOrderStart: 0
 
-    property string pathFieldTitle: qsTrc("uicomponents", "Current path:")
+    property string pathFieldTitle: qsTrc("ui", "Current path:")
+
+    property alias pathFieldWidth: pathField.implicitWidth
+    property alias spacing: row.spacing
 
     signal pathEdited(var newPath)
 
-    height: 30
+    implicitWidth: row.implicitWidth
+    implicitHeight: row.implicitHeight
 
     FilePickerModel {
         id: filePickerModel
     }
 
     RowLayout {
+        id: row
         anchors.fill: parent
-        spacing: 8
+        spacing: 12
 
         TextInputField {
             id: pathField
             Layout.fillWidth: true
+            Layout.minimumWidth: implicitWidth
             Layout.alignment: Qt.AlignVCenter
+
+            implicitWidth: 0
 
             navigation.name: "PathFieldBox"
             navigation.panel: root.navigation
@@ -70,12 +79,13 @@ Item {
             navigation.column: root.navigationColumnOrderStart
             navigation.accessible.name: root.pathFieldTitle + " " + pathField.currentText
 
-            onCurrentTextEdited: {
+            onCurrentTextEdited: function(newTextValue) {
                 root.pathEdited(newTextValue)
             }
         }
 
         FlatButton {
+            id: button
             Layout.alignment: Qt.AlignVCenter
             icon: IconCode.OPEN_FILE
 
@@ -84,22 +94,33 @@ Item {
             navigation.row: root.navigationRowOrderStart
             navigation.enabled: root.visible && root.enabled
             navigation.column: root.navigationColumnOrderStart + 1
-            accessible.name: root.pickerType === FilePicker.PickerType.File ? qsTrc("uicomponents", "File choose")
-                                                                            : qsTrc("uicomponents", "Directory choose")
+            accessible.name: root.pickerType === FilePicker.PickerType.File ? qsTrc("ui", "Choose file")
+                                                                            : qsTrc("ui", "Choose directory")
 
             onClicked: {
-                var selectedPath
-                if (pickerType === FilePicker.PickerType.File) {
-                    selectedPath = filePickerModel.selectFile()
-                } else {
-                    selectedPath = filePickerModel.selectDirectory()
-                }
+                switch (pickerType) {
+                case FilePicker.PickerType.File: {
+                    var selectedFile = filePickerModel.selectFile()
+                    if (Boolean(selectedFile)) {
+                        root.pathEdited(selectedFile)
+                    }
 
-                if (!Boolean(selectedPath)) {
-                    return
+                    break
                 }
+                case FilePicker.PickerType.Directory: {
+                    var selectedDirectory = filePickerModel.selectDirectory()
+                    if (Boolean(selectedDirectory)) {
+                        root.pathEdited(selectedDirectory)
+                    }
 
-                root.pathEdited(selectedPath)
+                    break
+                }
+                case FilePicker.PickerType.MultipleDirectories:{
+                    var selectedDirectories = filePickerModel.selectMultipleDirectories(root.path)
+                    root.pathEdited(selectedDirectories)
+                    break
+                }
+                }
             }
         }
     }

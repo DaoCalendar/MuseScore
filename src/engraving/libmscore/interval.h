@@ -23,14 +23,16 @@
 #ifndef __INTERVAL_H__
 #define __INTERVAL_H__
 
-namespace Ms {
+#include <cstdint>
+
+namespace mu::engraving {
 //---------------------------------------------------------
 //   Interval
 //---------------------------------------------------------
 
 struct Interval {
-    signed char diatonic;
-    signed char chromatic;
+    int8_t diatonic;
+    int8_t chromatic;
 
     Interval();
     Interval(int a, int b);
@@ -40,5 +42,5 @@ struct Interval {
     bool operator!=(const Interval& a) const { return diatonic != a.diatonic || chromatic != a.chromatic; }
     bool operator==(const Interval& a) const { return diatonic == a.diatonic && chromatic == a.chromatic; }
 };
-}     // namespace Ms
+} // namespace mu::engraving
 #endif

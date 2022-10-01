@@ -21,12 +21,12 @@
  */
 #include "autobotactionscontroller.h"
 
-#include "uri.h"
+#include "types/uri.h"
 
 using namespace mu::autobot;
 
-static const mu::UriQuery SHOW_BATCHTESTS_URI("musescore://autobot/batchtests?sync=false&modal=false");
-static const mu::UriQuery SHOW_SCRIPTS_URI("musescore://autobot/scripts?sync=false&modal=false");
+static const mu::UriQuery SHOW_BATCHTESTS_URI("musescore://autobot/batchtests?sync=false&modal=false&floating=true");
+static const mu::UriQuery SHOW_SCRIPTS_URI("musescore://autobot/scripts?sync=false&modal=false&floating=true");
 
 void AutobotActionsController::init()
 {

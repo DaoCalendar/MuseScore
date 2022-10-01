@@ -22,6 +22,15 @@
 
 #include "pluginsconfiguration.h"
 
+#include <QJsonDocument>
+#include <QJsonArray>
+
+#include "multiinstances/resourcelockguard.h"
+
+#include "ui/uitypes.h"
+
+#include "translation.h"
+
 #include "settings.h"
 #include "log.h"
 
@@ -30,7 +39,10 @@ using namespace mu::framework;
 
 static const std::string module_name("plugins");
 static const Settings::Key USER_PLUGINS_PATH(module_name, "application/paths/myPlugins");
-static const Settings::Key INSTALLED_PLUGINS(module_name, "plugins/installedPlugins");
+
+static const mu::io::path_t PLUGINS_FILE("/plugins.json");
+
+static const std::string PLUGINS_RESOURCE_NAME("PLUGINS");
 
 void PluginsConfiguration::init()
 {
@@ -40,20 +52,25 @@ void PluginsConfiguration::init()
     });
     fileSystem()->makePath(userPluginsPath());
 
-    settings()->valueChanged(INSTALLED_PLUGINS).onReceive(nullptr, [this](const Val& val) {
-        CodeKeyList installedPlugins = parseInstalledPlugins(val);
-        m_installedPluginsChanged.send(installedPlugins);
+    fileSystem()->makePath(pluginsDataPath());
+
+    multiInstancesProvider()->resourceChanged().onReceive(this, [this](const std::string& resourceName){
+        if (resourceName == PLUGINS_RESOURCE_NAME) {
+            updatePluginsConfiguration();
+        }
     });
+
+    updatePluginsConfiguration();
 }
 
-mu::io::paths PluginsConfiguration::availablePluginsPaths() const
+mu::io::paths_t PluginsConfiguration::availablePluginsPaths() const
 {
-    io::paths result;
+    io::paths_t result;
 
-    io::path appPluginsPath  = globalConfiguration()->appDataPath() + "/plugins";
+    io::path_t appPluginsPath  = globalConfiguration()->appDataPath() + "/plugins";
     result.push_back(appPluginsPath);
 
-    io::path userPluginsPath = this->userPluginsPath();
+    io::path_t userPluginsPath = this->userPluginsPath();
     if (!userPluginsPath.empty() && userPluginsPath != appPluginsPath) {
         result.push_back(userPluginsPath);
     }
@@ -61,42 +78,116 @@ mu::io::paths PluginsConfiguration::availablePluginsPaths() const
     return result;
 }
 
-mu::io::path PluginsConfiguration::userPluginsPath() const
+mu::io::path_t PluginsConfiguration::userPluginsPath() const
 {
     return settings()->value(USER_PLUGINS_PATH).toPath();
 }
 
-void PluginsConfiguration::setUserPluginsPath(const io::path& path)
+void PluginsConfiguration::setUserPluginsPath(const io::path_t& path)
 {
     settings()->setSharedValue(USER_PLUGINS_PATH, Val(path));
 }
 
-mu::async::Channel<mu::io::path> PluginsConfiguration::userPluginsPathChanged() const
+mu::async::Channel<mu::io::path_t> PluginsConfiguration::userPluginsPathChanged() const
 {
     return m_userPluginsPathChanged;
 }
 
-mu::ValCh<CodeKeyList> PluginsConfiguration::installedPlugins() const
+const IPluginsConfiguration::PluginsConfigurationHash& PluginsConfiguration::pluginsConfiguration() const
 {
-    ValCh<CodeKeyList> result;
-    result.val = parseInstalledPlugins(settings()->value(INSTALLED_PLUGINS));
-    result.ch = m_installedPluginsChanged;
+    return m_pluginsConfiguration;
+}
+
+mu::Ret PluginsConfiguration::setPluginsConfiguration(const PluginsConfigurationHash& configuration)
+{
+    TRACEFUNC;
+
+    QJsonArray jsonArray;
+    for (const PluginConfiguration& plugin : configuration.values()) {
+        QVariantMap value;
+        value["codeKey"] = plugin.codeKey;
+        value["enabled"] = plugin.enabled;
+        value["shortcuts"] = QString::fromStdString(plugin.shortcuts);
+
+        jsonArray << QJsonValue::fromVariant(value);
+    }
+
+    QByteArray data = QJsonDocument(jsonArray).toJson();
+    Ret ret = writePluginsConfiguration(data);
+    if (!ret) {
+        LOGE() << ret.toString();
+        return ret;
+    }
+
+    m_pluginsConfiguration = configuration;
+    return make_ok();
+}
+
+QColor PluginsConfiguration::viewBackgroundColor() const
+{
+    return uiConfiguration()->currentTheme().values[ui::BACKGROUND_PRIMARY_COLOR].toString();
+}
+
+mu::io::path_t PluginsConfiguration::pluginsDataPath() const
+{
+    return globalConfiguration()->userAppDataPath() + "/plugins";
+}
+
+mu::io::path_t PluginsConfiguration::pluginsFilePath() const
+{
+    return pluginsDataPath() + PLUGINS_FILE;
+}
+
+mu::RetVal<mu::ByteArray> PluginsConfiguration::readPluginsConfiguration() const
+{
+    TRACEFUNC;
+
+    mi::ReadResourceLockGuard lock_guard(multiInstancesProvider(), PLUGINS_RESOURCE_NAME);
+    return fileSystem()->readFile(pluginsFilePath());
+}
+
+mu::Ret PluginsConfiguration::writePluginsConfiguration(const QByteArray& data)
+{
+    mi::WriteResourceLockGuard lock_guard(multiInstancesProvider(), PLUGINS_RESOURCE_NAME);
+    return fileSystem()->writeFile(pluginsFilePath(), ByteArray::fromQByteArrayNoCopy(data));
+}
+
+IPluginsConfiguration::PluginsConfigurationHash PluginsConfiguration::parsePluginsConfiguration(const QByteArray& json) const
+{
+    TRACEFUNC;
+
+    QJsonParseError err;
+    QJsonDocument jsodDoc = QJsonDocument::fromJson(json, &err);
+    if (err.error != QJsonParseError::NoError || !jsodDoc.isArray()) {
+        LOGE() << "failed parse, err: " << err.errorString();
+        return {};
+    }
+
+    PluginsConfigurationHash result;
+    const QVariantList pluginList = jsodDoc.array().toVariantList();
+    for (const QVariant& pluginVal : pluginList) {
+        QVariantMap pluginMap = pluginVal.toMap();
+
+        PluginConfiguration plugin;
+        plugin.codeKey = pluginMap.value("codeKey").toString();
+        plugin.enabled = pluginMap.value("enabled").toBool();
+        plugin.shortcuts = pluginMap.value("shortcuts").toString().toStdString();
+
+        if (plugin.isValid()) {
+            result[plugin.codeKey] = plugin;
+        }
+    }
 
     return result;
 }
 
-void PluginsConfiguration::setInstalledPlugins(const CodeKeyList& codeKeyList)
+void PluginsConfiguration::updatePluginsConfiguration()
 {
-    QStringList plugins;
-
-    for (const CodeKey& codeKey: codeKeyList) {
-        plugins << codeKey;
+    RetVal<ByteArray> retVal = readPluginsConfiguration();
+    if (!retVal.ret) {
+        LOGE() << retVal.ret.toString();
+        return;
     }
 
-    settings()->setSharedValue(INSTALLED_PLUGINS, Val::fromQVariant(plugins));
-}
-
-CodeKeyList PluginsConfiguration::parseInstalledPlugins(const mu::Val& val) const
-{
-    return val.toQVariant().toStringList();
+    m_pluginsConfiguration = parsePluginsConfiguration(retVal.val.toQByteArrayNoCopy());
 }

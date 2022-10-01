@@ -25,28 +25,28 @@
 #include "engraving/style/style.h"
 
 #include "libmscore/chord.h"
-#include "libmscore/measure.h"
 #include "libmscore/masterscore.h"
+#include "libmscore/measure.h"
 #include "libmscore/undo.h"
 
 #include "utils/scorerw.h"
 #include "utils/scorecomp.h"
 
-static const QString EARLYMUSIC_DATA_DIR("earlymusic_data/");
-
+using namespace mu;
 using namespace mu::engraving;
-using namespace Ms;
 
-class EarlymusicTests : public ::testing::Test
+static const String EARLYMUSIC_DATA_DIR("earlymusic_data/");
+
+class Engraving_EarlymusicTests : public ::testing::Test
 {
 };
 
 //---------------------------------------------------------
 //   Setting cross-measure value flag and undoing.
 //---------------------------------------------------------
-TEST_F(EarlymusicTests, earlymusic01)
+TEST_F(Engraving_EarlymusicTests, earlymusic01)
 {
-    MasterScore* score = ScoreRW::readScore(EARLYMUSIC_DATA_DIR + "mensurstrich01.mscx");
+    MasterScore* score = ScoreRW::readScore(EARLYMUSIC_DATA_DIR + u"mensurstrich01.mscx");
     EXPECT_TRUE(score);
     score->doLayout();
 
@@ -55,16 +55,16 @@ TEST_F(EarlymusicTests, earlymusic01)
     EXPECT_TRUE(msr);
     Segment* seg   = msr->findSegment(SegmentType::ChordRest, Fraction(0, 1));
     EXPECT_TRUE(seg);
-    Ms::Chord* chord = static_cast<Ms::Chord*>(seg->element(0));
+    Chord* chord = toChord(seg->element(0));
     EXPECT_TRUE(chord);
     EXPECT_EQ(chord->type(), ElementType::CHORD);
     EXPECT_EQ(chord->crossMeasure(), CrossMeasure::UNKNOWN);
     TDuration cmDur   = chord->crossMeasureDurationType();
-//    EXPECT_EQ(cmDur.type(), TDuration::DurationType::V_INVALID);    // irrelevant if crossMeasure() == UNKNOWN
+//    EXPECT_EQ(cmDur.type(), DurationType::V_INVALID);    // irrelevant if crossMeasure() == UNKNOWN
     TDuration acDur   = chord->actualDurationType();
-    EXPECT_EQ(acDur.type(), TDuration::DurationType::V_BREVE);
+    EXPECT_EQ(acDur.type(), DurationType::V_BREVE);
     TDuration dur     = chord->durationType();
-    EXPECT_EQ(dur.type(), TDuration::DurationType::V_BREVE);
+    EXPECT_EQ(dur.type(), DurationType::V_BREVE);
 
     // set crossMeasureValue flag ON: score should not change
     MStyle newStyle = score->style();
@@ -77,13 +77,13 @@ TEST_F(EarlymusicTests, earlymusic01)
     // verify crossMeasureDurationType did change
     EXPECT_EQ(chord->crossMeasure(), CrossMeasure::FIRST);
     cmDur = chord->crossMeasureDurationType();
-    EXPECT_EQ(cmDur.type(), TDuration::DurationType::V_LONG);
+    EXPECT_EQ(cmDur.type(), DurationType::V_LONG);
     acDur = chord->actualDurationType();
-    EXPECT_EQ(acDur.type(), TDuration::DurationType::V_BREVE);
+    EXPECT_EQ(acDur.type(), DurationType::V_BREVE);
     dur   = chord->durationType();
-    EXPECT_EQ(dur.type(), TDuration::DurationType::V_LONG);
+    EXPECT_EQ(dur.type(), DurationType::V_LONG);
     // verify score file did not change
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "mensurstrich01.mscx", EARLYMUSIC_DATA_DIR + "mensurstrich01-ref.mscx"));
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"mensurstrich01.mscx", EARLYMUSIC_DATA_DIR + u"mensurstrich01-ref.mscx"));
 
     // UNDO AND VERIFY
     EditData ed;
@@ -91,11 +91,11 @@ TEST_F(EarlymusicTests, earlymusic01)
     score->doLayout();
     EXPECT_EQ(chord->crossMeasure(), CrossMeasure::UNKNOWN);
     cmDur = chord->crossMeasureDurationType();
-//      QVERIFY(cmDur.type() == TDuration::DurationType::V_LONG);    // irrelevant if crossMeasure() == UNKNOWN
+//      QVERIFY(cmDur.type() == DurationType::V_LONG);    // irrelevant if crossMeasure() == UNKNOWN
     acDur = chord->actualDurationType();
-    EXPECT_EQ(acDur.type(), TDuration::DurationType::V_BREVE);
+    EXPECT_EQ(acDur.type(), DurationType::V_BREVE);
     dur   = chord->durationType();
-    EXPECT_EQ(dur.type(), TDuration::DurationType::V_BREVE);
-    EXPECT_TRUE(ScoreComp::saveCompareScore(score, "mensurstrich01.mscx", EARLYMUSIC_DATA_DIR + "mensurstrich01.mscx"));
+    EXPECT_EQ(dur.type(), DurationType::V_BREVE);
+    EXPECT_TRUE(ScoreComp::saveCompareScore(score, u"mensurstrich01.mscx", EARLYMUSIC_DATA_DIR + u"mensurstrich01.mscx"));
     delete score;
 }

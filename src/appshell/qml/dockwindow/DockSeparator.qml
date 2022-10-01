@@ -33,12 +33,14 @@ Rectangle {
 
     readonly property QtObject separatorCpp: parent
 
+    visible: separatorCpp && separatorCpp.isSeparatorVisible
+
     MouseArea {
         anchors.fill: parent
         anchors.margins: -5 //! NOTE: extra space for user convenience
 
-        cursorShape: separatorCpp ? (separatorCpp.isVertical ? Qt.SizeVerCursor : Qt.SizeHorCursor)
-                                   : Qt.SizeHorCursor
+        cursorShape: (separatorCpp && separatorCpp.showResizeCursor) ? (separatorCpp.isVertical ? Qt.SizeVerCursor : Qt.SizeHorCursor)
+                                   : Qt.ArrowCursor
         onPressed: {
             separatorCpp.onMousePressed()
         }
@@ -47,7 +49,7 @@ Rectangle {
             separatorCpp.onMouseReleased()
         }
 
-        onPositionChanged: {
+        onPositionChanged: function(mouse) {
             separatorCpp.onMouseMoved(Qt.point(mouse.x, mouse.y))
         }
 

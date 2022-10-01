@@ -26,7 +26,13 @@
 #include "log.h"
 
 #include "modularity/ioc.h"
+
+#if defined(Q_OS_MACOS)
+#include "internal/platform/macos/macosshortcutsinstancemodel.h"
+#else
 #include "internal/shortcutsinstancemodel.h"
+#endif
+
 #include "internal/shortcutsregister.h"
 #include "internal/shortcutscontroller.h"
 #include "internal/midiremote.h"
@@ -45,6 +51,7 @@ using namespace mu::framework;
 using namespace mu::modularity;
 using namespace mu::ui;
 
+static std::shared_ptr<ShortcutsController> s_shortcutsController = std::make_shared<ShortcutsController>();
 static std::shared_ptr<ShortcutsRegister> s_shortcutsRegister = std::make_shared<ShortcutsRegister>();
 static std::shared_ptr<ShortcutsConfiguration> s_configuration = std::make_shared<ShortcutsConfiguration>();
 static std::shared_ptr<MidiRemote> s_midiRemote = std::make_shared<MidiRemote>();
@@ -62,7 +69,7 @@ std::string ShortcutsModule::moduleName() const
 void ShortcutsModule::registerExports()
 {
     ioc()->registerExport<IShortcutsRegister>(moduleName(), s_shortcutsRegister);
-    ioc()->registerExport<IShortcutsController>(moduleName(), new ShortcutsController());
+    ioc()->registerExport<IShortcutsController>(moduleName(), s_shortcutsController);
     ioc()->registerExport<IMidiRemote>(moduleName(), s_midiRemote);
     ioc()->registerExport<IShortcutsConfiguration>(moduleName(), s_configuration);
 }
@@ -74,7 +81,12 @@ void ShortcutsModule::registerResources()
 
 void ShortcutsModule::registerUiTypes()
 {
+#if defined(Q_OS_MACOS)
+    qmlRegisterType<MacOSShortcutsInstanceModel>("MuseScore.Shortcuts", 1, 0, "ShortcutsInstanceModel");
+#else
     qmlRegisterType<ShortcutsInstanceModel>("MuseScore.Shortcuts", 1, 0, "ShortcutsInstanceModel");
+#endif
+
     qmlRegisterType<ShortcutsModel>("MuseScore.Shortcuts", 1, 0, "ShortcutsModel");
     qmlRegisterType<EditShortcutModel>("MuseScore.Shortcuts", 1, 0, "EditShortcutModel");
     qmlRegisterType<MidiDeviceMappingModel>("MuseScore.Shortcuts", 1, 0, "MidiDeviceMappingModel");
@@ -90,8 +102,9 @@ void ShortcutsModule::onInit(const IApplication::RunMode& mode)
     }
 
     s_configuration->init();
-    s_shortcutsRegister->load();
-    s_midiRemote->load();
+    s_shortcutsController->init();
+    s_shortcutsRegister->init();
+    s_midiRemote->init();
 
     auto pr = ioc()->resolve<diagnostics::IDiagnosticsPathsRegister>(moduleName());
     if (pr) {

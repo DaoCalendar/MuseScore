@@ -48,8 +48,9 @@ RadioDelegate {
 
     hoverEnabled: true
 
-    //! NONE Disabled default Qt Accessible
-    Accessible.role: Accessible.NoRole
+    onToggled: {
+        navigation.requestActiveByInteraction()
+    }
 
     NavigationControl {
         id: keynavCtrl

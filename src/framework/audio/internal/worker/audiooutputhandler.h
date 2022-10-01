@@ -52,6 +52,11 @@ public:
     async::Promise<AudioSignalChanges> signalChanges(const TrackSequenceId sequenceId, const TrackId trackId) const override;
     async::Promise<AudioSignalChanges> masterSignalChanges() const override;
 
+    async::Promise<bool> saveSoundTrack(const TrackSequenceId sequenceId, const io::path_t& destination,
+                                        const SoundTrackFormat& format) override;
+
+    framework::Progress saveSoundTrackProgress(const TrackSequenceId sequenceId) override;
+
 private:
     std::shared_ptr<Mixer> mixer() const;
     ITrackSequencePtr sequence(const TrackSequenceId id) const;
@@ -62,6 +67,8 @@ private:
 
     mutable async::Channel<AudioOutputParams> m_masterOutputParamsChanged;
     mutable async::Channel<TrackSequenceId, TrackId, AudioOutputParams> m_outputParamsChanged;
+
+    QHash<TrackSequenceId, framework::Progress> m_saveSoundTracksMap;
 };
 }
 

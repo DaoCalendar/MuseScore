@@ -25,13 +25,14 @@
 
 #include "symbol.h"
 
-namespace Ms {
+namespace mu::engraving {
 //---------------------------------------------------------
 //   SystemDivider
 //---------------------------------------------------------
 
 class SystemDivider final : public Symbol
 {
+    OBJECT_ALLOCATOR(engraving, SystemDivider)
 public:
     enum class Type {
         LEFT, RIGHT
@@ -57,8 +58,8 @@ public:
     void layout() override;
 
     Segment* segment() const override { return nullptr; }
-    System* system() const { return (System*)parent(); }
+    System* system() const { return (System*)explicitParent(); }
 };
-} // namespace Ms
+} // namespace mu::engraving
 
 #endif

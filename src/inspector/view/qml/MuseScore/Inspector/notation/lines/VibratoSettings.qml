@@ -49,11 +49,12 @@ Column {
         propertyItem: root.model ? root.model.lineType : null
         model: root.model ? root.model.possibleLineTypes() : null
 
+        navigationName: "Type"
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart
     }
 
-    SeparatorLine { anchors.margins: -10 }
+    SeparatorLine { anchors.margins: -12 }
 
     PlacementSection {
         propertyItem: root.model ? root.model.placement : null

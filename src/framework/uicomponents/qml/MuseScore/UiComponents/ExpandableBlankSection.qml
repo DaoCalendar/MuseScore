@@ -44,9 +44,10 @@ FocusScope {
     NavigationControl {
         id: navCtrl
         name: root.title
+        enabled: root.enabled && root.visible
         accessible.role: MUAccessible.ListItem
         accessible.name: root.title
-        enabled: root.enabled
+
         onTriggered: {
             root.isExpanded = !root.isExpanded
         }
@@ -62,8 +63,12 @@ FocusScope {
 
         spacing: 4
 
+        height: titleLabel.implicitHeight
+
         Rectangle {
             id: expandButton
+
+            anchors.verticalCenter: parent.verticalCenter
 
             height: expandButtonIcon.height * 1.2
             width: expandButtonIcon.width * 1.2
@@ -72,6 +77,8 @@ FocusScope {
 
             StyledIconLabel {
                 id: expandButtonIcon
+
+                anchors.verticalCenter: parent.verticalCenter
 
                 rotation: root.isExpanded ? 0 : -90
 
@@ -103,6 +110,8 @@ FocusScope {
         hoverEnabled: true
 
         onClicked: {
+            navigation.requestActiveByInteraction()
+
             root.isExpanded = !root.isExpanded
         }
     }

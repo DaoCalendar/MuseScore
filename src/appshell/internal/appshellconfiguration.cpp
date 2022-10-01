@@ -21,8 +21,15 @@
  */
 #include "appshellconfiguration.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+
 #include "config.h"
 #include "settings.h"
+
+#include "multiinstances/resourcelockguard.h"
+
+#include "log.h"
 
 using namespace mu::appshell;
 using namespace mu::notation;
@@ -30,70 +37,72 @@ using namespace mu::framework;
 
 static const std::string module_name("appshell");
 
-static const Settings::Key STARTUP_SESSION_TYPE(module_name, "application/startup/sessionStart");
+static const Settings::Key HAS_COMPLETED_FIRST_LAUNCH_SETUP(module_name, "application/hasCompletedFirstLaunchSetup");
+
+static const Settings::Key STARTUP_MODE_TYPE(module_name, "application/startup/modeStart");
 static const Settings::Key STARTUP_SCORE_PATH(module_name, "application/startup/startScore");
 
-static const Settings::Key CHECK_FOR_UPDATE_KEY(module_name, "application/checkForUpdate");
-
-static const std::string ONLINE_HANDBOOK_URL("https://musescore.org/redirect/help?tag=handbook&locale=");
-static const std::string ASK_FOR_HELP_URL("https://musescore.org/redirect/post/question?locale=");
-static const std::string BUG_REPORT_URL("https://musescore.org/redirect/post/bug-report?locale=");
-static const std::string LEAVE_FEEDBACK_URL("https://musescore.com/content/editor-feedback?");
-static const std::string MUSESCORE_URL("https://www.musescore.org/");
-static const std::string MUSICXML_LICENSE_URL("https://www.w3.org/community/about/process/final/");
-static const std::string MUSICXML_LICENSE_DEED_URL("https://www.w3.org/community/about/process/fsa-deed/");
+static const std::string MUSESCORE_ONLINE_HANDBOOK_URL_PATH("/redirect/help");
+static const std::string MUSESCORE_ASK_FOR_HELP_URL_PATH("/redirect/post/question");
+static const std::string MUSESCORE_BUG_REPORT_URL_PATH("/redirect/post/bug-report?locale=");
+static const std::string MUSESCORE_FORUM_URL_PATH("/forum");
+static const std::string MUSESCORE_CONTRIBUTE_URL_PATH("/contribute");
+static const std::string LEAVE_FEEDBACK_URL("https://musescore.com/content/editor-feedback");
+static const std::string MUSICXML_URL("https://w3.org");
+static const std::string MUSICXML_LICENSE_URL(MUSICXML_URL + "/community/about/process/final/");
+static const std::string MUSICXML_LICENSE_DEED_URL(MUSICXML_URL + "/community/about/process/fsa-deed/");
 
 static const std::string UTM_MEDIUM_MENU("menu");
 
 static const QString NOTATION_NAVIGATOR_VISIBLE_KEY("showNavigator");
 static const Settings::Key SPLASH_SCREEN_VISIBLE_KEY(module_name, "ui/application/startup/showSplashScreen");
-static const Settings::Key TOURS_VISIBLE_KEY(module_name, "ui/application/startup/showTours");
+
+static const mu::io::path_t SESSION_FILE("/session.json");
+static const std::string SESSION_RESOURCE_NAME("SESSION");
 
 void AppShellConfiguration::init()
 {
-    settings()->setDefaultValue(STARTUP_SESSION_TYPE, Val(static_cast<int>(StartupSessionType::StartEmpty)));
+    settings()->setDefaultValue(HAS_COMPLETED_FIRST_LAUNCH_SETUP, Val(false));
+
+    settings()->setDefaultValue(STARTUP_MODE_TYPE, Val(StartupModeType::StartEmpty));
     settings()->setDefaultValue(STARTUP_SCORE_PATH, Val(projectConfiguration()->myFirstProjectPath().toStdString()));
 
-    settings()->setDefaultValue(CHECK_FOR_UPDATE_KEY, Val(isAppUpdatable()));
+    fileSystem()->makePath(sessionDataPath());
 }
 
-StartupSessionType AppShellConfiguration::startupSessionType() const
+bool AppShellConfiguration::hasCompletedFirstLaunchSetup() const
 {
-    return static_cast<StartupSessionType>(settings()->value(STARTUP_SESSION_TYPE).toInt());
+    return settings()->value(HAS_COMPLETED_FIRST_LAUNCH_SETUP).toBool();
 }
 
-void AppShellConfiguration::setStartupSessionType(StartupSessionType type)
+void AppShellConfiguration::setHasCompletedFirstLaunchSetup(bool has)
 {
-    settings()->setSharedValue(STARTUP_SESSION_TYPE, Val(static_cast<int>(type)));
+    settings()->setSharedValue(HAS_COMPLETED_FIRST_LAUNCH_SETUP, Val(has));
 }
 
-mu::io::path AppShellConfiguration::startupScorePath() const
+StartupModeType AppShellConfiguration::startupModeType() const
+{
+    return settings()->value(STARTUP_MODE_TYPE).toEnum<StartupModeType>();
+}
+
+void AppShellConfiguration::setStartupModeType(StartupModeType type)
+{
+    settings()->setSharedValue(STARTUP_MODE_TYPE, Val(type));
+}
+
+mu::io::path_t AppShellConfiguration::startupScorePath() const
 {
     return settings()->value(STARTUP_SCORE_PATH).toString();
 }
 
-void AppShellConfiguration::setStartupScorePath(const io::path& scorePath)
+void AppShellConfiguration::setStartupScorePath(const io::path_t& scorePath)
 {
     settings()->setSharedValue(STARTUP_SCORE_PATH, Val(scorePath.toStdString()));
 }
 
-bool AppShellConfiguration::isAppUpdatable() const
+mu::io::path_t AppShellConfiguration::userDataPath() const
 {
-#ifdef APP_UPDATABLE
-    return true;
-#else
-    return false;
-#endif
-}
-
-bool AppShellConfiguration::needCheckForUpdate() const
-{
-    return settings()->value(CHECK_FOR_UPDATE_KEY).toBool();
-}
-
-void AppShellConfiguration::setNeedCheckForUpdate(bool needCheck)
-{
-    settings()->setSharedValue(CHECK_FOR_UPDATE_KEY, Val(needCheck));
+    return globalConfiguration()->userDataPath();
 }
 
 std::string AppShellConfiguration::handbookUrl() const
@@ -101,44 +110,65 @@ std::string AppShellConfiguration::handbookUrl() const
     std::string utm = utmParameters(UTM_MEDIUM_MENU);
     std::string languageCode = currentLanguageCode();
 
-    return ONLINE_HANDBOOK_URL + languageCode + "&" + utm;
+    QStringList params = {
+        "tag=handbook",
+        "locale=" + QString::fromStdString(languageCode),
+        QString::fromStdString(utm)
+    };
+
+    return MUSESCORE_ONLINE_HANDBOOK_URL_PATH + "?" + params.join("&").toStdString();
 }
 
 std::string AppShellConfiguration::askForHelpUrl() const
 {
     std::string languageCode = currentLanguageCode();
-    return ASK_FOR_HELP_URL + languageCode;
+
+    QStringList params = {
+        "locale=" + QString::fromStdString(languageCode)
+    };
+
+    return MUSESCORE_ASK_FOR_HELP_URL_PATH + "?" + params.join("&").toStdString();
 }
 
 std::string AppShellConfiguration::bugReportUrl() const
 {
     std::string utm = utmParameters(UTM_MEDIUM_MENU);
+    std::string _sha = sha();
     std::string languageCode = currentLanguageCode();
 
-    return BUG_REPORT_URL + languageCode + "&" + utm + "&" + sha();
+    QStringList params = {
+        "locale=" + QString::fromStdString(languageCode),
+        QString::fromStdString(utm),
+        QString::fromStdString(_sha)
+    };
+
+    return MUSESCORE_BUG_REPORT_URL_PATH + "?" + params.join("&").toStdString();
 }
 
 std::string AppShellConfiguration::leaveFeedbackUrl() const
 {
     std::string utm = utmParameters(UTM_MEDIUM_MENU);
 
-    return LEAVE_FEEDBACK_URL + utm;
+    QStringList params = {
+        QString::fromStdString(utm)
+    };
+
+    return LEAVE_FEEDBACK_URL + "?" + params.join("&").toStdString();
 }
 
 std::string AppShellConfiguration::museScoreUrl() const
 {
-    std::string languageCode = currentLanguageCode();
-    return MUSESCORE_URL + languageCode;
+    return globalConfiguration()->museScoreUrl();
 }
 
 std::string AppShellConfiguration::museScoreForumUrl() const
 {
-    return MUSESCORE_URL + "forum";
+    return globalConfiguration()->museScoreUrl() + MUSESCORE_FORUM_URL_PATH;
 }
 
 std::string AppShellConfiguration::museScoreContributionUrl() const
 {
-    return MUSESCORE_URL + "contribute";
+    return globalConfiguration()->museScoreUrl() + MUSESCORE_CONTRIBUTE_URL_PATH;
 }
 
 std::string AppShellConfiguration::musicXMLLicenseUrl() const
@@ -186,16 +216,6 @@ void AppShellConfiguration::setNeedShowSplashScreen(bool show)
     settings()->setSharedValue(SPLASH_SCREEN_VISIBLE_KEY, Val(show));
 }
 
-bool AppShellConfiguration::needShowTours() const
-{
-    return settings()->value(TOURS_VISIBLE_KEY).toBool();
-}
-
-void AppShellConfiguration::setNeedShowTours(bool show)
-{
-    settings()->setSharedValue(TOURS_VISIBLE_KEY, Val(show));
-}
-
 void AppShellConfiguration::startEditSettings()
 {
     settings()->beginTransaction();
@@ -211,9 +231,31 @@ void AppShellConfiguration::rollbackSettings()
     settings()->rollbackTransaction();
 }
 
-void AppShellConfiguration::revertToFactorySettings(bool keepDefaultSettings) const
+void AppShellConfiguration::revertToFactorySettings(bool keepDefaultSettings, bool notifyAboutChanges) const
 {
-    settings()->reset(keepDefaultSettings);
+    settings()->reset(keepDefaultSettings, notifyAboutChanges);
+}
+
+mu::io::paths_t AppShellConfiguration::sessionProjectsPaths() const
+{
+    RetVal<ByteArray> retVal = readSessionState();
+    if (!retVal.ret) {
+        LOGE() << retVal.ret.toString();
+        return {};
+    }
+
+    return parseSessionProjectsPaths(retVal.val.toQByteArrayNoCopy());
+}
+
+mu::Ret AppShellConfiguration::setSessionProjectsPaths(const mu::io::paths_t& paths)
+{
+    QJsonArray jsonArray;
+    for (const io::path_t& path : paths) {
+        jsonArray << QJsonValue(path.toQString());
+    }
+
+    QByteArray data = QJsonDocument(jsonArray).toJson();
+    return writeSessionState(data);
 }
 
 std::string AppShellConfiguration::utmParameters(const std::string& utmMedium) const
@@ -225,7 +267,7 @@ std::string AppShellConfiguration::utmParameters(const std::string& utmMedium) c
 
 std::string AppShellConfiguration::sha() const
 {
-    return "sha=" + notationConfiguration()->notationRevision();
+    return "sha=" MUSESCORE_REVISION;
 }
 
 std::string AppShellConfiguration::currentLanguageCode() const
@@ -234,4 +276,47 @@ std::string AppShellConfiguration::currentLanguageCode() const
     QLocale locale(languageCode);
 
     return locale.bcp47Name().toStdString();
+}
+
+mu::io::path_t AppShellConfiguration::sessionDataPath() const
+{
+    return globalConfiguration()->userAppDataPath() + "/session";
+}
+
+mu::io::path_t AppShellConfiguration::sessionFilePath() const
+{
+    return sessionDataPath() + SESSION_FILE;
+}
+
+mu::RetVal<mu::ByteArray> AppShellConfiguration::readSessionState() const
+{
+    mi::ReadResourceLockGuard lock_guard(multiInstancesProvider(), SESSION_RESOURCE_NAME);
+    return fileSystem()->readFile(sessionFilePath());
+}
+
+mu::Ret AppShellConfiguration::writeSessionState(const QByteArray& data)
+{
+    mi::WriteResourceLockGuard lock_guard(multiInstancesProvider(), SESSION_RESOURCE_NAME);
+    return fileSystem()->writeFile(sessionFilePath(), ByteArray::fromQByteArrayNoCopy(data));
+}
+
+mu::io::paths_t AppShellConfiguration::parseSessionProjectsPaths(const QByteArray& json) const
+{
+    QJsonParseError err;
+    QJsonDocument jsodDoc = QJsonDocument::fromJson(json, &err);
+    if (err.error != QJsonParseError::NoError || !jsodDoc.isArray()) {
+        LOGE() << "failed parse, err: " << err.errorString();
+        return {};
+    }
+
+    io::paths_t result;
+    const QVariantList pathsList = jsodDoc.array().toVariantList();
+    for (const QVariant& pathVal : pathsList) {
+        io::path_t path = pathVal.toString().toStdString();
+        if (!path.empty()) {
+            result.push_back(path);
+        }
+    }
+
+    return result;
 }

@@ -25,28 +25,24 @@
 #include <iterator>
 #include <unordered_set>
 
-#include "translation.h"
-#include "io/xml.h"
+#include "rw/xml.h"
+#include "style/textstyle.h"
+#include "types/translatablestring.h"
+#include "types/typesconv.h"
 
-#include "score.h"
-#include "undo.h"
-#include "bracket.h"
 #include "bracketItem.h"
-#include "measure.h"
-#include "spanner.h"
-#include "musescoreCore.h"
-#include "symnames.h"
-#include "masterscore.h"
 #include "factory.h"
 #include "linkedobjects.h"
+#include "masterscore.h"
+#include "score.h"
+#include "undo.h"
 
 #include "log.h"
-#include "config.h"
 
 using namespace mu;
 using namespace mu::engraving;
 
-namespace Ms {
+namespace mu::engraving {
 ElementStyle const EngravingObject::emptyStyle;
 
 EngravingObject* EngravingObjectList::at(size_t i) const
@@ -62,11 +58,17 @@ EngravingObject::EngravingObject(const ElementType& type, EngravingObject* paren
     }
 
     if (type != ElementType::SCORE) {
-        IF_ASSERT_FAILED(parent) {
-        }
+        assert(parent);
     }
 
     doSetParent(parent);
+    if (m_parent) {
+        doSetScore(m_parent->score());
+    }
+
+    if (type == ElementType::SCORE) {
+        m_score = static_cast<Score*>(this);
+    }
 
     if (elementsProvider()) {
         elementsProvider()->reg(this);
@@ -77,8 +79,8 @@ EngravingObject::EngravingObject(const EngravingObject& se)
 {
     m_type = se.m_type;
     doSetParent(se.m_parent);
+    m_score = se.m_score;
     m_isParentExplicitlySet = se.m_isParentExplicitlySet;
-    m_isDummy = se.m_isDummy;
     _elementStyle = se._elementStyle;
     if (_elementStyle) {
         size_t n = _elementStyle->size();
@@ -88,6 +90,10 @@ EngravingObject::EngravingObject(const EngravingObject& se)
         }
     }
     _links = 0;
+
+    if (elementsProvider()) {
+        elementsProvider()->reg(this);
+    }
 }
 
 //---------------------------------------------------------
@@ -96,33 +102,35 @@ EngravingObject::EngravingObject(const EngravingObject& se)
 
 EngravingObject::~EngravingObject()
 {
-    for (EngravingObject* c : m_children) {
-        c->m_parent = nullptr;
+    if (m_parent) {
+        m_parent->removeChild(this);
     }
 
-    if (!isDummy() && !isScore()) {
-        Score* sc = score();
-        IF_ASSERT_FAILED(sc) {
-            return;
+    if (!this->isType(ElementType::ROOT_ITEM)
+        && !this->isType(ElementType::DUMMY)
+        && !this->isType(ElementType::SCORE)) {
+        EngravingObjectList children = m_children;
+        for (EngravingObject* c : children) {
+            c->m_parent = nullptr;
+            c->moveToDummy();
         }
-
-        auto dummy = sc->dummy();
-        if (dummy && dummy != this) {
-            for (EngravingObject* c : m_children) {
-                c->m_parent = dummy;
-                c->m_parent->addChild(c);
+    } else {
+        bool isPaletteScore = score()->isPaletteScore();
+        for (EngravingObject* c : m_children) {
+            c->m_parent = nullptr;
+            if (!isPaletteScore) {
+                delete c;
             }
         }
+        m_children.clear();
     }
-
-    doSetParent(nullptr);
 
     if (elementsProvider()) {
         elementsProvider()->unreg(this);
     }
 
     if (_links) {
-        _links->removeOne(this);
+        _links->remove(this);
         if (_links->empty()) {
             delete _links;
             _links = 0;
@@ -137,22 +145,9 @@ void EngravingObject::doSetParent(EngravingObject* p)
         return;
     }
 
-#ifdef BUILD_DIAGNOSTICS
-    // check recursion
-    {
-        std::unordered_set<EngravingObject*> used;
-        used.insert(this);
-        EngravingObject* pi = p;
-        while (pi) {
-            IF_ASSERT_FAILED(used.find(pi) == used.end()) {
-                LOGE() << "recursion detected";
-                return;
-            }
-            used.insert(pi);
-            pi = pi->m_parent;
-        }
+    IF_ASSERT_FAILED(p != this) {
+        return;
     }
-#endif
 
     if (m_parent) {
         m_parent->removeChild(this);
@@ -165,6 +160,113 @@ void EngravingObject::doSetParent(EngravingObject* p)
     }
 }
 
+void EngravingObject::doSetScore(Score* sc)
+{
+    if (m_score == sc) {
+        return;
+    }
+
+    m_score = sc;
+
+    for (EngravingObject* ch : m_children) {
+        ch->doSetScore(sc);
+    }
+}
+
+void EngravingObject::moveToDummy()
+{
+    Score* sc = score();
+    if (sc) {
+        if (sc->dummy() && sc->dummy() != this) {
+            setParent(sc->dummy());
+        }
+    }
+}
+
+void EngravingObject::setScore(Score* s)
+{
+    doSetScore(s);
+}
+
+void EngravingObject::addChild(EngravingObject* o)
+{
+    IF_ASSERT_FAILED(o != this) {
+        return;
+    }
+
+    m_children.push_back(o);
+}
+
+void EngravingObject::removeChild(EngravingObject* o)
+{
+    IF_ASSERT_FAILED(o->m_parent == this) {
+        return;
+    }
+    o->m_parent = nullptr;
+    m_children.remove(o);
+}
+
+EngravingObject* EngravingObject::parent() const
+{
+    return m_parent;
+}
+
+EngravingObject* EngravingObject::explicitParent() const
+{
+    if (!m_isParentExplicitlySet) {
+        return nullptr;
+    }
+    return m_parent;
+}
+
+void EngravingObject::setParent(EngravingObject* p)
+{
+    IF_ASSERT_FAILED(this != p) {
+        return;
+    }
+
+    if (!p) {
+        moveToDummy();
+        return;
+    }
+
+    doSetParent(p);
+    if (m_parent) {
+        doSetScore(m_parent->score());
+    }
+
+    if (p && !p->isType(ElementType::DUMMY)) {
+        m_isParentExplicitlySet = true;
+    } else {
+        m_isParentExplicitlySet = false;
+    }
+}
+
+void EngravingObject::resetExplicitParent()
+{
+    m_isParentExplicitlySet = false;
+}
+
+Score* EngravingObject::score() const
+{
+    return m_score;
+}
+
+MasterScore* EngravingObject::masterScore() const
+{
+    return score()->masterScore();
+}
+
+bool EngravingObject::onSameScore(const EngravingObject* other) const
+{
+    return this->score() == other->score();
+}
+
+const MStyle* EngravingObject::style() const
+{
+    return &score()->style();
+}
+
 //---------------------------------------------------------
 //   scanElements
 /// Recursively apply scanElements to all children.
@@ -173,8 +275,7 @@ void EngravingObject::doSetParent(EngravingObject* p)
 
 void EngravingObject::scanElements(void* data, void (* func)(void*, EngravingItem*), bool all)
 {
-    for (int i = 0; i < scanChildCount(); ++i) {
-        EngravingObject* child = scanChild(i);
+    for (EngravingObject* child : scanChildren()) {
         child->scanElements(data, func, all);
     }
 }
@@ -183,28 +284,28 @@ void EngravingObject::scanElements(void* data, void (* func)(void*, EngravingIte
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant EngravingObject::propertyDefault(Pid pid, Tid tid) const
+PropertyValue EngravingObject::propertyDefault(Pid pid, TextStyleType tid) const
 {
     for (const StyledProperty& spp : *textStyle(tid)) {
         if (spp.pid == pid) {
             return styleValue(pid, spp.sid);
         }
     }
-    return QVariant();
+    return PropertyValue();
 }
 
 //---------------------------------------------------------
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant EngravingObject::propertyDefault(Pid pid) const
+PropertyValue EngravingObject::propertyDefault(Pid pid) const
 {
     Sid sid = getPropertyStyle(pid);
     if (sid != Sid::NOSTYLE) {
         return styleValue(pid, sid);
     }
-    //      qDebug("<%s>(%d) not found in <%s>", propertyQmlName(pid), int(pid), name());
-    return QVariant();
+    //      LOGD("<%s>(%d) not found in <%s>", propertyQmlName(pid), int(pid), typeName());
+    return PropertyValue();
 }
 
 //---------------------------------------------------------
@@ -232,7 +333,7 @@ void EngravingObject::initElementStyle(const ElementStyle* ss)
 
 void EngravingObject::resetProperty(Pid pid)
 {
-    QVariant v = propertyDefault(pid);
+    PropertyValue v = propertyDefault(pid);
     if (v.isValid()) {
         setProperty(pid, v);
         PropertyFlags p = propertyFlags(pid);
@@ -269,7 +370,7 @@ bool EngravingObject::isStyled(Pid pid) const
 //   changeProperty
 //---------------------------------------------------------
 
-static void changeProperty(EngravingObject* e, Pid t, const QVariant& st, PropertyFlags ps)
+static void changeProperty(EngravingObject* e, Pid t, const PropertyValue& st, PropertyFlags ps)
 {
     if (e->getProperty(t) != st || e->propertyFlags(t) != ps) {
         if (e->isBracketItem()) {
@@ -285,7 +386,7 @@ static void changeProperty(EngravingObject* e, Pid t, const QVariant& st, Proper
 //   changeProperties
 //---------------------------------------------------------
 
-static void changeProperties(EngravingObject* e, Pid t, const QVariant& st, PropertyFlags ps)
+static void changeProperties(EngravingObject* e, Pid t, const PropertyValue& st, PropertyFlags ps)
 {
     if (propertyLink(t)) {
         for (EngravingObject* ee : e->linkList()) {
@@ -300,12 +401,12 @@ static void changeProperties(EngravingObject* e, Pid t, const QVariant& st, Prop
 //   undoChangeProperty
 //---------------------------------------------------------
 
-void EngravingObject::undoChangeProperty(Pid id, const QVariant& v)
+void EngravingObject::undoChangeProperty(Pid id, const PropertyValue& v)
 {
     undoChangeProperty(id, v, propertyFlags(id));
 }
 
-void EngravingObject::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
+void EngravingObject::undoChangeProperty(Pid id, const PropertyValue& v, PropertyFlags ps)
 {
     if ((getProperty(id) == v) && (propertyFlags(id) == ps)) {
         return;
@@ -317,7 +418,7 @@ void EngravingObject::undoChangeProperty(Pid id, const QVariant& v, PropertyFlag
         if (isStyled(Pid::OFFSET)) {
             // TODO: maybe it just makes more sense to do this in EngravingItem::undoChangeProperty,
             // but some of the overrides call ScoreElement explicitly
-            qreal sp;
+            double sp;
             if (isEngravingItem()) {
                 sp = toEngravingItem(this)->spatium();
             } else {
@@ -327,11 +428,11 @@ void EngravingObject::undoChangeProperty(Pid id, const QVariant& v, PropertyFlag
             EngravingItem* e = toEngravingItem(this);
             e->setOffsetChanged(false);
         }
-    } else if (id == Pid::SUB_STYLE) {
+    } else if (id == Pid::TEXT_STYLE) {
         //
         // change a list of properties
         //
-        auto l = textStyle(Tid(v.toInt()));
+        auto l = textStyle(v.value<TextStyleType>());
         // Change to ElementStyle defaults
         for (const StyledProperty& p : *l) {
             if (p.sid == Sid::NOSTYLE) {
@@ -350,7 +451,7 @@ void EngravingObject::undoChangeProperty(Pid id, const QVariant& v, PropertyFlag
     }
     changeProperties(this, id, v, ps);
     if (id != Pid::GENERATED) {
-        changeProperties(this, Pid::GENERATED, QVariant(false), PropertyFlags::NOSTYLE);
+        changeProperties(this, Pid::GENERATED, false, PropertyFlags::NOSTYLE);
     }
 }
 
@@ -360,7 +461,7 @@ void EngravingObject::undoChangeProperty(Pid id, const QVariant& v, PropertyFlag
 
 void EngravingObject::undoPushProperty(Pid id)
 {
-    QVariant val = getProperty(id);
+    PropertyValue val = getProperty(id);
     score()->undoStack()->push1(new ChangeProperty(this, id, val));
 }
 
@@ -370,15 +471,12 @@ void EngravingObject::undoPushProperty(Pid id)
 
 void EngravingObject::readProperty(XmlReader& e, Pid id)
 {
-    QVariant v = Ms::readProperty(id, e);
+    PropertyValue v = mu::engraving::readProperty(id, e);
     switch (propertyType(id)) {
-    case P_TYPE::SP_REAL:
-        v = v.toReal() * score()->spatium();
+    case P_TYPE::MILLIMETRE: //! NOTE type mm, but stored in xml as spatium
+        v = v.value<Spatium>().toMM(score()->spatium());
         break;
-    case P_TYPE::POINT_SP:
-        v = v.value<PointF>() * score()->spatium();
-        break;
-    case P_TYPE::POINT_SP_MM:
+    case P_TYPE::POINT:
         if (offsetIsSpatiumDependent()) {
             v = v.value<PointF>() * score()->spatium();
         } else {
@@ -394,7 +492,7 @@ void EngravingObject::readProperty(XmlReader& e, Pid id)
     }
 }
 
-bool EngravingObject::readProperty(const QStringRef& s, XmlReader& e, Pid id)
+bool EngravingObject::readProperty(const AsciiStringView& s, XmlReader& e, Pid id)
 {
     if (s == propertyName(id)) {
         readProperty(e, id);
@@ -416,13 +514,13 @@ void EngravingObject::writeProperty(XmlWriter& xml, Pid pid) const
     if (isStyled(pid)) {
         return;
     }
-    QVariant p = getProperty(pid);
+    PropertyValue p = getProperty(pid);
     if (!p.isValid()) {
-        qDebug("%s invalid property %d <%s>", name(), int(pid), propertyName(pid));
+        LOGD("%s invalid property %d <%s>", typeName(), int(pid), propertyName(pid));
         return;
     }
     PropertyFlags f = propertyFlags(pid);
-    QVariant d = (f != PropertyFlags::STYLED) ? propertyDefault(pid) : QVariant();
+    PropertyValue d = (f != PropertyFlags::STYLED) ? propertyDefault(pid) : PropertyValue();
 
     if (pid == Pid::FONT_STYLE) {
         FontStyle ds = FontStyle(d.isValid() ? d.toInt() : 0);
@@ -436,78 +534,40 @@ void EngravingObject::writeProperty(XmlWriter& xml, Pid pid) const
         if ((fs& FontStyle::Underline) != (ds & FontStyle::Underline)) {
             xml.tag("underline", fs & FontStyle::Underline);
         }
+        if ((fs& FontStyle::Strike) != (ds & FontStyle::Strike)) {
+            xml.tag("strike", fs & FontStyle::Strike);
+        }
         return;
     }
 
-    if (propertyType(pid) == P_TYPE::SP_REAL) {
-        qreal f1 = p.toReal();
-        if (d.isValid() && qAbs(f1 - d.toReal()) < 0.0001) {            // fuzzy compare
+    P_TYPE type = propertyType(pid);
+    if (P_TYPE::MILLIMETRE == type) {
+        double f1 = p.toReal();
+        if (d.isValid() && std::abs(f1 - d.toReal()) < 0.0001) {            // fuzzy compare
             return;
         }
-        p = QVariant(f1 / score()->spatium());
-        d = QVariant();
-    } else if (propertyType(pid) == P_TYPE::POINT_SP) {
+        p = PropertyValue(Spatium::fromMM(f1, score()->spatium()));
+        d = PropertyValue();
+    } else if (P_TYPE::POINT == type) {
         PointF p1 = p.value<PointF>();
         if (d.isValid()) {
             PointF p2 = d.value<PointF>();
-            if ((qAbs(p1.x() - p2.x()) < 0.0001) && (qAbs(p1.y() - p2.y()) < 0.0001)) {
+            if ((std::abs(p1.x() - p2.x()) < 0.0001) && (std::abs(p1.y() - p2.y()) < 0.0001)) {
                 return;
             }
         }
-        p = QVariant(p1 / score()->spatium());
-        d = QVariant();
-    } else if (propertyType(pid) == P_TYPE::POINT_SP_MM) {
-        PointF p1 = p.value<PointF>();
-        if (d.isValid()) {
-            PointF p2 = d.value<PointF>();
-            if ((qAbs(p1.x() - p2.x()) < 0.0001) && (qAbs(p1.y() - p2.y()) < 0.0001)) {
-                return;
-            }
-        }
-        qreal q = offsetIsSpatiumDependent() ? score()->spatium() : DPMM;
-        p = QVariant(p1 / q);
-        d = QVariant();
+        double q = offsetIsSpatiumDependent() ? score()->spatium() : DPMM;
+        p = PropertyValue(p1 / q);
+        d = PropertyValue();
     }
-    xml.tag(pid, p, d);
-}
-
-//---------------------------------------------------------
-//   propertyId
-//---------------------------------------------------------
-
-Pid EngravingObject::propertyId(const QStringRef& xmlName) const
-{
-    return Ms::propertyId(xmlName);
-}
-
-//---------------------------------------------------------
-//   propertyUserValue
-//---------------------------------------------------------
-
-QString EngravingObject::propertyUserValue(Pid id) const
-{
-    QVariant val = getProperty(id);
-    switch (propertyType(id)) {
-    case P_TYPE::POINT_SP:
-    {
-        PointF p = val.value<PointF>();
-        return QString("(%1, %2)").arg(p.x()).arg(p.y());
-    }
-    case P_TYPE::DIRECTION:
-        return toUserString(val.value<Direction>());
-    case P_TYPE::SYMID:
-        return SymNames::translatedUserNameForSymId(val.value<SymId>());
-    default:
-        break;
-    }
-    return val.toString();
+    xml.tagProperty(pid, p, d);
 }
 
 //---------------------------------------------------------
 //   readStyledProperty
 //---------------------------------------------------------
 
-bool EngravingObject::readStyledProperty(XmlReader& e, const QStringRef& tag)
+bool EngravingObject::readStyledProperty(XmlReader& e, const AsciiStringView& tag)
 {
     for (const StyledProperty& spp : *styledProperties()) {
         if (readProperty(tag, e, spp.pid)) {
@@ -545,8 +605,8 @@ void EngravingObject::reset()
 
 void EngravingObject::readAddConnector(ConnectorInfoReader* info, bool pasteMode)
 {
-    Q_UNUSED(pasteMode);
-    qDebug("Cannot add connector %s to %s", info->connector()->name(), name());
+    UNUSED(pasteMode);
+    LOGD("Cannot add connector %s to %s", info->connector()->typeName(), typeName());
 }
 
 //---------------------------------------------------------
@@ -555,23 +615,23 @@ void EngravingObject::readAddConnector(ConnectorInfoReader* info, bool pasteMode
 //---------------------------------------------------------
 void EngravingObject::linkTo(EngravingObject* element)
 {
-    Q_ASSERT(element != this);
-    Q_ASSERT(!_links);
+    assert(element != this);
+    assert(!_links);
 
     if (element->links()) {
         _links = element->_links;
-        Q_ASSERT(_links->contains(element));
+        assert(_links->contains(element));
     } else {
         if (isStaff()) {
             _links = new LinkedObjects(score(), -1);       // don’t use lid
         } else {
             _links = new LinkedObjects(score());
         }
-        _links->append(element);
+        _links->push_back(element);
         element->_links = _links;
     }
-    Q_ASSERT(!_links->contains(this));
-    _links->append(this);
+    assert(!_links->contains(this));
+    _links->push_back(this);
 }
 
 //---------------------------------------------------------
@@ -584,8 +644,8 @@ void EngravingObject::unlink()
         return;
     }
 
-    Q_ASSERT(_links->contains(this));
-    _links->removeOne(this);
+    assert(_links->contains(this));
+    _links->remove(this);
 
     // if link list is empty, remove list
     if (_links->size() <= 1) {
@@ -610,7 +670,7 @@ bool EngravingObject::isLinked(EngravingObject* se) const
     }
 
     if (se == nullptr) {
-        return !_links->isEmpty() && _links->mainElement() != this;
+        return !_links->empty() && _links->mainElement() != this;
     }
 
     return _links->contains(se);
@@ -631,149 +691,15 @@ void EngravingObject::undoUnlink()
 //   linkList
 //---------------------------------------------------------
 
-QList<EngravingObject*> EngravingObject::linkList() const
+std::list<EngravingObject*> EngravingObject::linkList() const
 {
-    QList<EngravingObject*> el;
+    std::list<EngravingObject*> el;
     if (_links) {
         el = *_links;
     } else {
-        el.append(const_cast<EngravingObject*>(this));
+        el.push_back(const_cast<EngravingObject*>(this));
     }
     return el;
-}
-
-void EngravingObject::setScore(Score* s)
-{
-    _score = s;
-}
-
-void EngravingObject::addChild(EngravingObject* o)
-{
-#ifdef BUILD_DIAGNOSTICS
-    IF_ASSERT_FAILED(std::find(m_children.begin(), m_children.end(), o) == m_children.end()) {
-        return;
-    }
-#endif
-    m_children.push_back(o);
-}
-
-void EngravingObject::removeChild(EngravingObject* o)
-{
-    IF_ASSERT_FAILED(o->m_parent == this) {
-        return;
-    }
-    o->m_parent = nullptr;
-    m_children.remove(o);
-}
-
-EngravingObject* EngravingObject::parent(bool isIncludeDummy) const
-{
-    if (!m_parent) {
-        return nullptr;
-    }
-
-    //! NOTE We need to exclude a dummy for compatibility reasons.
-    if (isIncludeDummy) {
-        return m_parent;
-    }
-
-    if (!m_isParentExplicitlySet) {
-        return nullptr;
-    }
-
-    if (m_parent->isScore()) {
-        return nullptr;
-    }
-
-    if (m_parent->isDummy()) {
-        return nullptr;
-    }
-
-    return m_parent;
-}
-
-void EngravingObject::setParent(EngravingObject* p, bool isExplicitly)
-{
-    IF_ASSERT_FAILED(this != p) {
-        return;
-    }
-
-    if (!p) {
-        moveToDummy();
-        return;
-    }
-
-    doSetParent(p);
-
-    m_isParentExplicitlySet = isExplicitly;
-}
-
-void EngravingObject::moveToDummy()
-{
-    if (isDummy()) {
-        doSetParent(nullptr);
-        return;
-    }
-
-    Score* sc = score();
-    IF_ASSERT_FAILED(sc) {
-        return;
-    }
-
-    if (sc->dummy() != this && sc->dummy()) {
-        setParent(sc->dummy());
-    }
-}
-
-void EngravingObject::setIsDummy(bool arg)
-{
-    m_isDummy = arg;
-}
-
-bool EngravingObject::isDummy() const
-{
-    return m_isDummy;
-}
-
-Score* EngravingObject::score(bool required) const
-{
-    TRACEFUNC;
-    if (_score) {
-        return _score;
-    }
-
-    Score* sc = nullptr;
-    EngravingObject* e = const_cast<EngravingObject*>(this);
-    while (e) {
-        if (e->isScore()) {
-            sc = toScore(e);
-            break;
-        }
-
-        e = e->m_parent;
-    }
-
-    if (required) {
-        IF_ASSERT_FAILED(sc) {
-        }
-    }
-
-    return sc;
-}
-
-MasterScore* EngravingObject::masterScore() const
-{
-    return score()->masterScore();
-}
-
-bool EngravingObject::onSameScore(const EngravingObject* other) const
-{
-    return this->score() == other->score();
-}
-
-const MStyle* EngravingObject::style() const
-{
-    return &score()->style();
 }
 
 //---------------------------------------------------------
@@ -848,14 +774,19 @@ void EngravingObject::styleChanged()
     }
 }
 
-const char* EngravingObject::name() const
+const char* EngravingObject::typeName() const
 {
-    return Factory::name(type());
+    return TConv::toXml(type()).ascii();
 }
 
-QString EngravingObject::userName() const
+TranslatableString EngravingObject::typeUserName() const
 {
-    return qtrc("elementName", Factory::userName(type()));
+    return TConv::userName(type());
+}
+
+String EngravingObject::translatedTypeUserName() const
+{
+    return typeUserName().translated();
 }
 
 //---------------------------------------------------------
@@ -866,7 +797,8 @@ bool EngravingObject::isSLineSegment() const
 {
     return isHairpinSegment() || isOttavaSegment() || isPedalSegment()
            || isTrillSegment() || isVoltaSegment() || isTextLineSegment()
-           || isGlissandoSegment() || isLetRingSegment() || isVibratoSegment() || isPalmMuteSegment();
+           || isGlissandoSegment() || isLetRingSegment() || isVibratoSegment() || isPalmMuteSegment()
+           || isGradualTempoChangeSegment();
 }
 
 //---------------------------------------------------------
@@ -884,6 +816,8 @@ bool EngravingObject::isTextBase() const
            || type() == ElementType::JUMP
            || type() == ElementType::STAFF_TEXT
            || type() == ElementType::SYSTEM_TEXT
+           || type() == ElementType::TRIPLET_FEEL
+           || type() == ElementType::PLAYTECH_ANNOTATION
            || type() == ElementType::REHEARSAL_MARK
            || type() == ElementType::INSTRUMENT_CHANGE
            || type() == ElementType::FIGURED_BASS
@@ -899,22 +833,12 @@ bool EngravingObject::isTextBase() const
 //   styleValue
 //---------------------------------------------------------
 
-QVariant EngravingObject::styleValue(Pid pid, Sid sid) const
+PropertyValue EngravingObject::styleValue(Pid pid, Sid sid) const
 {
     switch (propertyType(pid)) {
-    case P_TYPE::SP_REAL:
-        return score()->styleP(sid);
-    case P_TYPE::POINT_SP: {
-        PointF val = score()->styleV(sid).value<PointF>() * score()->spatium();
-        if (isEngravingItem()) {
-            const EngravingItem* e = toEngravingItem(this);
-            if (e->staff() && !e->systemFlag()) {
-                val *= e->staff()->staffMag(e->tick());
-            }
-        }
-        return val;
-    }
-    case P_TYPE::POINT_SP_MM: {
+    case P_TYPE::MILLIMETRE:
+        return score()->styleMM(sid);
+    case P_TYPE::POINT: {
         PointF val = score()->styleV(sid).value<PointF>();
         if (offsetIsSpatiumDependent()) {
             val *= score()->spatium();
@@ -932,10 +856,5 @@ QVariant EngravingObject::styleValue(Pid pid, Sid sid) const
     default:
         return score()->styleV(sid);
     }
-}
-
-QString EngravingObject::mscoreVersion() const
-{
-    return score()->masterScore()->mscoreVersion();
 }
 }

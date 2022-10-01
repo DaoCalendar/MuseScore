@@ -24,80 +24,75 @@
 #define __LAYOUTBREAK_H__
 
 #include "engravingitem.h"
-#include "infrastructure/draw/painterpath.h"
+#include "draw/types/painterpath.h"
 
 namespace mu::engraving {
 class Factory;
-}
 
-namespace Ms {
 //---------------------------------------------------------
 //   @@ LayoutBreak
 ///    symbols for line break, page break etc.
 //---------------------------------------------------------
 class LayoutBreak final : public EngravingItem
 {
-    Q_GADGET
+    OBJECT_ALLOCATOR(engraving, LayoutBreak)
 public:
-    enum class Type {
-        ///.\{
-        PAGE, LINE, SECTION, NOBREAK
-        ///\}
-    };
-    Q_ENUM(Type);
 
     void setParent(MeasureBase* parent);
 
     LayoutBreak* clone() const override { return new LayoutBreak(*this); }
     int subtype() const override { return static_cast<int>(_layoutBreakType); }
 
-    void setLayoutBreakType(Type);
-    Type layoutBreakType() const { return _layoutBreakType; }
+    void setLayoutBreakType(LayoutBreakType);
+    LayoutBreakType layoutBreakType() const { return _layoutBreakType; }
 
     bool acceptDrop(EditData&) const override;
     EngravingItem* drop(EditData&) override;
     void write(XmlWriter&) const override;
     void read(XmlReader&) override;
 
-    MeasureBase* measure() const { return (MeasureBase*)parent(); }
-    qreal pause() const { return _pause; }
-    void setPause(qreal v) { _pause = v; }
+    MeasureBase* measure() const { return (MeasureBase*)explicitParent(); }
+    double pause() const { return _pause; }
+    void setPause(double v) { _pause = v; }
     bool startWithLongNames() const { return _startWithLongNames; }
     void setStartWithLongNames(bool v) { _startWithLongNames = v; }
     bool startWithMeasureOne() const { return _startWithMeasureOne; }
     void setStartWithMeasureOne(bool v) { _startWithMeasureOne = v; }
-    bool firstSystemIdentation() const { return _firstSystemIdentation; }
-    void setFirstSystemIdentation(bool v) { _firstSystemIdentation = v; }
+    bool firstSystemIndentation() const { return _firstSystemIndentation; }
+    void setFirstSystemIndentation(bool v) { _firstSystemIndentation = v; }
 
-    bool isPageBreak() const { return _layoutBreakType == Type::PAGE; }
-    bool isLineBreak() const { return _layoutBreakType == Type::LINE; }
-    bool isSectionBreak() const { return _layoutBreakType == Type::SECTION; }
-    bool isNoBreak() const { return _layoutBreakType == Type::NOBREAK; }
+    bool isPageBreak() const { return _layoutBreakType == LayoutBreakType::PAGE; }
+    bool isLineBreak() const { return _layoutBreakType == LayoutBreakType::LINE; }
+    bool isSectionBreak() const { return _layoutBreakType == LayoutBreakType::SECTION; }
+    bool isNoBreak() const { return _layoutBreakType == LayoutBreakType::NOBREAK; }
 
-    QVariant getProperty(Pid propertyId) const override;
-    bool setProperty(Pid propertyId, const QVariant&) override;
-    QVariant propertyDefault(Pid) const override;
-    Pid propertyId(const QStringRef& xmlName) const override;
+    PropertyValue getProperty(Pid propertyId) const override;
+    bool setProperty(Pid propertyId, const PropertyValue&) override;
+    PropertyValue propertyDefault(Pid) const override;
+
+protected:
+    void added() override;
+    void removed() override;
 
 private:
 
-    friend class mu::engraving::Factory;
+    friend class Factory;
     LayoutBreak(MeasureBase* parent = 0);
     LayoutBreak(const LayoutBreak&);
 
     void draw(mu::draw::Painter*) const override;
     void layout0();
-    void spatiumChanged(qreal oldValue, qreal newValue) override;
+    void spatiumChanged(double oldValue, double newValue) override;
 
-    qreal lw;
+    double lw;
     mu::RectF m_iconBorderRect;
-    mu::PainterPath m_iconPath;
-    qreal _pause;
+    mu::draw::PainterPath m_iconPath;
+    double _pause;
     bool _startWithLongNames;
     bool _startWithMeasureOne;
-    bool _firstSystemIdentation;
-    Type _layoutBreakType;
+    bool _firstSystemIndentation;
+    LayoutBreakType _layoutBreakType;
 };
-}     // namespace Ms
+} // namespace mu::engraving
 
 #endif

@@ -32,6 +32,10 @@ FocusScope {
     property alias icon: buttonIcon.iconCode
     property bool checked: false
 
+    property string toolTipTitle: ""
+    property string toolTipDescription: ""
+    property string toolTipShortcut: ""
+
     property bool transparent: false
     property color normalColor: transparent ? "transparent" : ui.theme.buttonColor
     property color hoverHitColor: ui.theme.buttonColor
@@ -53,6 +57,7 @@ FocusScope {
     NavigationControl {
         id: navCtrl
         name: root.objectName != "" ? root.objectName : "FlatToggleButton"
+        enabled: root.enabled && root.visible
 
         accessible.role: MUAccessible.RadioButton
         accessible.checked: root.checked
@@ -85,8 +90,26 @@ FocusScope {
 
         hoverEnabled: true
         onClicked: {
+            navigation.requestActiveByInteraction()
+
             root.ensureActiveFocus()
             root.toggled()
+        }
+
+        onPressed: {
+            ui.tooltip.hide(root, true)
+        }
+
+        onContainsMouseChanged: {
+            if (!Boolean(root.toolTipTitle)) {
+                return
+            }
+
+            if (mouseArea.containsMouse) {
+                ui.tooltip.show(root, root.toolTipTitle, root.toolTipDescription, root.toolTipShortcut)
+            } else {
+                ui.tooltip.hide(root)
+            }
         }
     }
 

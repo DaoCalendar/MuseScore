@@ -30,6 +30,8 @@
 #include "async/asyncable.h"
 #include "audio/itracks.h"
 #include "audio/iplayback.h"
+#include "context/iglobalcontext.h"
+#include "ui/view/navigationsection.h"
 
 #include "iplaybackcontroller.h"
 #include "internal/mixerchannelitem.h"
@@ -41,31 +43,54 @@ class MixerPanelModel : public QAbstractListModel, public async::Asyncable
 
     INJECT(playback, audio::IPlayback, playback)
     INJECT(playback, IPlaybackController, controller)
+    INJECT(playback, context::IGlobalContext, context)
+
+    Q_PROPERTY(int count READ rowCount NOTIFY rowCountChanged)
 
 public:
     explicit MixerPanelModel(QObject* parent = nullptr);
 
-    Q_INVOKABLE void load();
+    Q_INVOKABLE void load(const QVariant& navigationSection);
+    Q_INVOKABLE QVariantMap get(int index);
 
     QVariant data(const QModelIndex& index, int role) const override;
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QHash<int, QByteArray> roleNames() const override;
 
+signals:
+    void rowCountChanged();
+
 private:
     enum Roles {
-        ItemRole = Qt::UserRole + 1
+        ChannelItemRole = Qt::UserRole + 1
     };
 
-    void loadItems(const audio::TrackSequenceId sequenceId, const audio::TrackIdList& trackIdList);
-    void addItem(const audio::TrackSequenceId sequenceId, const audio::TrackId trackId);
+    void loadItems();
+    void addItem(const audio::TrackId trackId, const engraving::InstrumentTrackId& instrumentTrackId);
     void removeItem(const audio::TrackId trackId);
-    void sortItems();
+    void updateItemsPanelsOrder();
     void clear();
+    void setupConnections();
 
-    MixerChannelItem* buildTrackChannelItem(const audio::TrackSequenceId& sequenceId, const audio::TrackId& trackId);
+    int resolveInsertIndex(const engraving::InstrumentTrackId& instrumentTrackId) const;
+    int indexOf(const audio::TrackId trackId) const;
+
+    MixerChannelItem* buildTrackChannelItem(const audio::TrackId trackId, const engraving::InstrumentTrackId& instrumentTrackId,
+                                            bool isPrimary = true);
     MixerChannelItem* buildMasterChannelItem();
 
+    TrackMixerChannelItem* trackChannelItem(const audio::TrackId& trackId) const;
+    TrackMixerChannelItem* trackChannelItem(const engraving::InstrumentTrackId& instrumentTrackId) const;
+
+    project::INotationProjectPtr currentProject() const;
+    project::IProjectAudioSettingsPtr audioSettings() const;
+    notation::INotationPlaybackPtr notationPlayback() const;
+    notation::INotationPartsPtr masterNotationParts() const;
+
     QList<MixerChannelItem*> m_mixerChannelList;
+    audio::TrackSequenceId m_currentTrackSequenceId = -1;
+
+    ui::NavigationSection* m_itemsNavigationSection = nullptr;
 };
 }
 

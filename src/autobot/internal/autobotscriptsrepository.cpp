@@ -21,6 +21,9 @@
  */
 #include "autobotscriptsrepository.h"
 
+#include "scriptengine.h"
+#include "autobottypes.h"
+
 #include "log.h"
 
 using namespace mu;
@@ -28,23 +31,43 @@ using namespace mu::autobot;
 
 Scripts AutobotScriptsRepository::scripts() const
 {
-    using namespace mu::system;
-
-    io::paths scriptsDirs = configuration()->scriptsDirPaths();
-    io::paths scriptsPaths;
-    for (const io::path& dir : scriptsDirs) {
-        RetVal<io::paths> paths = fileSystem()->scanFiles(dir, { "*.js" }, IFileSystem::ScanMode::OnlyCurrentDir);
+    io::paths_t scriptsDirs = configuration()->scriptsDirPaths();
+    io::paths_t scriptsPaths;
+    for (const io::path_t& dir : scriptsDirs) {
+        RetVal<io::paths_t> paths = fileSystem()->scanFiles(dir, { "*.js" }, io::ScanMode::FilesInCurrentDir);
         scriptsPaths.insert(scriptsPaths.end(), paths.val.begin(), paths.val.end());
     }
 
     std::sort(scriptsPaths.begin(), scriptsPaths.end());
 
     Scripts scripts;
-    for (const io::path& p : scriptsPaths) {
+    for (const io::path_t& p : scriptsPaths) {
         Script s;
         s.path = p;
-        s.title = io::basename(p).toQString();
 
+        //! NOTE Get script info
+        ScriptEngine engine;
+        engine.setScriptPath(p);
+        if (!engine.evaluate()) {
+            LOGW() << "Bad script: " << p;
+            s.type = ScriptType::Undefined;
+            s.title = io::basename(p).toQString();
+            scripts.push_back(std::move(s));
+            continue;
+        }
+
+        QJSValue tcVal = engine.globalProperty(TESTCASE_JS_GLOBALNAME);
+        TestCase tc(tcVal);
+        if (!tc.isValid()) {
+            s.type = ScriptType::Custom;
+            s.title = io::basename(p).toQString();
+            scripts.push_back(std::move(s));
+            continue;
+        }
+
+        s.type = ScriptType::TestCase;
+        s.title = tc.name();
+        s.description = tc.description();
         scripts.push_back(std::move(s));
     }
 

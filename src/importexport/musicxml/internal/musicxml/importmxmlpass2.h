@@ -25,14 +25,16 @@
 
 #include <array>
 
-#include "libmscore/masterscore.h"
-#include "libmscore/tuplet.h"
-#include "importxmlfirstpass.h"
 #include "importmxmlpass1.h"
+#include "importxmlfirstpass.h"
 #include "musicxml.h" // a.o. for Slur
-#include "musicxmlsupport.h"
 
-namespace Ms {
+#include "libmscore/types.h"
+
+namespace mu::engraving {
+class StringData;
+class Tuplet;
+
 //---------------------------------------------------------
 //   support enums / structs / classes
 //---------------------------------------------------------
@@ -72,7 +74,7 @@ enum class MusicXmlSlash : char {
 struct MusicXmlTupletDesc {
     MusicXmlTupletDesc();
     MxmlStartStop type;
-    Placement placement;
+    PlacementV placement;
     TupletBracketType bracket;
     TupletNumberType shownumber;
 };
@@ -98,7 +100,7 @@ struct MusicXmlSpannerDesc {
 struct MusicXmlExtendedSpannerDesc {
     SLine* _sp { nullptr };
     Fraction _tick2 { 0, 0 };
-    int _track2 {};
+    track_idx_t _track2 = 0;
     bool _isStarted { false };
     bool _isStopped { false };
     MusicXmlExtendedSpannerDesc() {}
@@ -115,7 +117,7 @@ public:
     MusicXmlLyricsExtend() {}
     void init();
     void addLyric(Lyrics* const lyric);
-    void setExtend(const int no, const int track, const Fraction& tick);
+    void setExtend(const int no, const track_idx_t track, const Fraction& tick);
 
 private:
     QSet<Lyrics*> _lyrics;
@@ -251,7 +253,7 @@ class MusicXMLParserPass2
 {
 public:
     MusicXMLParserPass2(Score* score, MusicXMLParserPass1& pass1, MxmlLogger* logger);
-    Score::FileError parse(QIODevice* device);
+    Err parse(QIODevice* device);
     QString errors() const { return _errors; }
 
     // part specific data interface functions
@@ -263,7 +265,7 @@ private:
     void addError(const QString& error);      ///< Add an error to be shown in the GUI
     void initPartState(const QString& partId);
     SpannerSet findIncompleteSpannersAtPartEnd();
-    Score::FileError parse();
+    Err parse();
     void scorePartwise();
     void partList();
     void scorePart();
@@ -271,7 +273,7 @@ private:
     void measChordNote(/*, const MxmlPhase2Note note, ChordRest& currChord */);
     void measChordFlush(/*, ChordRest& currChord */);
     void measure(const QString& partId, const Fraction time);
-    void setMeasureRepeats(const int scoreRelStaff, Measure* measure);
+    void setMeasureRepeats(const staff_idx_t scoreRelStaff, Measure* measure);
     void attributes(const QString& partId, Measure* measure, const Fraction& tick);
     void measureStyle(Measure* measure);
     void barline(const QString& partId, Measure* measure, const Fraction& tick);
@@ -289,12 +291,12 @@ private:
     FretDiagram* frame();
     void harmony(const QString& partId, Measure* measure, const Fraction sTime);
     Accidental* accidental();
-    void beam(Beam::Mode& beamMode);
+    void beam(BeamMode& beamMode);
     void duration(Fraction& dura);
     void forward(Fraction& dura);
     void backup(Fraction& dura);
     void timeModification(Fraction& timeMod, TDuration& normalType);
-    void stem(Direction& sd, bool& nost);
+    void stem(DirectionV& sd, bool& nost);
     void doEnding(const QString& partId, Measure* measure, const QString& number, const QString& type, const QString& text);
     void staffDetails(const QString& partId);
     void staffTuning(StringData* t);
@@ -341,11 +343,12 @@ private:
     Chord* _tremStart;                            ///< Starting chord for current tremolo
     FiguredBass* _figBass;                        ///< Current figured bass element (to attach to next note)
     int _multiMeasureRestCount;
+    int _measureNumber;                           ///< Current measure number as written in the score
     MusicXmlLyricsExtend _extendedLyrics;         ///< Lyrics with "extend" requiring fixup
 
     MusicXmlSlash _measureStyleSlash;             ///< Are we inside a measure to be displayed as slashes?
 
-    int _nstaves;                                 ///< Number of staves in current part
+    size_t _nstaves;                              ///< Number of staves in current part
     std::vector<int> _measureRepeatNumMeasures;
     std::vector<int> _measureRepeatCount;
 };
@@ -399,7 +402,7 @@ private:
     QString metronome(double& r);
     void sound();
     void dynamics();
-    void handleRepeats(Measure* measure, const int track);
+    void handleRepeats(Measure* measure, const track_idx_t track);
     void skipLogCurrElem();
 };
 } // namespace Ms

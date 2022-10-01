@@ -21,8 +21,7 @@
  */
 #include "playbacktoolbarmodel.h"
 
-#include "log.h"
-#include "translation.h"
+#include "types/translatablestring.h"
 
 #include "ui/view/musicalsymbolcodes.h"
 #include "playback/playbacktypes.h"
@@ -31,7 +30,9 @@
 using namespace mu::playback;
 using namespace mu::actions;
 using namespace mu::ui;
+using namespace mu::uicomponents;
 using namespace mu::notation;
+using namespace mu::audio;
 
 static const ActionCode PLAY_ACTION_CODE("play");
 
@@ -65,8 +66,6 @@ void PlaybackToolBarModel::setupConnections()
     connect(this, &PlaybackToolBarModel::isToolbarFloatingChanged, this, &PlaybackToolBarModel::updateActions);
 
     playbackController()->isPlayAllowedChanged().onNotify(this, [this]() {
-        emit maxPlayTimeChanged();
-        updatePlayTime();
         emit isPlayAllowedChanged();
     });
 
@@ -75,7 +74,16 @@ void PlaybackToolBarModel::setupConnections()
     });
 
     playbackController()->playbackPositionChanged().onNotify(this, [this]() {
-        updatePlayTime();
+        updatePlayPosition();
+    });
+
+    playbackController()->totalPlayTimeChanged().onNotify(this, [this]() {
+        emit maxPlayTimeChanged();
+        updatePlayPosition();
+    });
+
+    playbackController()->currentTempoChanged().onNotify(this, [this]() {
+        emit tempoChanged();
     });
 }
 
@@ -85,7 +93,7 @@ void PlaybackToolBarModel::updateActions()
     MenuItemList settingsItems;
 
     for (const UiAction& action : PlaybackUiActions::settingsActions()) {
-        settingsItems << makeActionWithDescriptionAsTitle(action.code);
+        settingsItems << makeMenuItem(action.code);
     }
 
     if (!m_isToolbarFloating) {
@@ -97,14 +105,18 @@ void PlaybackToolBarModel::updateActions()
     for (const ToolConfig::Item& item : config.items) {
         if (isAdditionalAction(item.action) && !m_isToolbarFloating) {
             //! NOTE In this case, we want to see the actions' description instead of the title
-            settingsItems << makeActionWithDescriptionAsTitle(item.action);
+            settingsItems << makeMenuItem(item.action);
         } else {
             result << makeMenuItem(item.action);
         }
     }
 
-    MenuItem settingsItem = makeMenu(qtrc("action", "Playback settings"), settingsItems);
-    settingsItem.iconCode = IconCode::Code::SETTINGS_COG;
+    MenuItem* settingsItem = makeMenu(TranslatableString("action", "Playback settings"), settingsItems);
+
+    UiAction action = settingsItem->action();
+    action.iconCode = IconCode::Code::SETTINGS_COG;
+    settingsItem->setAction(action);
+
     result << settingsItem;
 
     setItems(result);
@@ -116,22 +128,17 @@ void PlaybackToolBarModel::onActionsStateChanges(const actions::ActionCodeList& 
 
     if (isPlayAllowed() && containsAction(codes, PLAY_ACTION_CODE)) {
         bool isPlaying = playbackController()->isPlaying();
-        findItem(PLAY_ACTION_CODE).iconCode = isPlaying ? IconCode::Code::PAUSE : IconCode::Code::PLAY;
-    }
 
-    emit dataChanged(index(0), index(rowCount() - 1));
+        MenuItem& item = findItem(PLAY_ACTION_CODE);
+        UiAction action = item.action();
+        action.iconCode = isPlaying ? IconCode::Code::PAUSE : IconCode::Code::PLAY;
+        item.setAction(action);
+    }
 }
 
 bool PlaybackToolBarModel::isAdditionalAction(const actions::ActionCode& actionCode) const
 {
     return PlaybackUiActions::loopBoundaryActions().contains(actionCode);
-}
-
-MenuItem PlaybackToolBarModel::makeActionWithDescriptionAsTitle(const actions::ActionCode& actionCode) const
-{
-    MenuItem item = makeMenuItem(actionCode);
-    item.title = item.description;
-    return item;
 }
 
 bool PlaybackToolBarModel::isPlayAllowed() const
@@ -173,23 +180,29 @@ void PlaybackToolBarModel::setPlayTime(const QDateTime& time)
 
     doSetPlayTime(newTime);
 
-    uint64_t msec = timeToMilliseconds(newTime);
+    msecs_t msec = timeToMilliseconds(newTime);
     rewind(msec);
 }
 
 qreal PlaybackToolBarModel::playPosition() const
 {
-    qreal allMsecs = totalPlayTimeMilliseconds();
-    qreal msecsDifference = allMsecs - m_playTime.msecsTo(totalPlayTime());
+    QTime totalTime = totalPlayTime();
+    msecs_t totalMsecs = timeToMilliseconds(totalTime);
 
-    qreal position = msecsDifference / allMsecs;
+    if (totalMsecs == 0) {
+        return 0;
+    }
+
+    msecs_t msecsDifference = totalMsecs - m_playTime.msecsTo(totalTime);
+    qreal position = static_cast<qreal>(msecsDifference) / static_cast<qreal>(totalMsecs);
+
     return position;
 }
 
 void PlaybackToolBarModel::setPlayPosition(qreal position)
 {
-    uint64_t allMsecs = totalPlayTimeMilliseconds();
-    uint64_t playPositionMsecs = allMsecs * position;
+    msecs_t totalPlayTimeMsecs = timeToMilliseconds(totalPlayTime());
+    msecs_t playPositionMsecs = totalPlayTimeMsecs * position;
 
     QTime time = timeFromMilliseconds(playPositionMsecs);
     setPlayTime(QDateTime(QDate::currentDate(), time));
@@ -200,17 +213,12 @@ QTime PlaybackToolBarModel::totalPlayTime() const
     return playbackController()->totalPlayTime();
 }
 
-uint64_t PlaybackToolBarModel::totalPlayTimeMilliseconds() const
-{
-    return timeToMilliseconds(totalPlayTime());
-}
-
 MeasureBeat PlaybackToolBarModel::measureBeat() const
 {
     return playbackController()->currentBeat();
 }
 
-void PlaybackToolBarModel::updatePlayTime()
+void PlaybackToolBarModel::updatePlayPosition()
 {
     float seconds = playbackController()->playbackPositionInSeconds();
     QTime playTime = timeFromSeconds(seconds);
@@ -225,17 +233,17 @@ void PlaybackToolBarModel::updatePlayTime()
 void PlaybackToolBarModel::doSetPlayTime(const QTime& time)
 {
     m_playTime = time;
-    emit playTimeChanged();
+    emit playPositionChanged();
 }
 
-void PlaybackToolBarModel::rewind(uint64_t milliseconds)
+void PlaybackToolBarModel::rewind(msecs_t milliseconds)
 {
-    dispatch("rewind", ActionData::make_arg1<uint64_t>(milliseconds));
+    dispatch("rewind", ActionData::make_arg1<msecs_t>(milliseconds));
 }
 
 void PlaybackToolBarModel::rewindToBeat(const MeasureBeat& beat)
 {
-    uint64_t msec = playbackController()->beatToMilliseconds(beat.measureIndex, beat.beatIndex);
+    msecs_t msec = playbackController()->beatToMilliseconds(beat.measureIndex, beat.beatIndex);
     rewind(msec);
 }
 
@@ -280,6 +288,16 @@ void PlaybackToolBarModel::setBeatNumber(int beatNumber)
     rewindToBeat(measureBeat);
 }
 
+void PlaybackToolBarModel::setTempoMultiplier(qreal multiplier)
+{
+    if (multiplier == tempoMultiplier()) {
+        return;
+    }
+
+    playbackController()->setTempoMultiplier(multiplier);
+    emit tempoChanged();
+}
+
 int PlaybackToolBarModel::maxBeatNumber() const
 {
     return measureBeat().maxBeatIndex + 1;
@@ -295,4 +313,9 @@ QVariant PlaybackToolBarModel::tempo() const
     obj["value"] = tempo.valueBpm;
 
     return obj;
+}
+
+qreal PlaybackToolBarModel::tempoMultiplier() const
+{
+    return playbackController()->tempoMultiplier();
 }

@@ -22,11 +22,11 @@
 #ifndef MU_ENGRAVING_PAGESTYLE_H
 #define MU_ENGRAVING_PAGESTYLE_H
 
-#include <QSet>
+#include <set>
 #include "styledef.h"
 
-namespace Ms {
-QSet<Sid> pageStyles();
+namespace mu::engraving {
+const std::set<Sid>& pageStyles();
 }
 
 #endif // MU_ENGRAVING_PAGESTYLE_H

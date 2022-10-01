@@ -40,7 +40,7 @@ Column {
     spacing: 12
 
     function focusOnFirst() {
-        horizontalScaleControl.focusOnFirst()
+        horizontalScaleControl.navigation.requestActive()
     }
 
     InspectorPropertyView {
@@ -53,6 +53,23 @@ Column {
         navigationPanel: root.navigationPanel
         navigationRowStart: root.navigationRowStart + 1
         navigationRowEnd: verticalScaleControl.navigation.row
+
+        isModified: root.model ? (root.model.horizontalScale.isModified
+                                  || root.model.verticalScale.isModified) : false
+
+        onRequestResetToDefault: {
+            if (root.model) {
+                root.model.horizontalScale.resetToDefault()
+                root.model.verticalScale.resetToDefault()
+            }
+        }
+
+        onRequestApplyToStyle: {
+            if (root.model) {
+                root.model.horizontalScale.applyToStyle()
+                root.model.verticalScale.applyToStyle()
+            }
+        }
 
         Item {
             height: childrenRect.height
@@ -80,7 +97,9 @@ Column {
                 navigation.row: scaleSection.navigationRowStart + 2
                 navigation.accessible.name: scaleSection.titleText + " " + qsTrc("inspector", "Horizontal") + currentValue
 
-                onValueEdited: { root.model.horizontalScale.value = newValue }
+                onValueEdited: function(newValue) {
+                    root.model.horizontalScale.value = newValue
+                }
             }
 
             IncrementalPropertyControl {
@@ -100,32 +119,31 @@ Column {
                 maxValue: 300
                 minValue: 1
 
-                navigation.name: "VeriticalScale"
+                navigation.name: "VerticalScale"
                 navigation.panel: root.navigationPanel
                 navigation.row: scaleSection.navigationRowStart + 3
                 navigation.accessible.name: scaleSection.titleText + " " + qsTrc("inspector", "Vertical") + currentValue
 
-                onValueEdited: { root.model.verticalScale.value = newValue }
+                onValueEdited: function(newValue) {
+                    root.model.verticalScale.value = newValue
+                }
             }
         }
     }
 
-    CheckBox {
-        isIndeterminate: root.model ? root.model.shouldShowCourtesy.isUndefined : false
-        checked: root.model && !isIndeterminate ? root.model.shouldShowCourtesy.value : false
+    CheckBoxPropertyView {
         text: qsTrc("inspector", "Show courtesy time signature on previous system")
+        propertyItem: root.model ? root.model.shouldShowCourtesy : null
 
         navigation.name: "ShowCourtesyCheckBox"
         navigation.panel: root.navigationPanel
         navigation.row: scaleSection.navigationRowEnd + 1
-
-        onClicked: { root.model.shouldShowCourtesy.value = !checked }
     }
 
     FlatButton {
         width: parent.width
 
-        text: qsTrc("inspector", "Change time signature")
+        text: qsTrc("inspector", "Time signature properties")
 
         navigation.name: "ChangeButton"
         navigation.panel: root.navigationPanel
